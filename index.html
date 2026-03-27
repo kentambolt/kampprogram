@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Badminton double-generator</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --panel-2: #1f2937;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --accent: #22c55e;
+            --accent-2: #38bdf8;
+            --danger: #f87171;
+            --border: #334155;
+            --warning: #f59e0b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+            color: var(--text);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+
+        .subtle {
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .panel {
+            background: rgba(17, 24, 39, 0.92);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+
+        .panel + .panel {
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        input,
+        button {
+            font: inherit;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+
+        .row-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .row-4 {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        button {
+            border: none;
+            border-radius: 10px;
+            padding: 11px 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.05s ease, opacity 0.2s ease;
+        }
+
+        button:hover { opacity: 0.95; }
+        button:active { transform: translateY(1px); }
+
+        .primary { background: var(--accent); color: #062b12; }
+        .secondary { background: var(--accent-2); color: #062235; }
+        .danger { background: var(--danger); color: #3b0a0a; }
+        .ghost { background: #334155; color: var(--text); }
+
+        .result-card {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+            background: rgba(31, 41, 55, 0.7);
+            margin-bottom: 14px;
+        }
+
+        .court-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .vs-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .team {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .team h4 {
+            margin: 0 0 8px 0;
+            color: #cbd5e1;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .player-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+        }
+
+        .player-line:last-child {
+            border-bottom: none;
+        }
+
+        .tag {
+            display: inline-block;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.16);
+            color: #bae6fd;
+        }
+
+        .score-box {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .score-tile {
+            background: rgba(31, 41, 55, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .score-tile .label {
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .score-tile .value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+
+        .bench-list, .history-list {
+            margin: 0;
+            padding-left: 18px;
+            line-height: 1.6;
+        }
+
+        .warning {
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-top: 12px;
+        }
+
+        .player-manager {
+            display: grid;
+            grid-template-columns: 1.2fr 0.5fr auto;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 12px;
+        }
+
+        .player-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .player-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 7px 10px;
+        }
+
+        .player-chip .meta {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .player-chip button {
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+        }
+
+        .status-on { color: #86efac; }
+        .status-off { color: #fca5a5; }
+
+        .mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .mini-table th,
+        .mini-table td {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            padding: 8px 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .mini-table th {
+            color: var(--muted);
+            font-weight: bold;
+        }
+
+        .settings-panel,
+        .arrival-panel {
+            display: none;
+        }
+
+        .settings-panel.open,
+        .arrival-panel.open {
+            display: block;
+        }
+
+        .arrival-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .arrival-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .arrival-item.empty {
+            grid-column: 1 / -1;
+            justify-content: flex-start;
+            color: var(--muted);
+        }
+
+        @media (max-width: 980px) {
+            .grid,
+            .row-3,
+            .row-4,
+            .score-box,
+            .vs-grid,
+            .player-manager,
+            .arrival-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Badminton double-generator</h1>
+    <p class="subtle">
+        Programmet holder styr på en fast spillerliste med hardcodede start-indstillinger, og du kan løbende markere spillere som ankommet i løbet af dagen.
+        Den bedste sammensætning vælges ud fra niveau-balance, makker-match, gentagelser fra de to seneste kampe og meget hård straf for at sidde over to kampe i træk.
+    </p>
+
+    <div class="grid">
+        <div>
+            <div class="panel">
+                <h2>Spillerstyring</h2>
+
+                <div class="player-manager">
+                    <div>
+                        <label for="newPlayerName">Navn</label>
+                        <input id="newPlayerName" type="text" placeholder="Fx Frederik" />
+                    </div>
+                    <div>
+                        <label for="newPlayerLevel">Niveau</label>
+                        <input id="newPlayerLevel" type="number" min="1" max="3" value="2" />
+                    </div>
+                    <div>
+                        <button class="secondary" id="addPlayerBtn">Tilføj spiller</button>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="secondary" id="loadDefaultsBtn">Indlæs hardcodede spillere</button>
+                    <button class="ghost" id="arrivalBtn">Meld ankomst</button>
+                </div>
+
+                <h3>Aktive spillere i dag</h3>
+                <div class="player-chip-list" id="playerRosterArea"></div>
+            </div>
+
+            <div class="panel arrival-panel" id="arrivalPanel">
+                <h2>Meld ankomst</h2>
+                <p class="subtle">Her vises kun spillere, som findes i den hardcodede liste, men som ikke er aktive endnu.</p>
+                <div class="arrival-list" id="arrivalListArea"></div>
+            </div>
+
+            <div class="panel">
+                <h2>Input</h2>
+
+                <div class="row-3">
+                    <div>
+                        <label for="courtCount">Antal baner</label>
+                        <input id="courtCount" type="number" min="1" value="2" />
+                    </div>
+                    <div>
+                        <label for="iterations">Antal random forsøg</label>
+                        <input id="iterations" type="number" min="1" step="100" value="1000" />
+                    </div>
+                    <div>
+                        <label for="seedInfo">Aktive spillere lige nu</label>
+                        <input id="seedInfo" type="text" value="0" readonly />
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="primary" id="generateBtn">Lav næste kamp</button>
+                    <button class="ghost" id="settingsBtn">Indstillinger</button>
+                    <button class="ghost" id="undoBtn">Fjern seneste kamp fra historik</button>
+                    <button class="danger" id="resetHistoryBtn">Nulstil historik</button>
+                </div>
+            </div>
+
+            <div class="panel settings-panel" id="settingsPanel">
+                <h2>Score / straf-konfiguration</h2>
+                <p class="subtle">Du kan justere vægte direkte her. Højere tal betyder større betydning i den samlede score.</p>
+
+                <div class="row-4">
+                    <div>
+                        <label for="weightTeamBalance">Straffaktor: ubalance mellem sider</label>
+                        <input id="weightTeamBalance" type="number" step="0.1" value="12" />
+                    </div>
+                    <div>
+                        <label for="weightPartnerBalance">Straffaktor: makkere med forskelligt niveau</label>
+                        <input id="weightPartnerBalance" type="number" step="0.1" value="3" />
+                    </div>
+                    <div>
+                        <label for="penaltyRepeatTeammateLast">Straf: samme makker som sidst</label>
+                        <input id="penaltyRepeatTeammateLast" type="number" step="0.1" value="10" />
+                    </div>
+                    <div>
+                        <label for="penaltyRepeatTeammatePrev">Straf: samme makker som forrige</label>
+                        <input id="penaltyRepeatTeammatePrev" type="number" step="0.1" value="6" />
+                    </div>
+                </div>
+
+                <div class="row-4">
+                    <div>
+                        <label for="penaltyRepeatOpponentLast">Straf: samme modstander som sidst</label>
+                        <input id="penaltyRepeatOpponentLast" type="number" step="0.1" value="5" />
+                    </div>
+                    <div>
+                        <label for="penaltyRepeatOpponentPrev">Straf: samme modstander som forrige</label>
+                        <input id="penaltyRepeatOpponentPrev" type="number" step="0.1" value="2.5" />
+                    </div>
+                    <div>
+                        <label for="weightUnusedPlayers">Straffaktor: spillere på bænken</label>
+                        <input id="weightUnusedPlayers" type="number" step="0.1" value="0.2" />
+                    </div>
+                    <div>
+                        <label for="bonusPerfectBalance">Bonus: helt lige bane</label>
+                        <input id="bonusPerfectBalance" type="number" step="0.1" value="4" />
+                    </div>
+                </div>
+
+                <div class="row-4">
+                    <div>
+                        <label for="penaltyBenchLast">Straf: samme spiller sidder over som sidst</label>
+                        <input id="penaltyBenchLast" type="number" step="1" value="500" />
+                    </div>
+                    <div>
+                        <label for="penaltyBenchPrev">Straf: samme spiller sidder over som forrige</label>
+                        <input id="penaltyBenchPrev" type="number" step="1" value="120" />
+                    </div>
+                    <div>
+                        <label for="bonusNeverBenched">Bonus: spiller undgår bænken efter at have siddet over</label>
+                        <input id="bonusNeverBenched" type="number" step="0.1" value="10" />
+                    </div>
+                    <div>
+                        <label for="iterationsBoostInfo">Bemærkning</label>
+                        <input id="iterationsBoostInfo" type="text" value="500 gør gentagen bænk næsten umulig" readonly />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="panel">
+                <h2>Resultat</h2>
+
+                <div class="score-box">
+                    <div class="score-tile">
+                        <div class="label">Samlet score</div>
+                        <div class="value" id="totalScore">-</div>
+                    </div>
+                    <div class="score-tile">
+                        <div class="label">Baner i brug</div>
+                        <div class="value" id="courtsUsed">-</div>
+                    </div>
+                    <div class="score-tile">
+                        <div class="label">Testede opstillinger</div>
+                        <div class="value" id="triesUsed">-</div>
+                    </div>
+                </div>
+
+                <div id="resultArea">
+                    <p class="subtle">Tryk på <strong>Lav næste kamp</strong> for at generere en opstilling.</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Status på spillere</h2>
+                <div id="playerStatsArea" class="subtle">Ingen data endnu.</div>
+            </div>
+
+            <div class="panel">
+                <h2>Historik</h2>
+                <div id="historyArea" class="subtle">Ingen kampe endnu.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const DEFAULT_PLAYERS = [
+        { name: 'Anders', level: 3, active: true },
+        { name: 'Mads', level: 3, active: true },
+        { name: 'Jonas', level: 2, active: true },
+        { name: 'Kasper', level: 2, active: true },
+        { name: 'Lars', level: 2, active: true },
+        { name: 'Mikkel', level: 2, active: true },
+        { name: 'Rasmus', level: 1, active: true },
+        { name: 'Nicolai', level: 1, active: true },
+        { name: 'Simon', level: 1, active: false },
+        { name: 'Thomas', level: 3, active: false },
+        { name: 'Frederik', level: 2, active: false },
+        { name: 'Peter', level: 1, active: false }
+    ];
+
+    const state = {
+        roster: [],
+        history: [],
+        lastResult: null
+    };
+
+    const el = {
+        playerRosterArea: document.getElementById('playerRosterArea'),
+        playerStatsArea: document.getElementById('playerStatsArea'),
+        arrivalListArea: document.getElementById('arrivalListArea'),
+        arrivalPanel: document.getElementById('arrivalPanel'),
+        arrivalBtn: document.getElementById('arrivalBtn'),
+        newPlayerName: document.getElementById('newPlayerName'),
+        newPlayerLevel: document.getElementById('newPlayerLevel'),
+        addPlayerBtn: document.getElementById('addPlayerBtn'),
+        courtCount: document.getElementById('courtCount'),
+        iterations: document.getElementById('iterations'),
+        seedInfo: document.getElementById('seedInfo'),
+        weightTeamBalance: document.getElementById('weightTeamBalance'),
+        weightPartnerBalance: document.getElementById('weightPartnerBalance'),
+        penaltyRepeatTeammateLast: document.getElementById('penaltyRepeatTeammateLast'),
+        penaltyRepeatTeammatePrev: document.getElementById('penaltyRepeatTeammatePrev'),
+        penaltyRepeatOpponentLast: document.getElementById('penaltyRepeatOpponentLast'),
+        penaltyRepeatOpponentPrev: document.getElementById('penaltyRepeatOpponentPrev'),
+        weightUnusedPlayers: document.getElementById('weightUnusedPlayers'),
+        bonusPerfectBalance: document.getElementById('bonusPerfectBalance'),
+        penaltyBenchLast: document.getElementById('penaltyBenchLast'),
+        penaltyBenchPrev: document.getElementById('penaltyBenchPrev'),
+        bonusNeverBenched: document.getElementById('bonusNeverBenched'),
+        settingsBtn: document.getElementById('settingsBtn'),
+        settingsPanel: document.getElementById('settingsPanel'),
+        generateBtn: document.getElementById('generateBtn'),
+        loadDefaultsBtn: document.getElementById('loadDefaultsBtn'),
+        resetHistoryBtn: document.getElementById('resetHistoryBtn'),
+        undoBtn: document.getElementById('undoBtn'),
+        resultArea: document.getElementById('resultArea'),
+        historyArea: document.getElementById('historyArea'),
+        totalScore: document.getElementById('totalScore'),
+        courtsUsed: document.getElementById('courtsUsed'),
+        triesUsed: document.getElementById('triesUsed')
+    };
+
+    function clonePlayers(players) {
+        return players.map(player => ({ ...player }));
+    }
+
+    function normalizeName(name) {
+        return String(name || '').trim();
+    }
+
+    function loadDefaults() {
+        state.roster = clonePlayers(DEFAULT_PLAYERS);
+        renderRoster();
+        renderArrivalList();
+        renderPlayerStats();
+    }
+
+    function getActivePlayers() {
+        return state.roster.filter(player => player.active);
+    }
+
+    function getInactivePlayers() {
+        return state.roster.filter(player => !player.active);
+    }
+
+    function getConfig() {
+        return {
+            teamBalanceWeight: Number(el.weightTeamBalance.value),
+            partnerBalanceWeight: Number(el.weightPartnerBalance.value),
+            teammateLastPenalty: Number(el.penaltyRepeatTeammateLast.value),
+            teammatePrevPenalty: Number(el.penaltyRepeatTeammatePrev.value),
+            opponentLastPenalty: Number(el.penaltyRepeatOpponentLast.value),
+            opponentPrevPenalty: Number(el.penaltyRepeatOpponentPrev.value),
+            unusedPlayersWeight: Number(el.weightUnusedPlayers.value),
+            perfectBalanceBonus: Number(el.bonusPerfectBalance.value),
+            benchLastPenalty: Number(el.penaltyBenchLast.value),
+            benchPrevPenalty: Number(el.penaltyBenchPrev.value),
+            benchReturnBonus: Number(el.bonusNeverBenched.value)
+        };
+    }
+
+    function shuffle(arr) {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    function pairKey(a, b) {
+        return [a, b].sort().join('::');
+    }
+
+    function buildRelationMaps(round) {
+        const teammatePairs = new Set();
+        const opponentPairs = new Set();
+
+        for (const court of round.courts) {
+            const [a1, a2] = court.teamA.players;
+            const [b1, b2] = court.teamB.players;
+
+            teammatePairs.add(pairKey(a1.name, a2.name));
+            teammatePairs.add(pairKey(b1.name, b2.name));
+
+            const opponents = [
+                [a1.name, b1.name], [a1.name, b2.name],
+                [a2.name, b1.name], [a2.name, b2.name]
+            ];
+            for (const [x, y] of opponents) {
+                opponentPairs.add(pairKey(x, y));
+            }
+        }
+
+        return { teammatePairs, opponentPairs, benched: new Set(round.benched.map(player => player.name)) };
+    }
+
+    function createRandomRound(players, courtCount) {
+        const shuffled = shuffle(players);
+        const maxPlayers = Math.min(courtCount * 4, shuffled.length);
+        const selected = shuffled.slice(0, maxPlayers);
+        const benched = shuffled.slice(maxPlayers);
+        const courts = [];
+
+        for (let i = 0; i < selected.length; i += 4) {
+            const group = selected.slice(i, i + 4);
+            if (group.length < 4) break;
+
+            const arrangements = [
+                { teamA: [group[0], group[1]], teamB: [group[2], group[3]] },
+                { teamA: [group[0], group[2]], teamB: [group[1], group[3]] },
+                { teamA: [group[0], group[3]], teamB: [group[1], group[2]] }
+            ];
+
+            const chosen = arrangements[Math.floor(Math.random() * arrangements.length)];
+            courts.push({
+                teamA: {
+                    players: chosen.teamA,
+                    totalLevel: chosen.teamA.reduce((sum, p) => sum + p.level, 0)
+                },
+                teamB: {
+                    players: chosen.teamB,
+                    totalLevel: chosen.teamB.reduce((sum, p) => sum + p.level, 0)
+                }
+            });
+        }
+
+        return { courts, benched };
+    }
+
+    function scoreBenchRotation(round, history, config, breakdown) {
+        let scoreDelta = 0;
+        const lastRound = history[history.length - 1] || null;
+        const prevRound = history[history.length - 2] || null;
+        const lastBenched = new Set(lastRound ? lastRound.benched.map(player => player.name) : []);
+        const prevBenched = new Set(prevRound ? prevRound.benched.map(player => player.name) : []);
+        const currentBench = new Set(round.benched.map(player => player.name));
+
+        for (const player of round.benched) {
+            const benchPenalty = player.level * config.unusedPlayersWeight;
+            scoreDelta -= benchPenalty;
+            breakdown.benchPenalty += benchPenalty;
+
+            if (lastBenched.has(player.name)) {
+                scoreDelta -= config.benchLastPenalty;
+                breakdown.benchRepeatPenalty += config.benchLastPenalty;
+            }
+            if (prevBenched.has(player.name)) {
+                scoreDelta -= config.benchPrevPenalty;
+                breakdown.benchRepeatPenalty += config.benchPrevPenalty;
+            }
+        }
+
+        if (lastRound) {
+            const playingNow = new Set(round.courts.flatMap(court => [
+                court.teamA.players[0].name,
+                court.teamA.players[1].name,
+                court.teamB.players[0].name,
+                court.teamB.players[1].name
+            ]));
+
+            for (const benchedName of lastBenched) {
+                if (!currentBench.has(benchedName) && playingNow.has(benchedName)) {
+                    scoreDelta += config.benchReturnBonus;
+                    breakdown.benchReturnBonus += config.benchReturnBonus;
+                }
+            }
+        }
+
+        return scoreDelta;
+    }
+
+    function scoreRound(round, history, config) {
+        let score = 0;
+        const breakdown = {
+            teamBalancePenalty: 0,
+            partnerPenalty: 0,
+            teammateRepeatPenalty: 0,
+            opponentRepeatPenalty: 0,
+            benchPenalty: 0,
+            benchRepeatPenalty: 0,
+            benchReturnBonus: 0,
+            perfectBalanceBonus: 0
+        };
+
+        const lastRound = history[history.length - 1] || null;
+        const prevRound = history[history.length - 2] || null;
+        const lastMaps = lastRound ? buildRelationMaps(lastRound) : null;
+        const prevMaps = prevRound ? buildRelationMaps(prevRound) : null;
+
+        for (const court of round.courts) {
+            const sumA = court.teamA.totalLevel;
+            const sumB = court.teamB.totalLevel;
+            const teamDiff = Math.abs(sumA - sumB);
+            const partnerDiffA = Math.abs(court.teamA.players[0].level - court.teamA.players[1].level);
+            const partnerDiffB = Math.abs(court.teamB.players[0].level - court.teamB.players[1].level);
+
+            const teamPenalty = teamDiff * config.teamBalanceWeight;
+            const partnerPenalty = (partnerDiffA + partnerDiffB) * config.partnerBalanceWeight;
+
+            score -= teamPenalty;
+            score -= partnerPenalty;
+            breakdown.teamBalancePenalty += teamPenalty;
+            breakdown.partnerPenalty += partnerPenalty;
+
+            if (teamDiff === 0) {
+                score += config.perfectBalanceBonus;
+                breakdown.perfectBalanceBonus += config.perfectBalanceBonus;
+            }
+
+            const teammatePairs = [
+                pairKey(court.teamA.players[0].name, court.teamA.players[1].name),
+                pairKey(court.teamB.players[0].name, court.teamB.players[1].name)
+            ];
+
+            for (const key of teammatePairs) {
+                if (lastMaps?.teammatePairs.has(key)) {
+                    score -= config.teammateLastPenalty;
+                    breakdown.teammateRepeatPenalty += config.teammateLastPenalty;
+                }
+                if (prevMaps?.teammatePairs.has(key)) {
+                    score -= config.teammatePrevPenalty;
+                    breakdown.teammateRepeatPenalty += config.teammatePrevPenalty;
+                }
+            }
+
+            const opponents = [
+                [court.teamA.players[0].name, court.teamB.players[0].name],
+                [court.teamA.players[0].name, court.teamB.players[1].name],
+                [court.teamA.players[1].name, court.teamB.players[0].name],
+                [court.teamA.players[1].name, court.teamB.players[1].name]
+            ];
+
+            for (const [x, y] of opponents) {
+                const key = pairKey(x, y);
+                if (lastMaps?.opponentPairs.has(key)) {
+                    score -= config.opponentLastPenalty;
+                    breakdown.opponentRepeatPenalty += config.opponentLastPenalty;
+                }
+                if (prevMaps?.opponentPairs.has(key)) {
+                    score -= config.opponentPrevPenalty;
+                    breakdown.opponentRepeatPenalty += config.opponentPrevPenalty;
+                }
+            }
+        }
+
+        score += scoreBenchRotation(round, history, config, breakdown);
+
+        return { score, breakdown };
+    }
+
+    function findBestRound(players, courtCount, iterations, history, config) {
+        let best = null;
+
+        for (let i = 0; i < iterations; i++) {
+            const round = createRandomRound(players, courtCount);
+            const scored = scoreRound(round, history, config);
+            const candidate = { ...round, ...scored, iteration: i + 1 };
+
+            if (!best || candidate.score > best.score) {
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    function getPlayerStats() {
+        return state.roster.map(player => {
+            let played = 0;
+            let benched = 0;
+            let benchedLast = false;
+            let benchedPrev = false;
+
+            state.history.forEach((round, index) => {
+                const onBench = round.benched.some(p => p.name === player.name);
+                const onCourt = round.courts.some(court =>
+                    [...court.teamA.players, ...court.teamB.players].some(p => p.name === player.name)
+                );
+
+                if (onBench) benched += 1;
+                if (onCourt) played += 1;
+
+                if (index === state.history.length - 1) benchedLast = onBench;
+                if (index === state.history.length - 2) benchedPrev = onBench;
+            });
+
+            return {
+                ...player,
+                played,
+                benched,
+                benchedLast,
+                benchedPrev
+            };
+        });
+    }
+
+    function renderRoster() {
+        const activePlayers = getActivePlayers();
+
+        if (activePlayers.length === 0) {
+            el.playerRosterArea.innerHTML = '<div class="subtle">Ingen aktive spillere endnu.</div>';
+            el.seedInfo.value = '0';
+            return;
+        }
+
+        el.playerRosterArea.innerHTML = activePlayers.map(player => {
+            const index = state.roster.findIndex(p => p.name === player.name);
+            return `
+          <div class="player-chip">
+            <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">Niveau ${player.level}</span></span>
+            <span class="meta status-on">Aktiv</span>
+            <button class="danger" onclick="removePlayer(${index})">Fjern</button>
+          </div>
+        `;
+        }).join('');
+
+        el.seedInfo.value = String(activePlayers.length);
+    }
+
+    function renderArrivalList() {
+        const inactivePlayers = getInactivePlayers();
+
+        if (inactivePlayers.length === 0) {
+            el.arrivalListArea.innerHTML = '<div class="arrival-item empty">Alle spillere er allerede aktive.</div>';
+            return;
+        }
+
+        el.arrivalListArea.innerHTML = inactivePlayers.map(player => {
+            const index = state.roster.findIndex(p => p.name === player.name);
+            return `
+          <div class="arrival-item">
+            <div>
+              <strong>${escapeHtml(player.name)}</strong><br>
+              <span class="meta">Niveau ${player.level}</span>
+            </div>
+            <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
+          </div>
+        `;
+        }).join('');
+    }
+
+    function renderPlayerStats() {
+        const stats = getPlayerStats();
+        if (stats.length === 0) {
+            el.playerStatsArea.innerHTML = '<div class="subtle">Ingen data endnu.</div>';
+            return;
+        }
+
+        el.playerStatsArea.innerHTML = `
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Spiller</th>
+              <th>Status</th>
+              <th>Spillet</th>
+              <th>Sidder over</th>
+              <th>Seneste bænk</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.map(player => `
+              <tr>
+                <td>${escapeHtml(player.name)} (N${player.level})</td>
+                <td>${player.active ? 'Aktiv' : 'Ikke ankommet'}</td>
+                <td>${player.played}</td>
+                <td>${player.benched}</td>
+                <td>
+                  ${player.benchedLast ? 'Sidst' : '-'}
+                  ${player.benchedPrev ? (player.benchedLast ? ' + forrige' : 'Forrige') : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderRound(result, iterations) {
+        el.totalScore.textContent = result.score.toFixed(1);
+        el.courtsUsed.textContent = String(result.courts.length);
+        el.triesUsed.textContent = String(iterations);
+
+        let html = '';
+
+        if (result.courts.length === 0) {
+            html += '<p class="warning">Der var ikke nok aktive spillere til at fylde en bane.</p>';
+        }
+
+        result.courts.forEach((court, index) => {
+            html += `
+          <div class="result-card">
+            <div class="court-title">
+              <span>Bane ${index + 1}</span>
+              <span class="tag">Samlet niveau: ${court.teamA.totalLevel} vs ${court.teamB.totalLevel}</span>
+            </div>
+            <div class="vs-grid">
+              <div class="team">
+                <h4>Hold A</h4>
+                ${court.teamA.players.map(player => `
+                  <div class="player-line">
+                    <span>${escapeHtml(player.name)}</span>
+                    <span>Niveau ${player.level}</span>
+                  </div>
+                `).join('')}
+              </div>
+              <div><strong>VS</strong></div>
+              <div class="team">
+                <h4>Hold B</h4>
+                ${court.teamB.players.map(player => `
+                  <div class="player-line">
+                    <span>${escapeHtml(player.name)}</span>
+                    <span>Niveau ${player.level}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+        });
+
+        if (result.benched.length > 0) {
+            html += `
+          <div class="result-card">
+            <h3>Sidder over</h3>
+            <ul class="bench-list">
+              ${result.benched.map(p => `<li>${escapeHtml(p.name)} (niveau ${p.level})</li>`).join('')}
+            </ul>
+          </div>
+        `;
+        }
+
+        html += `
+        <div class="result-card">
+          <h3>Score-forklaring</h3>
+          <ul class="history-list">
+            <li>Straf for ubalance mellem sider: ${result.breakdown.teamBalancePenalty.toFixed(1)}</li>
+            <li>Straf for makkere med forskelligt niveau: ${result.breakdown.partnerPenalty.toFixed(1)}</li>
+            <li>Straf for gentagne makkere: ${result.breakdown.teammateRepeatPenalty.toFixed(1)}</li>
+            <li>Straf for gentagne modstandere: ${result.breakdown.opponentRepeatPenalty.toFixed(1)}</li>
+            <li>Grundstraf for spillere på bænken: ${result.breakdown.benchPenalty.toFixed(1)}</li>
+            <li>Ekstra straf for samme spiller på bænken igen: ${result.breakdown.benchRepeatPenalty.toFixed(1)}</li>
+            <li>Bonus for spillere der kommer ind efter at have siddet over: ${result.breakdown.benchReturnBonus.toFixed(1)}</li>
+            <li>Bonus for helt lige baner: ${result.breakdown.perfectBalanceBonus.toFixed(1)}</li>
+          </ul>
+        </div>
+      `;
+
+        el.resultArea.innerHTML = html;
+    }
+
+    function renderHistory() {
+        if (state.history.length === 0) {
+            el.historyArea.innerHTML = '<div class="subtle">Ingen kampe endnu.</div>';
+            return;
+        }
+
+        const recent = state.history.slice(-6).reverse();
+        el.historyArea.innerHTML = recent.map((round, idx) => {
+            const roundNo = state.history.length - idx;
+            return `
+          <div class="result-card">
+            <div class="court-title">
+              <span>Kamp ${roundNo}</span>
+              <span class="tag">Score ${round.score.toFixed(1)}</span>
+            </div>
+            <ul class="history-list">
+              ${round.courts.map((court, i) => `
+                <li>
+                  Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} + ${escapeHtml(court.teamA.players[1].name)}
+                  mod
+                  ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
+                </li>
+              `).join('')}
+              ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} (${p.level})`).join(', ')}</li>` : ''}
+            </ul>
+          </div>
+        `;
+        }).join('');
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function addPlayer() {
+        const name = normalizeName(el.newPlayerName.value);
+        const level = Number(el.newPlayerLevel.value);
+
+        if (!name) {
+            el.resultArea.innerHTML = '<div class="warning">Skriv et navn før du tilføjer spilleren.</div>';
+            return;
+        }
+        if (![1, 2, 3].includes(level)) {
+            el.resultArea.innerHTML = '<div class="warning">Niveau skal være 1, 2 eller 3.</div>';
+            return;
+        }
+        if (state.roster.some(player => player.name.toLowerCase() === name.toLowerCase())) {
+            el.resultArea.innerHTML = `<div class="warning">Spilleren ${escapeHtml(name)} findes allerede.</div>`;
+            return;
+        }
+
+        state.roster.push({ name, level, active: true });
+        el.newPlayerName.value = '';
+        el.newPlayerLevel.value = '2';
+        renderRoster();
+        renderArrivalList();
+        renderPlayerStats();
+    }
+
+    function markArrived(index) {
+        const player = state.roster[index];
+        if (!player) return;
+        player.active = true;
+        renderRoster();
+        renderArrivalList();
+        renderPlayerStats();
+    }
+
+    function removePlayer(index) {
+        const player = state.roster[index];
+        if (!player) return;
+        const confirmed = window.confirm(`Vil du virkelig fjerne ${player.name}?`);
+        if (!confirmed) return;
+        state.roster.splice(index, 1);
+        renderRoster();
+        renderArrivalList();
+        renderPlayerStats();
+    }
+
+    window.markArrived = markArrived;
+    window.removePlayer = removePlayer;
+
+    function generateRound() {
+        try {
+            const players = getActivePlayers();
+            const courtCount = Math.max(1, Number(el.courtCount.value) || 1);
+            const iterations = Math.max(1, Number(el.iterations.value) || 1000);
+            const config = getConfig();
+
+            if (players.length < 4) {
+                throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Tilføj flere spillere, markér spillere som ankommet, eller indlæs de hardcodede startspillere.');
+            }
+
+            const best = findBestRound(players, courtCount, iterations, state.history, config);
+
+            if (!best) {
+                throw new Error('Kunne ikke finde en gyldig opstilling.');
+            }
+
+            state.lastResult = best;
+            state.history.push(best);
+            renderRound(best, iterations);
+            renderHistory();
+            renderPlayerStats();
+        } catch (err) {
+            el.resultArea.innerHTML = `<div class="warning">${escapeHtml(err.message)}</div>`;
+        }
+    }
+
+    function resetHistory() {
+        state.history = [];
+        state.lastResult = null;
+        renderHistory();
+        renderPlayerStats();
+        el.totalScore.textContent = '-';
+        el.courtsUsed.textContent = '-';
+        el.triesUsed.textContent = '-';
+        el.resultArea.innerHTML = '<p class="subtle">Historikken er nulstillet. Generér en ny kamp.</p>';
+    }
+
+    function undoLastRound() {
+        if (state.history.length === 0) return;
+        state.history.pop();
+        renderHistory();
+        renderPlayerStats();
+        el.resultArea.innerHTML = '<p class="subtle">Seneste kamp er fjernet fra historikken.</p>';
+        el.totalScore.textContent = '-';
+        el.courtsUsed.textContent = '-';
+        el.triesUsed.textContent = '-';
+    }
+
+    el.loadDefaultsBtn.addEventListener('click', loadDefaults);
+    el.addPlayerBtn.addEventListener('click', addPlayer);
+    el.arrivalBtn.addEventListener('click', () => {
+        el.arrivalPanel.classList.toggle('open');
+    });
+    el.settingsBtn.addEventListener('click', () => {
+        el.settingsPanel.classList.toggle('open');
+    });
+    el.generateBtn.addEventListener('click', generateRound);
+    el.resetHistoryBtn.addEventListener('click', resetHistory);
+    el.undoBtn.addEventListener('click', undoLastRound);
+
+    loadDefaults();
+    renderHistory();
+    renderPlayerStats();
+</script>
+</body>
+</html>
