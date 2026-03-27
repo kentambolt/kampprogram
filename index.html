@@ -343,12 +343,6 @@
 </head>
 <body>
 <div class="container">
-    <h1>Badminton double-generator</h1>
-    <p class="subtle">
-        Programmet holder styr på en fast spillerliste med hardcodede start-indstillinger, og du kan løbende markere spillere som ankommet i løbet af dagen.
-        Spillere med betalt kontingent bliver prioriteret højere til spil, fordi straf for at sidde over er markant større for dem end for spillere uden betalt kontingent.
-    </p>
-
     <div class="grid">
         <div>
             <div class="panel">
@@ -537,14 +531,14 @@
 
 <script>
     const DEFAULT_PLAYERS = [
-        { name: 'Esben', level: 3, active: true, paid: true },
-        { name: 'Palle', level: 3, active: true, paid: true },
-        { name: 'Ditte', level: 1, active: true, paid: true },
-        { name: 'Lene', level: 1, active: true, paid: true },
-        { name: 'Mette', level: 1, active: true, paid: true },
-        { name: 'Dishaan', level: 3, active: true, paid: true },
-        { name: 'Karina', level: 2, active: true, paid: true },
-        { name: 'Martin', level: 3, active: true, paid: true },
+        { name: 'Esben', level: 3, active: false, paid: true },
+        { name: 'Palle', level: 3, active: false, paid: true },
+        { name: 'Ditte', level: 1, active: false, paid: true },
+        { name: 'Lene', level: 1, active: false, paid: true },
+        { name: 'Mette', level: 1, active: false, paid: true },
+        { name: 'Dishaan', level: 3, active: false, paid: true },
+        { name: 'Karina', level: 2, active: false, paid: true },
+        { name: 'Martin', level: 3, active: false, paid: true },
         { name: 'Paw', level: 3, active: false, paid: true },
         { name: 'Kent', level: 3, active: false, paid: true },
         { name: 'Jonas', level: 3, active: false, paid: true },
@@ -915,7 +909,7 @@
             const index = state.roster.findIndex(p => p.name === player.name);
             return `
           <div class="player-chip">
-            <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">Niveau ${player.level}</span></span>
+            <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">${player.level}</span></span>
             <span class="tag ${player.paid ? 'tag-paid' : 'tag-unpaid'}">${player.paid ? 'Kontingent betalt' : 'Ikke betalt'}</span>
             <span class="meta status-on">Aktiv</span>
             <button class="danger" onclick="removePlayer(${index})">Fjern</button>
@@ -1116,7 +1110,7 @@
             return;
         }
 
-        state.roster.push({ name, level, active: true, paid });
+        state.roster.push({ name, level, active: false, paid });
         el.newPlayerName.value = '';
         el.newPlayerLevel.value = '2';
         el.newPlayerPaid.value = 'yes';
