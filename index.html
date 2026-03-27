@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Badminton double-generator</title>
     <style>
         :root {
@@ -18,7 +18,9 @@
             --warning: #f59e0b;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body {
             margin: 0;
@@ -66,7 +68,7 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 18px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
 
         .panel + .panel {
@@ -126,13 +128,33 @@
             transition: transform 0.05s ease, opacity 0.2s ease;
         }
 
-        button:hover { opacity: 0.95; }
-        button:active { transform: translateY(1px); }
+        button:hover {
+            opacity: 0.95;
+        }
 
-        .primary { background: var(--accent); color: #062b12; }
-        .secondary { background: var(--accent-2); color: #062235; }
-        .danger { background: var(--danger); color: #3b0a0a; }
-        .ghost { background: #334155; color: var(--text); }
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .primary {
+            background: var(--accent);
+            color: #062b12;
+        }
+
+        .secondary {
+            background: var(--accent-2);
+            color: #062235;
+        }
+
+        .danger {
+            background: var(--danger);
+            color: #3b0a0a;
+        }
+
+        .ghost {
+            background: #334155;
+            color: var(--text);
+        }
 
         .result-card {
             border: 1px solid var(--border);
@@ -261,7 +283,7 @@
             padding: 7px 10px;
         }
 
-        .player-chip .meta {
+        .level {
             color: var(--muted);
             font-size: 12px;
         }
@@ -348,18 +370,11 @@
                 <div class="player-manager">
                     <div>
                         <label for="newPlayerName">Navn</label>
-                        <input id="newPlayerName" type="text" placeholder="Fx Frederik" />
+                        <input id="newPlayerName" type="text" placeholder="Fx Frederik"/>
                     </div>
                     <div>
                         <label for="newPlayerLevel">Niveau</label>
-                        <input id="newPlayerLevel" type="number" min="1" max="3" value="2" />
-                    </div>
-                    <div>
-                        <label for="newPlayerPaid">Kontingent</label>
-                        <select id="newPlayerPaid">
-                            <option value="yes">Betalt</option>
-                            <option value="no">Ikke betalt</option>
-                        </select>
+                        <input id="newPlayerLevel" type="number" min="1" max="3" value="2"/>
                     </div>
                     <div>
                         <button class="secondary" id="addPlayerBtn">Tilføj spiller</button>
@@ -386,15 +401,15 @@
                 <div class="row-3">
                     <div>
                         <label for="courtCount">Antal baner</label>
-                        <input id="courtCount" type="number" min="1" value="2" />
+                        <input id="courtCount" type="number" min="1" value="2"/>
                     </div>
                     <div>
                         <label for="iterations">Antal random forsøg</label>
-                        <input id="iterations" type="number" min="1" step="100" value="1000" />
+                        <input id="iterations" type="number" min="1" step="100" value="1000"/>
                     </div>
                     <div>
                         <label for="seedInfo">Aktive spillere lige nu</label>
-                        <input id="seedInfo" type="text" value="0" readonly />
+                        <input id="seedInfo" type="text" value="0" readonly/>
                     </div>
                 </div>
 
@@ -408,77 +423,51 @@
 
             <div class="panel settings-panel" id="settingsPanel">
                 <h2>Score / straf-konfiguration</h2>
-                <p class="subtle">Du kan justere vægte direkte her. Højere tal betyder større betydning i den samlede score.</p>
+                <p class="subtle">Du kan justere vægte direkte her. Højere tal betyder større betydning i den samlede
+                    score.</p>
 
                 <div class="row-4">
                     <div>
                         <label for="weightTeamBalance">Straffaktor: ubalance mellem sider</label>
-                        <input id="weightTeamBalance" type="number" step="0.1" value="12" />
+                        <input id="weightTeamBalance" type="number" step="0.1" value="12"/>
                     </div>
                     <div>
                         <label for="weightPartnerBalance">Straffaktor: makkere med forskelligt niveau</label>
-                        <input id="weightPartnerBalance" type="number" step="0.1" value="3" />
+                        <input id="weightPartnerBalance" type="number" step="0.1" value="3"/>
                     </div>
                     <div>
                         <label for="penaltyRepeatTeammateLast">Straf: samme makker som sidst</label>
-                        <input id="penaltyRepeatTeammateLast" type="number" step="0.1" value="10" />
+                        <input id="penaltyRepeatTeammateLast" type="number" step="0.1" value="10"/>
                     </div>
                     <div>
                         <label for="penaltyRepeatTeammatePrev">Straf: samme makker som forrige</label>
-                        <input id="penaltyRepeatTeammatePrev" type="number" step="0.1" value="6" />
+                        <input id="penaltyRepeatTeammatePrev" type="number" step="0.1" value="6"/>
                     </div>
                 </div>
 
                 <div class="row-4">
                     <div>
                         <label for="penaltyRepeatOpponentLast">Straf: samme modstander som sidst</label>
-                        <input id="penaltyRepeatOpponentLast" type="number" step="0.1" value="5" />
+                        <input id="penaltyRepeatOpponentLast" type="number" step="0.1" value="5"/>
                     </div>
                     <div>
                         <label for="penaltyRepeatOpponentPrev">Straf: samme modstander som forrige</label>
-                        <input id="penaltyRepeatOpponentPrev" type="number" step="0.1" value="2.5" />
+                        <input id="penaltyRepeatOpponentPrev" type="number" step="0.1" value="2.5"/>
                     </div>
                     <div>
-                        <label for="weightUnusedPlayers">Grundstraffaktor: spillere på bænken</label>
-                        <input id="weightUnusedPlayers" type="number" step="0.1" value="0.2" />
-                    </div>
-                    <div>
-                        <label for="bonusPerfectBalance">Bonus: helt lige bane</label>
-                        <input id="bonusPerfectBalance" type="number" step="0.1" value="4" />
+                        <label for="weightBenchPenalty">Grundstraffaktor: spillere på bænken</label>
+                        <input id="weightBenchPenalty" type="number" step="0.1" value="0.2"/>
                     </div>
                 </div>
 
                 <div class="row-4">
                     <div>
                         <label for="penaltyBenchLast">Straf: samme spiller sidder over som sidst</label>
-                        <input id="penaltyBenchLast" type="number" step="1" value="500" />
+                        <input id="penaltyBenchLast" type="number" step="1" value="500"/>
                     </div>
                     <div>
                         <label for="penaltyBenchPrev">Straf: samme spiller sidder over som forrige</label>
-                        <input id="penaltyBenchPrev" type="number" step="1" value="120" />
-                    </div>
-                    <div>
-                        <label for="bonusNeverBenched">Bonus: spiller undgår bænken efter at have siddet over</label>
-                        <input id="bonusNeverBenched" type="number" step="0.1" value="10" />
-                    </div>
-                </div>
-
-                <div class="row-4">
-                    <div>
-                        <label for="paidBenchMultiplier">Multiplier: betalt kontingent på bænken</label>
-                        <input id="paidBenchMultiplier" type="number" step="0.1" value="2.5" />
-                    </div>
-                    <div>
-                        <label for="unpaidBenchMultiplier">Multiplier: ikke betalt kontingent på bænken</label>
-                        <input id="unpaidBenchMultiplier" type="number" step="0.1" value="0.4" />
-                    </div>
-                    <div>
-                        <label for="paidRepeatBenchMultiplier">Multiplier: gentagen bænk for betalt kontingent</label>
-                        <input id="paidRepeatBenchMultiplier" type="number" step="0.1" value="1.5" />
-                    </div>
-                    <div>
-                        <label for="unpaidRepeatBenchMultiplier">Multiplier: gentagen bænk for ikke betalt kontingent</label>
-                        <input id="unpaidRepeatBenchMultiplier" type="number" step="0.1" value="0.25" />
+                        <input id="penaltyBenchPrev" type="number" step="1" value="120"/>
                     </div>
                 </div>
             </div>
@@ -523,34 +512,34 @@
 
 <script>
     const DEFAULT_PLAYERS = [
-        { name: 'Esben', level: 3, active: false, paid: true },
-        { name: 'Palle', level: 3, active: false, paid: true },
-        { name: 'Ditte', level: 1, active: false, paid: true },
-        { name: 'Lene', level: 1, active: false, paid: true },
-        { name: 'Mette', level: 1, active: false, paid: true },
-        { name: 'Dishaan', level: 3, active: false, paid: true },
-        { name: 'Karina', level: 2, active: false, paid: true },
-        { name: 'Martin', level: 3, active: false, paid: true },
-        { name: 'Paw', level: 3, active: false, paid: true },
-        { name: 'Kent', level: 3, active: false, paid: true },
-        { name: 'Jonas', level: 3, active: false, paid: true },
-        { name: 'Mads', level: 2, active: false, paid: true },
-        { name: 'Mona', level: 2, active: false, paid: true },
-        { name: 'Peter', level: 2, active: false, paid: true },
-        { name: 'Louise', level: 2, active: false, paid: true },
-        { name: 'Thor', level: 2, active: false, paid: true },
-        { name: 'Ioana', level: 2, active: false, paid: true },
-        { name: 'Christoffer', level: 3, active: false, paid: true },
-        { name: 'Klaus', level: 3, active: false, paid: true },
-        { name: 'Varsha', level: 2, active: false, paid: true },
-        { name: 'Anders', level: 2, active: false, paid: true },
-        { name: 'Trine', level: 2, active: false, paid: true },
-        { name: 'Esra', level: 1, active: false, paid: true },
-        { name: 'Istahil', level: 1, active: false, paid: true },
-        { name: 'Katrine', level: 2, active: false, paid: true },
-        { name: 'Philip', level: 2, active: false, paid: true },
-        { name: 'Laura', level: 2, active: false, paid: true },
-        { name: 'Mark', level: 3, active: false, paid: false },
+        {name: 'Esben', level: 3, active: false},
+        {name: 'Palle', level: 3, active: false},
+        {name: 'Ditte', level: 1, active: false},
+        {name: 'Lene', level: 1, active: false},
+        {name: 'Mette', level: 1, active: false},
+        {name: 'Dishaan', level: 3, active: false},
+        {name: 'Karina', level: 2, active: false},
+        {name: 'Martin', level: 3, active: false},
+        {name: 'Paw', level: 3, active: false},
+        {name: 'Kent', level: 3, active: false},
+        {name: 'Jonas', level: 3, active: false},
+        {name: 'Mads', level: 2, active: false},
+        {name: 'Mona', level: 2, active: false},
+        {name: 'Peter', level: 2, active: false},
+        {name: 'Louise', level: 2, active: false},
+        {name: 'Thor', level: 2, active: false},
+        {name: 'Ioana', level: 2, active: false},
+        {name: 'Christoffer', level: 3, active: false},
+        {name: 'Klaus', level: 3, active: false},
+        {name: 'Varsha', level: 2, active: false},
+        {name: 'Anders', level: 2, active: false},
+        {name: 'Trine', level: 2, active: false},
+        {name: 'Esra', level: 1, active: false},
+        {name: 'Istahil', level: 1, active: false},
+        {name: 'Katrine', level: 2, active: false},
+        {name: 'Philip', level: 2, active: false},
+        {name: 'Laura', level: 2, active: false},
+        {name: 'Mark', level: 3, active: false},
     ];
 
     const state = {
@@ -567,7 +556,6 @@
         arrivalBtn: document.getElementById('arrivalBtn'),
         newPlayerName: document.getElementById('newPlayerName'),
         newPlayerLevel: document.getElementById('newPlayerLevel'),
-        newPlayerPaid: document.getElementById('newPlayerPaid'),
         addPlayerBtn: document.getElementById('addPlayerBtn'),
         courtCount: document.getElementById('courtCount'),
         iterations: document.getElementById('iterations'),
@@ -578,15 +566,9 @@
         penaltyRepeatTeammatePrev: document.getElementById('penaltyRepeatTeammatePrev'),
         penaltyRepeatOpponentLast: document.getElementById('penaltyRepeatOpponentLast'),
         penaltyRepeatOpponentPrev: document.getElementById('penaltyRepeatOpponentPrev'),
-        weightUnusedPlayers: document.getElementById('weightUnusedPlayers'),
-        bonusPerfectBalance: document.getElementById('bonusPerfectBalance'),
+        weightBenchPenalty: document.getElementById('weightBenchPenalty'),
         penaltyBenchLast: document.getElementById('penaltyBenchLast'),
         penaltyBenchPrev: document.getElementById('penaltyBenchPrev'),
-        bonusNeverBenched: document.getElementById('bonusNeverBenched'),
-        paidBenchMultiplier: document.getElementById('paidBenchMultiplier'),
-        unpaidBenchMultiplier: document.getElementById('unpaidBenchMultiplier'),
-        paidRepeatBenchMultiplier: document.getElementById('paidRepeatBenchMultiplier'),
-        unpaidRepeatBenchMultiplier: document.getElementById('unpaidRepeatBenchMultiplier'),
         settingsBtn: document.getElementById('settingsBtn'),
         settingsPanel: document.getElementById('settingsPanel'),
         generateBtn: document.getElementById('generateBtn'),
@@ -600,7 +582,7 @@
     };
 
     function clonePlayers(players) {
-        return players.map(player => ({ ...player, active: Boolean(player.active) }));
+        return players.map(player => ({...player, active: Boolean(player.active)}));
     }
 
     function normalizeName(name) {
@@ -633,24 +615,10 @@
             teammatePrevPenalty: Number(el.penaltyRepeatTeammatePrev.value),
             opponentLastPenalty: Number(el.penaltyRepeatOpponentLast.value),
             opponentPrevPenalty: Number(el.penaltyRepeatOpponentPrev.value),
-            unusedPlayersWeight: Number(el.weightUnusedPlayers.value),
-            perfectBalanceBonus: Number(el.bonusPerfectBalance.value),
+            baseBenchPenalty: Number(el.weightBenchPenalty.value),
             benchLastPenalty: Number(el.penaltyBenchLast.value),
-            benchPrevPenalty: Number(el.penaltyBenchPrev.value),
-            benchReturnBonus: Number(el.bonusNeverBenched.value),
-            paidBenchMultiplier: Number(el.paidBenchMultiplier.value),
-            unpaidBenchMultiplier: Number(el.unpaidBenchMultiplier.value),
-            paidRepeatBenchMultiplier: Number(el.paidRepeatBenchMultiplier.value),
-            unpaidRepeatBenchMultiplier: Number(el.unpaidRepeatBenchMultiplier.value)
+            benchPrevPenalty: Number(el.penaltyBenchPrev.value)
         };
-    }
-
-    function getBenchMultiplier(player, config) {
-        return player.paid ? config.paidBenchMultiplier : config.unpaidBenchMultiplier;
-    }
-
-    function getRepeatBenchMultiplier(player, config) {
-        return player.paid ? config.paidRepeatBenchMultiplier : config.unpaidRepeatBenchMultiplier;
     }
 
     function shuffle(arr) {
@@ -696,19 +664,21 @@
 
     function createRandomRound(players, courtCount) {
         const shuffled = shuffle(players);
-        const maxPlayers = Math.min(courtCount * 4, shuffled.length);
-        const selected = shuffled.slice(0, maxPlayers);
-        const benched = shuffled.slice(maxPlayers);
+
+        const maxSlots = Math.min(courtCount * 4, shuffled.length);
+        const usablePlayers = Math.floor(maxSlots / 4) * 4;
+
+        const selected = shuffled.slice(0, usablePlayers);
+        const benched = shuffled.slice(usablePlayers);
         const courts = [];
 
         for (let i = 0; i < selected.length; i += 4) {
             const group = selected.slice(i, i + 4);
-            if (group.length < 4) break;
 
             const arrangements = [
-                { teamA: [group[0], group[1]], teamB: [group[2], group[3]] },
-                { teamA: [group[0], group[2]], teamB: [group[1], group[3]] },
-                { teamA: [group[0], group[3]], teamB: [group[1], group[2]] }
+                {teamA: [group[0], group[1]], teamB: [group[2], group[3]]},
+                {teamA: [group[0], group[2]], teamB: [group[1], group[3]]},
+                {teamA: [group[0], group[3]], teamB: [group[1], group[2]]}
             ];
 
             const chosen = arrangements[Math.floor(Math.random() * arrangements.length)];
@@ -725,7 +695,7 @@
             });
         }
 
-        return { courts, benched };
+        return {courts, benched};
     }
 
     function scoreBenchRotation(round, history, config, breakdown) {
@@ -734,42 +704,24 @@
         const prevRound = history[history.length - 2] || null;
         const lastBenched = new Set(lastRound ? lastRound.benched.map(player => player.name) : []);
         const prevBenched = new Set(prevRound ? prevRound.benched.map(player => player.name) : []);
-        const currentBench = new Set(round.benched.map(player => player.name));
 
         for (const player of round.benched) {
-            const benchPenalty = player.level * config.unusedPlayersWeight * getBenchMultiplier(player, config);
+            const benchPenalty = config.baseBenchPenalty
             scoreDelta -= benchPenalty;
             breakdown.benchPenalty += benchPenalty;
 
             if (lastBenched.has(player.name)) {
-                const repeatPenalty = config.benchLastPenalty * getRepeatBenchMultiplier(player, config);
+                const repeatPenalty = config.benchLastPenalty;
                 scoreDelta -= repeatPenalty;
                 breakdown.benchRepeatPenalty += repeatPenalty;
             }
 
             if (prevBenched.has(player.name)) {
-                const repeatPenalty = config.benchPrevPenalty * getRepeatBenchMultiplier(player, config);
+                const repeatPenalty = config.benchPrevPenalty;
                 scoreDelta -= repeatPenalty;
                 breakdown.benchRepeatPenalty += repeatPenalty;
             }
         }
-
-        if (lastRound) {
-            const playingNow = new Set(round.courts.flatMap(court => [
-                court.teamA.players[0].name,
-                court.teamA.players[1].name,
-                court.teamB.players[0].name,
-                court.teamB.players[1].name
-            ]));
-
-            for (const benchedName of lastBenched) {
-                if (!currentBench.has(benchedName) && playingNow.has(benchedName)) {
-                    scoreDelta += config.benchReturnBonus;
-                    breakdown.benchReturnBonus += config.benchReturnBonus;
-                }
-            }
-        }
-
         return scoreDelta;
     }
 
@@ -782,8 +734,6 @@
             opponentRepeatPenalty: 0,
             benchPenalty: 0,
             benchRepeatPenalty: 0,
-            benchReturnBonus: 0,
-            perfectBalanceBonus: 0
         };
 
         const lastRound = history[history.length - 1] || null;
@@ -806,11 +756,6 @@
             score -= partnerPenalty;
             breakdown.teamBalancePenalty += teamPenalty;
             breakdown.partnerPenalty += partnerPenalty;
-
-            if (teamDiff === 0) {
-                score += config.perfectBalanceBonus;
-                breakdown.perfectBalanceBonus += config.perfectBalanceBonus;
-            }
 
             const teammatePairs = [
                 pairKey(court.teamA.players[0].name, court.teamA.players[1].name),
@@ -850,7 +795,7 @@
 
         score += scoreBenchRotation(round, history, config, breakdown);
 
-        return { score, breakdown };
+        return {score, breakdown};
     }
 
     function findBestRound(players, courtCount, iterations, history, config) {
@@ -859,7 +804,7 @@
         for (let i = 0; i < iterations; i++) {
             const round = createRandomRound(players, courtCount);
             const scored = scoreRound(round, history, config);
-            const candidate = { ...round, ...scored, iteration: i + 1 };
+            const candidate = {...round, ...scored, iteration: i + 1};
 
             if (!best || candidate.score > best.score) {
                 best = candidate;
@@ -912,8 +857,7 @@
             const index = state.roster.findIndex(p => p.name === player.name);
             return `
                 <div class="player-chip">
-                    <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">Niveau ${player.level}</span></span>
-                    <span>${player.paid ? '' : '🆕'}</span>
+                    <span><strong>${escapeHtml(player.name)}</strong> <span class="level">${player.level}</span></span>
                     <button class="danger" onclick="removePlayer(${index})">Fjern</button>
                 </div>
             `;
@@ -933,7 +877,7 @@
             return `
                 <div class="arrival-item">
                     <div>
-                        <strong>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</strong>
+                        <strong>${escapeHtml(player.name)} <span class="level">${player.level}</span></strong>
                     </div>
                     <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
                 </div>
@@ -955,7 +899,6 @@
                     <tr>
                         <th>Spiller</th>
                         <th class="center">Niveau</th>
-                        <th class="center">Status</th>
                         <th class="center">Spillet</th>
                         <th class="center">Siddet over</th>
                         <th class="center">Seneste bænk</th>
@@ -966,7 +909,6 @@
                         <tr>
                             <td>${escapeHtml(player.name)}</td>
                             <td class="center">${player.level}</td>
-                            <td class="center">${player.paid ? '' : '🆕'}</td>
                             <td class="center">${player.played}</td>
                             <td class="center">${player.benched}</td>
                             <td class="center">
@@ -1002,7 +944,7 @@
                             <h4>Hold A</h4>
                             ${court.teamA.players.map(player => `
                                 <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
+                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
                                 </div>
                             `).join('')}
                         </div>
@@ -1011,7 +953,7 @@
                             <h4>Hold B</h4>
                             ${court.teamB.players.map(player => `
                                 <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
+                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
                                 </div>
                             `).join('')}
                         </div>
@@ -1025,7 +967,7 @@
                 <div class="result-card">
                     <h3>Sidder over</h3>
                     <ul class="bench-list">
-                        ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${p.level}</span> ${p.paid ? '' : '🆕'}</li>`).join('')}
+                        ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${p.level}</span></li>`).join('')}
                     </ul>
                 </div>
             `;
@@ -1057,7 +999,7 @@
                                 ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
                             </li>
                         `).join('')}
-                        ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>, ${p.paid ? 'betalt' : '🆕'}`).join(', ')}</li>` : ''}
+                        ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>`).join(', ')}</li>` : ''}
                     </ul>
                 </div>
             `;
@@ -1076,7 +1018,6 @@
     function addPlayer() {
         const name = normalizeName(el.newPlayerName.value);
         const level = Number(el.newPlayerLevel.value);
-        const paid = el.newPlayerPaid.value === 'yes';
 
         if (!name) {
             el.resultArea.innerHTML = '<div class="warning">Skriv et navn før du tilføjer spilleren.</div>';
@@ -1093,11 +1034,10 @@
             return;
         }
 
-        state.roster.push({ name, level, active: false, paid });
+        state.roster.push({name, level, active: false});
 
         el.newPlayerName.value = '';
         el.newPlayerLevel.value = '2';
-        el.newPlayerPaid.value = 'yes';
 
         renderRoster();
         renderArrivalList();
@@ -1118,10 +1058,7 @@
         const player = state.roster[index];
         if (!player) return;
 
-        const confirmed = window.confirm(`Vil du virkelig fjerne ${player.name}?`);
-        if (!confirmed) return;
-
-        state.roster.splice(index, 1);
+        player.active = false;
         renderRoster();
         renderArrivalList();
         renderPlayerStats();
@@ -1173,6 +1110,8 @@
         if (state.history.length === 0) return;
 
         state.history.pop();
+        state.lastResult = state.history[state.history.length - 1] || null;
+
         renderHistory();
         renderPlayerStats();
         el.resultArea.innerHTML = '<p class="subtle">Seneste kamp er fjernet fra historikken.</p>';
@@ -1197,7 +1136,6 @@
 
     loadDefaults();
     renderHistory();
-    renderPlayerStats();
 </script>
 </body>
 </html>
