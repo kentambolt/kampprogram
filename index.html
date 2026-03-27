@@ -25,14 +25,28 @@
         body {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
             color: var(--text);
+        }
+
+        body, .container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 24px;
+            position: fixed;
+            overflow: auto;
+        }
+
+
+        .container {
+            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
         }
 
         .mini-table td.center {
@@ -392,6 +406,11 @@
             <div class="panel arrival-panel" id="arrivalPanel">
                 <h2>Meld ankomst</h2>
                 <p class="subtle">Her vises kun spillere, som findes i listen, men som ikke er aktive endnu.</p>
+
+                <div class="actions">
+                    <button class="ghost" id="closeArrivalBtn">Luk</button>
+                </div>
+
                 <div class="arrival-list" id="arrivalListArea"></div>
             </div>
 
@@ -554,6 +573,7 @@
         arrivalListArea: document.getElementById('arrivalListArea'),
         arrivalPanel: document.getElementById('arrivalPanel'),
         arrivalBtn: document.getElementById('arrivalBtn'),
+        closeArrivalBtn: document.getElementById('closeArrivalBtn'),
         newPlayerName: document.getElementById('newPlayerName'),
         newPlayerLevel: document.getElementById('newPlayerLevel'),
         addPlayerBtn: document.getElementById('addPlayerBtn'),
@@ -1124,6 +1144,10 @@
 
     el.arrivalBtn.addEventListener('click', () => {
         el.arrivalPanel.classList.toggle('open');
+    });
+
+    el.closeArrivalBtn.addEventListener('click', () => {
+        el.arrivalPanel.classList.remove('open');
     });
 
     el.settingsBtn.addEventListener('click', () => {
