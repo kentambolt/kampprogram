@@ -33,9 +33,18 @@
             padding: 24px;
         }
 
+        .mini-table td.center {
+            text-align: center;
+        }
+
+        .mini-table th.center {
+            text-align: center;
+        }
+
         h1, h2 {
             margin-top: 0;
         }
+
         h3 {
             margin-top: 20px;
         }
@@ -184,7 +193,6 @@
             background: rgba(56, 189, 248, 0.16);
             color: #bae6fd;
         }
-
 
         .score-box {
             display: grid;
@@ -368,7 +376,7 @@
 
             <div class="panel arrival-panel" id="arrivalPanel">
                 <h2>Meld ankomst</h2>
-                <p class="subtle">Her vises kun spillere, som findes i den hardcodede liste, men som ikke er aktive endnu.</p>
+                <p class="subtle">Her vises kun spillere, som findes i listen, men som ikke er aktive endnu.</p>
                 <div class="arrival-list" id="arrivalListArea"></div>
             </div>
 
@@ -452,10 +460,6 @@
                     <div>
                         <label for="bonusNeverBenched">Bonus: spiller undgår bænken efter at have siddet over</label>
                         <input id="bonusNeverBenched" type="number" step="0.1" value="10" />
-                    </div>
-                    <div>
-                        <label for="iterationsBoostInfo">Bemærkning</label>
-                        <input id="iterationsBoostInfo" type="text" value="500 gør gentagen bænk næsten umulig" readonly />
                     </div>
                 </div>
 
@@ -596,7 +600,7 @@
     };
 
     function clonePlayers(players) {
-        return players.map(player => ({ ...player }));
+        return players.map(player => ({ ...player, active: Boolean(player.active) }));
     }
 
     function normalizeName(name) {
@@ -604,18 +608,21 @@
     }
 
     function loadDefaults() {
-        state.roster = clonePlayers(DEFAULT_PLAYERS);
+        state.roster = clonePlayers(DEFAULT_PLAYERS).map(player => ({
+            ...player,
+            active: false
+        }));
         renderRoster();
         renderArrivalList();
         renderPlayerStats();
     }
 
     function getActivePlayers() {
-        return state.roster.filter(player => player.active);
+        return state.roster.filter(player => player.active === true);
     }
 
     function getInactivePlayers() {
-        return state.roster.filter(player => !player.active);
+        return state.roster.filter(player => player.active !== true);
     }
 
     function getConfig() {
@@ -674,12 +681,17 @@
                 [a1.name, b1.name], [a1.name, b2.name],
                 [a2.name, b1.name], [a2.name, b2.name]
             ];
+
             for (const [x, y] of opponents) {
                 opponentPairs.add(pairKey(x, y));
             }
         }
 
-        return { teammatePairs, opponentPairs, benched: new Set(round.benched.map(player => player.name)) };
+        return {
+            teammatePairs,
+            opponentPairs,
+            benched: new Set(round.benched.map(player => player.name))
+        };
     }
 
     function createRandomRound(players, courtCount) {
@@ -700,6 +712,7 @@
             ];
 
             const chosen = arrangements[Math.floor(Math.random() * arrangements.length)];
+
             courts.push({
                 teamA: {
                     players: chosen.teamA,
@@ -733,6 +746,7 @@
                 scoreDelta -= repeatPenalty;
                 breakdown.benchRepeatPenalty += repeatPenalty;
             }
+
             if (prevBenched.has(player.name)) {
                 const repeatPenalty = config.benchPrevPenalty * getRepeatBenchMultiplier(player, config);
                 scoreDelta -= repeatPenalty;
@@ -781,6 +795,7 @@
             const sumA = court.teamA.totalLevel;
             const sumB = court.teamB.totalLevel;
             const teamDiff = Math.abs(sumA - sumB);
+
             const partnerDiffA = Math.abs(court.teamA.players[0].level - court.teamA.players[1].level);
             const partnerDiffB = Math.abs(court.teamB.players[0].level - court.teamB.players[1].level);
 
@@ -855,7 +870,7 @@
     }
 
     function getPlayerStats() {
-        return state.roster.map(player => {
+        return state.roster.filter(player => player.active).map(player => {
             let played = 0;
             let benched = 0;
             let benchedLast = false;
@@ -886,25 +901,23 @@
 
     function renderRoster() {
         const activePlayers = getActivePlayers();
+        el.seedInfo.value = String(activePlayers.length);
 
         if (activePlayers.length === 0) {
             el.playerRosterArea.innerHTML = '<div class="subtle">Ingen aktive spillere endnu.</div>';
-            el.seedInfo.value = '0';
             return;
         }
 
         el.playerRosterArea.innerHTML = activePlayers.map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
             return `
-          <div class="player-chip">
-            <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">${player.level}</span></span>
-            <span>${player.paid ? '' : '🆕'}</span>
-            <button class="danger" onclick="removePlayer(${index})">Fjern</button>
-          </div>
-        `;
+                <div class="player-chip">
+                    <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">Niveau ${player.level}</span></span>
+                    <span>${player.paid ? '' : '🆕'}</span>
+                    <button class="danger" onclick="removePlayer(${index})">Fjern</button>
+                </div>
+            `;
         }).join('');
-
-        el.seedInfo.value = String(activePlayers.length);
     }
 
     function renderArrivalList() {
@@ -918,51 +931,52 @@
         el.arrivalListArea.innerHTML = inactivePlayers.map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
             return `
-          <div class="arrival-item">
-            <div>
-              <strong>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</strong><br>
-            </div>
-            <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
-          </div>
-        `;
+                <div class="arrival-item">
+                    <div>
+                        <strong>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</strong>
+                    </div>
+                    <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
+                </div>
+            `;
         }).join('');
     }
 
     function renderPlayerStats() {
         const stats = getPlayerStats();
+
         if (stats.length === 0) {
             el.playerStatsArea.innerHTML = '<div class="subtle">Ingen data endnu.</div>';
             return;
         }
 
         el.playerStatsArea.innerHTML = `
-        <table class="mini-table">
-          <thead>
-            <tr>
-              <th>Spiller</th>
-              <th>Status</th>
-              <th>Kontingent</th>
-              <th>Spillet</th>
-              <th>Sidder over</th>
-              <th>Seneste bænk</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${stats.map(player => `
-              <tr>
-                <td>${escapeHtml(player.name)} <span class="level">${player.level}</span></td>
-                <td>${player.paid ? '' : '🆕'}</td>
-                <td>${player.played}</td>
-                <td>${player.benched}</td>
-                <td>
-                  ${player.benchedLast ? 'Sidst' : '-'}
-                  ${player.benchedPrev ? (player.benchedLast ? ' + forrige' : 'Forrige') : ''}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+            <table class="mini-table">
+                <thead>
+                    <tr>
+                        <th>Spiller</th>
+                        <th class="center">Niveau</th>
+                        <th class="center">Status</th>
+                        <th class="center">Spillet</th>
+                        <th class="center">Siddet over</th>
+                        <th class="center">Seneste bænk</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${stats.map(player => `
+                        <tr>
+                            <td>${escapeHtml(player.name)}</td>
+                            <td class="center">${player.level}</td>
+                            <td class="center">${player.paid ? '' : '🆕'}</td>
+                            <td class="center">${player.played}</td>
+                            <td class="center">${player.benched}</td>
+                            <td class="center">
+                                ${player.benchedLast ? 'Sidst' : (player.benchedPrev ? 'Forrige' : ' ')}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
     }
 
     function renderRound(result, iterations) {
@@ -978,60 +992,44 @@
 
         result.courts.forEach((court, index) => {
             html += `
-          <div class="result-card">
-            <div class="court-title">
-              <span>Bane ${index + 1}</span>
-              <span class="tag">Samlet niveau: ${court.teamA.totalLevel} vs ${court.teamB.totalLevel}</span>
-            </div>
-            <div class="vs-grid">
-              <div class="team">
-                <h4>Hold A</h4>
-                ${court.teamA.players.map(player => `
-                  <div class="player-line">
-                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
-                  </div>
-                `).join('')}
-              </div>
-              <div><strong>VS</strong></div>
-              <div class="team">
-                <h4>Hold B</h4>
-                ${court.teamB.players.map(player => `
-                  <div class="player-line">
-                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-        `;
+                <div class="result-card">
+                    <div class="court-title">
+                        <span>Bane ${index + 1}</span>
+                        <span class="tag">Samlet niveau: ${court.teamA.totalLevel} vs ${court.teamB.totalLevel}</span>
+                    </div>
+                    <div class="vs-grid">
+                        <div class="team">
+                            <h4>Hold A</h4>
+                            ${court.teamA.players.map(player => `
+                                <div class="player-line">
+                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div><strong>VS</strong></div>
+                        <div class="team">
+                            <h4>Hold B</h4>
+                            ${court.teamB.players.map(player => `
+                                <div class="player-line">
+                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span> ${player.paid ? '' : '🆕'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
         });
 
         if (result.benched.length > 0) {
             html += `
-          <div class="result-card">
-            <h3>Sidder over</h3>
-            <ul class="bench-list">
-              ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${player.level}</span> ${p.paid ? '' : '🆕'})</li>`).join('')}
-            </ul>
-          </div>
-        `;
+                <div class="result-card">
+                    <h3>Sidder over</h3>
+                    <ul class="bench-list">
+                        ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${p.level}</span> ${p.paid ? '' : '🆕'}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
         }
-
-        html += `
-        <div class="result-card">
-          <h3>Score-forklaring</h3>
-          <ul class="history-list">
-            <li>Straf for ubalance mellem sider: ${result.breakdown.teamBalancePenalty.toFixed(1)}</li>
-            <li>Straf for makkere med forskelligt niveau: ${result.breakdown.partnerPenalty.toFixed(1)}</li>
-            <li>Straf for gentagne makkere: ${result.breakdown.teammateRepeatPenalty.toFixed(1)}</li>
-            <li>Straf for gentagne modstandere: ${result.breakdown.opponentRepeatPenalty.toFixed(1)}</li>
-            <li>Straf for spillere på bænken, vægtet efter kontingent: ${result.breakdown.benchPenalty.toFixed(1)}</li>
-            <li>Ekstra straf for samme spiller på bænken igen, vægtet efter kontingent: ${result.breakdown.benchRepeatPenalty.toFixed(1)}</li>
-            <li>Bonus for spillere der kommer ind efter at have siddet over: ${result.breakdown.benchReturnBonus.toFixed(1)}</li>
-            <li>Bonus for helt lige baner: ${result.breakdown.perfectBalanceBonus.toFixed(1)}</li>
-          </ul>
-        </div>
-      `;
 
         el.resultArea.innerHTML = html;
     }
@@ -1046,23 +1044,23 @@
         el.historyArea.innerHTML = recent.map((round, idx) => {
             const roundNo = state.history.length - idx;
             return `
-          <div class="result-card">
-            <div class="court-title">
-              <span>Kamp ${roundNo}</span>
-              <span class="tag">Score ${round.score.toFixed(1)}</span>
-            </div>
-            <ul class="history-list">
-              ${round.courts.map((court, i) => `
-                <li>
-                  Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} + ${escapeHtml(court.teamA.players[1].name)}
-                  mod
-                  ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
-                </li>
-              `).join('')}
-              ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${player.level}</span>, ${p.paid ? 'betalt' : '🆕'}`).join(', ')}</li>` : ''}
-            </ul>
-          </div>
-        `;
+                <div class="result-card">
+                    <div class="court-title">
+                        <span>Kamp ${roundNo}</span>
+                        <span class="tag">Score ${round.score.toFixed(1)}</span>
+                    </div>
+                    <ul class="history-list">
+                        ${round.courts.map((court, i) => `
+                            <li>
+                                Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} + ${escapeHtml(court.teamA.players[1].name)}
+                                mod
+                                ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
+                            </li>
+                        `).join('')}
+                        ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>, ${p.paid ? 'betalt' : '🆕'}`).join(', ')}</li>` : ''}
+                    </ul>
+                </div>
+            `;
         }).join('');
     }
 
@@ -1084,19 +1082,23 @@
             el.resultArea.innerHTML = '<div class="warning">Skriv et navn før du tilføjer spilleren.</div>';
             return;
         }
+
         if (![1, 2, 3].includes(level)) {
             el.resultArea.innerHTML = '<div class="warning">Niveau skal være 1, 2 eller 3.</div>';
             return;
         }
+
         if (state.roster.some(player => player.name.toLowerCase() === name.toLowerCase())) {
             el.resultArea.innerHTML = `<div class="warning">Spilleren ${escapeHtml(name)} findes allerede.</div>`;
             return;
         }
 
         state.roster.push({ name, level, active: false, paid });
+
         el.newPlayerName.value = '';
         el.newPlayerLevel.value = '2';
         el.newPlayerPaid.value = 'yes';
+
         renderRoster();
         renderArrivalList();
         renderPlayerStats();
@@ -1105,6 +1107,7 @@
     function markArrived(index) {
         const player = state.roster[index];
         if (!player) return;
+
         player.active = true;
         renderRoster();
         renderArrivalList();
@@ -1114,8 +1117,10 @@
     function removePlayer(index) {
         const player = state.roster[index];
         if (!player) return;
+
         const confirmed = window.confirm(`Vil du virkelig fjerne ${player.name}?`);
         if (!confirmed) return;
+
         state.roster.splice(index, 1);
         renderRoster();
         renderArrivalList();
@@ -1133,7 +1138,7 @@
             const config = getConfig();
 
             if (players.length < 4) {
-                throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Tilføj flere spillere, markér spillere som ankommet, eller indlæs de hardcodede startspillere.');
+                throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Markér flere spillere som ankommet først.');
             }
 
             const best = findBestRound(players, courtCount, iterations, state.history, config);
@@ -1144,6 +1149,7 @@
 
             state.lastResult = best;
             state.history.push(best);
+
             renderRound(best, iterations);
             renderHistory();
             renderPlayerStats();
@@ -1165,6 +1171,7 @@
 
     function undoLastRound() {
         if (state.history.length === 0) return;
+
         state.history.pop();
         renderHistory();
         renderPlayerStats();
@@ -1175,12 +1182,15 @@
     }
 
     el.addPlayerBtn.addEventListener('click', addPlayer);
+
     el.arrivalBtn.addEventListener('click', () => {
         el.arrivalPanel.classList.toggle('open');
     });
+
     el.settingsBtn.addEventListener('click', () => {
         el.settingsPanel.classList.toggle('open');
     });
+
     el.generateBtn.addEventListener('click', generateRound);
     el.resetHistoryBtn.addEventListener('click', resetHistory);
     el.undoBtn.addEventListener('click', undoLastRound);
