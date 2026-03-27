@@ -16,6 +16,8 @@
             --danger: #f87171;
             --border: #334155;
             --warning: #f59e0b;
+            --paid: #86efac;
+            --unpaid: #fca5a5;
         }
 
         * { box-sizing: border-box; }
@@ -68,12 +70,14 @@
         }
 
         input,
-        button {
+        button,
+        select {
             font: inherit;
         }
 
         input[type="number"],
-        input[type="text"] {
+        input[type="text"],
+        select {
             width: 100%;
             background: var(--panel-2);
             color: var(--text);
@@ -180,6 +184,16 @@
             color: #bae6fd;
         }
 
+        .tag-paid {
+            background: rgba(34, 197, 94, 0.16);
+            color: var(--paid);
+        }
+
+        .tag-unpaid {
+            background: rgba(248, 113, 113, 0.16);
+            color: var(--unpaid);
+        }
+
         .score-box {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -224,7 +238,7 @@
 
         .player-manager {
             display: grid;
-            grid-template-columns: 1.2fr 0.5fr auto;
+            grid-template-columns: 1.1fr 0.45fr 0.8fr auto;
             gap: 10px;
             align-items: end;
             margin-bottom: 12px;
@@ -332,7 +346,7 @@
     <h1>Badminton double-generator</h1>
     <p class="subtle">
         Programmet holder styr på en fast spillerliste med hardcodede start-indstillinger, og du kan løbende markere spillere som ankommet i løbet af dagen.
-        Den bedste sammensætning vælges ud fra niveau-balance, makker-match, gentagelser fra de to seneste kampe og meget hård straf for at sidde over to kampe i træk.
+        Spillere med betalt kontingent bliver prioriteret højere til spil, fordi straf for at sidde over er markant større for dem end for spillere uden betalt kontingent.
     </p>
 
     <div class="grid">
@@ -348,6 +362,13 @@
                     <div>
                         <label for="newPlayerLevel">Niveau</label>
                         <input id="newPlayerLevel" type="number" min="1" max="3" value="2" />
+                    </div>
+                    <div>
+                        <label for="newPlayerPaid">Kontingent</label>
+                        <select id="newPlayerPaid">
+                            <option value="yes">Betalt</option>
+                            <option value="no">Ikke betalt</option>
+                        </select>
                     </div>
                     <div>
                         <button class="secondary" id="addPlayerBtn">Tilføj spiller</button>
@@ -428,7 +449,7 @@
                         <input id="penaltyRepeatOpponentPrev" type="number" step="0.1" value="2.5" />
                     </div>
                     <div>
-                        <label for="weightUnusedPlayers">Straffaktor: spillere på bænken</label>
+                        <label for="weightUnusedPlayers">Grundstraffaktor: spillere på bænken</label>
                         <input id="weightUnusedPlayers" type="number" step="0.1" value="0.2" />
                     </div>
                     <div>
@@ -453,6 +474,25 @@
                     <div>
                         <label for="iterationsBoostInfo">Bemærkning</label>
                         <input id="iterationsBoostInfo" type="text" value="500 gør gentagen bænk næsten umulig" readonly />
+                    </div>
+                </div>
+
+                <div class="row-4">
+                    <div>
+                        <label for="paidBenchMultiplier">Multiplier: betalt kontingent på bænken</label>
+                        <input id="paidBenchMultiplier" type="number" step="0.1" value="2.5" />
+                    </div>
+                    <div>
+                        <label for="unpaidBenchMultiplier">Multiplier: ikke betalt kontingent på bænken</label>
+                        <input id="unpaidBenchMultiplier" type="number" step="0.1" value="0.4" />
+                    </div>
+                    <div>
+                        <label for="paidRepeatBenchMultiplier">Multiplier: gentagen bænk for betalt kontingent</label>
+                        <input id="paidRepeatBenchMultiplier" type="number" step="0.1" value="1.5" />
+                    </div>
+                    <div>
+                        <label for="unpaidRepeatBenchMultiplier">Multiplier: gentagen bænk for ikke betalt kontingent</label>
+                        <input id="unpaidRepeatBenchMultiplier" type="number" step="0.1" value="0.25" />
                     </div>
                 </div>
             </div>
@@ -497,18 +537,33 @@
 
 <script>
     const DEFAULT_PLAYERS = [
-        { name: 'Anders', level: 3, active: true },
-        { name: 'Mads', level: 3, active: true },
-        { name: 'Jonas', level: 2, active: true },
-        { name: 'Kasper', level: 2, active: true },
-        { name: 'Lars', level: 2, active: true },
-        { name: 'Mikkel', level: 2, active: true },
-        { name: 'Rasmus', level: 1, active: true },
-        { name: 'Nicolai', level: 1, active: true },
-        { name: 'Simon', level: 1, active: false },
-        { name: 'Thomas', level: 3, active: false },
-        { name: 'Frederik', level: 2, active: false },
-        { name: 'Peter', level: 1, active: false }
+        { name: 'Esben', level: 3, active: true, paid: true },
+        { name: 'Palle', level: 3, active: true, paid: true },
+        { name: 'Ditte', level: 1, active: true, paid: true },
+        { name: 'Lene', level: 1, active: true, paid: true },
+        { name: 'Mette', level: 1, active: true, paid: true },
+        { name: 'Dishaan', level: 3, active: true, paid: true },
+        { name: 'Karina', level: 2, active: true, paid: true },
+        { name: 'Martin', level: 3, active: true, paid: true },
+        { name: 'Paw', level: 3, active: false, paid: true },
+        { name: 'Kent', level: 3, active: false, paid: true },
+        { name: 'Jonas', level: 3, active: false, paid: true },
+        { name: 'Mads', level: 2, active: false, paid: true },
+        { name: 'Mona', level: 2, active: false, paid: true },
+        { name: 'Peter', level: 2, active: false, paid: true },
+        { name: 'Louise', level: 2, active: false, paid: true },
+        { name: 'Thor', level: 2, active: false, paid: true },
+        { name: 'Ioana', level: 2, active: false, paid: true },
+        { name: 'Christoffer', level: 3, active: false, paid: true },
+        { name: 'Klaus', level: 3, active: false, paid: true },
+        { name: 'Varsha', level: 2, active: false, paid: true },
+        { name: 'Anders', level: 2, active: false, paid: true },
+        { name: 'Trine', level: 2, active: false, paid: true },
+        { name: 'Esra', level: 1, active: false, paid: true },
+        { name: 'Istahil', level: 1, active: false, paid: true },
+        { name: 'Katrine', level: 2, active: false, paid: true },
+        { name: 'Philip', level: 2, active: false, paid: true },
+        { name: 'Laura', level: 2, active: false, paid: true }
     ];
 
     const state = {
@@ -525,6 +580,7 @@
         arrivalBtn: document.getElementById('arrivalBtn'),
         newPlayerName: document.getElementById('newPlayerName'),
         newPlayerLevel: document.getElementById('newPlayerLevel'),
+        newPlayerPaid: document.getElementById('newPlayerPaid'),
         addPlayerBtn: document.getElementById('addPlayerBtn'),
         courtCount: document.getElementById('courtCount'),
         iterations: document.getElementById('iterations'),
@@ -540,6 +596,10 @@
         penaltyBenchLast: document.getElementById('penaltyBenchLast'),
         penaltyBenchPrev: document.getElementById('penaltyBenchPrev'),
         bonusNeverBenched: document.getElementById('bonusNeverBenched'),
+        paidBenchMultiplier: document.getElementById('paidBenchMultiplier'),
+        unpaidBenchMultiplier: document.getElementById('unpaidBenchMultiplier'),
+        paidRepeatBenchMultiplier: document.getElementById('paidRepeatBenchMultiplier'),
+        unpaidRepeatBenchMultiplier: document.getElementById('unpaidRepeatBenchMultiplier'),
         settingsBtn: document.getElementById('settingsBtn'),
         settingsPanel: document.getElementById('settingsPanel'),
         generateBtn: document.getElementById('generateBtn'),
@@ -588,8 +648,20 @@
             perfectBalanceBonus: Number(el.bonusPerfectBalance.value),
             benchLastPenalty: Number(el.penaltyBenchLast.value),
             benchPrevPenalty: Number(el.penaltyBenchPrev.value),
-            benchReturnBonus: Number(el.bonusNeverBenched.value)
+            benchReturnBonus: Number(el.bonusNeverBenched.value),
+            paidBenchMultiplier: Number(el.paidBenchMultiplier.value),
+            unpaidBenchMultiplier: Number(el.unpaidBenchMultiplier.value),
+            paidRepeatBenchMultiplier: Number(el.paidRepeatBenchMultiplier.value),
+            unpaidRepeatBenchMultiplier: Number(el.unpaidRepeatBenchMultiplier.value)
         };
+    }
+
+    function getBenchMultiplier(player, config) {
+        return player.paid ? config.paidBenchMultiplier : config.unpaidBenchMultiplier;
+    }
+
+    function getRepeatBenchMultiplier(player, config) {
+        return player.paid ? config.paidRepeatBenchMultiplier : config.unpaidRepeatBenchMultiplier;
     }
 
     function shuffle(arr) {
@@ -670,17 +742,19 @@
         const currentBench = new Set(round.benched.map(player => player.name));
 
         for (const player of round.benched) {
-            const benchPenalty = player.level * config.unusedPlayersWeight;
+            const benchPenalty = player.level * config.unusedPlayersWeight * getBenchMultiplier(player, config);
             scoreDelta -= benchPenalty;
             breakdown.benchPenalty += benchPenalty;
 
             if (lastBenched.has(player.name)) {
-                scoreDelta -= config.benchLastPenalty;
-                breakdown.benchRepeatPenalty += config.benchLastPenalty;
+                const repeatPenalty = config.benchLastPenalty * getRepeatBenchMultiplier(player, config);
+                scoreDelta -= repeatPenalty;
+                breakdown.benchRepeatPenalty += repeatPenalty;
             }
             if (prevBenched.has(player.name)) {
-                scoreDelta -= config.benchPrevPenalty;
-                breakdown.benchRepeatPenalty += config.benchPrevPenalty;
+                const repeatPenalty = config.benchPrevPenalty * getRepeatBenchMultiplier(player, config);
+                scoreDelta -= repeatPenalty;
+                breakdown.benchRepeatPenalty += repeatPenalty;
             }
         }
 
@@ -842,6 +916,7 @@
             return `
           <div class="player-chip">
             <span><strong>${escapeHtml(player.name)}</strong> <span class="meta">Niveau ${player.level}</span></span>
+            <span class="tag ${player.paid ? 'tag-paid' : 'tag-unpaid'}">${player.paid ? 'Kontingent betalt' : 'Ikke betalt'}</span>
             <span class="meta status-on">Aktiv</span>
             <button class="danger" onclick="removePlayer(${index})">Fjern</button>
           </div>
@@ -865,7 +940,7 @@
           <div class="arrival-item">
             <div>
               <strong>${escapeHtml(player.name)}</strong><br>
-              <span class="meta">Niveau ${player.level}</span>
+              <span class="meta">Niveau ${player.level} · ${player.paid ? 'Kontingent betalt' : 'Ikke betalt'}</span>
             </div>
             <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
           </div>
@@ -886,6 +961,7 @@
             <tr>
               <th>Spiller</th>
               <th>Status</th>
+              <th>Kontingent</th>
               <th>Spillet</th>
               <th>Sidder over</th>
               <th>Seneste bænk</th>
@@ -896,6 +972,7 @@
               <tr>
                 <td>${escapeHtml(player.name)} (N${player.level})</td>
                 <td>${player.active ? 'Aktiv' : 'Ikke ankommet'}</td>
+                <td>${player.paid ? 'Betalt' : 'Ikke betalt'}</td>
                 <td>${player.played}</td>
                 <td>${player.benched}</td>
                 <td>
@@ -932,7 +1009,7 @@
                 <h4>Hold A</h4>
                 ${court.teamA.players.map(player => `
                   <div class="player-line">
-                    <span>${escapeHtml(player.name)}</span>
+                    <span>${escapeHtml(player.name)} ${player.paid ? '• betalt' : '• ikke betalt'}</span>
                     <span>Niveau ${player.level}</span>
                   </div>
                 `).join('')}
@@ -942,7 +1019,7 @@
                 <h4>Hold B</h4>
                 ${court.teamB.players.map(player => `
                   <div class="player-line">
-                    <span>${escapeHtml(player.name)}</span>
+                    <span>${escapeHtml(player.name)} ${player.paid ? '• betalt' : '• ikke betalt'}</span>
                     <span>Niveau ${player.level}</span>
                   </div>
                 `).join('')}
@@ -957,7 +1034,7 @@
           <div class="result-card">
             <h3>Sidder over</h3>
             <ul class="bench-list">
-              ${result.benched.map(p => `<li>${escapeHtml(p.name)} (niveau ${p.level})</li>`).join('')}
+              ${result.benched.map(p => `<li>${escapeHtml(p.name)} (niveau ${p.level}, ${p.paid ? 'kontingent betalt' : 'ikke betalt'})</li>`).join('')}
             </ul>
           </div>
         `;
@@ -971,8 +1048,8 @@
             <li>Straf for makkere med forskelligt niveau: ${result.breakdown.partnerPenalty.toFixed(1)}</li>
             <li>Straf for gentagne makkere: ${result.breakdown.teammateRepeatPenalty.toFixed(1)}</li>
             <li>Straf for gentagne modstandere: ${result.breakdown.opponentRepeatPenalty.toFixed(1)}</li>
-            <li>Grundstraf for spillere på bænken: ${result.breakdown.benchPenalty.toFixed(1)}</li>
-            <li>Ekstra straf for samme spiller på bænken igen: ${result.breakdown.benchRepeatPenalty.toFixed(1)}</li>
+            <li>Straf for spillere på bænken, vægtet efter kontingent: ${result.breakdown.benchPenalty.toFixed(1)}</li>
+            <li>Ekstra straf for samme spiller på bænken igen, vægtet efter kontingent: ${result.breakdown.benchRepeatPenalty.toFixed(1)}</li>
             <li>Bonus for spillere der kommer ind efter at have siddet over: ${result.breakdown.benchReturnBonus.toFixed(1)}</li>
             <li>Bonus for helt lige baner: ${result.breakdown.perfectBalanceBonus.toFixed(1)}</li>
           </ul>
@@ -1005,7 +1082,7 @@
                   ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
                 </li>
               `).join('')}
-              ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} (${p.level})`).join(', ')}</li>` : ''}
+              ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} (${p.level}, ${p.paid ? 'betalt' : 'ikke betalt'})`).join(', ')}</li>` : ''}
             </ul>
           </div>
         `;
@@ -1024,6 +1101,7 @@
     function addPlayer() {
         const name = normalizeName(el.newPlayerName.value);
         const level = Number(el.newPlayerLevel.value);
+        const paid = el.newPlayerPaid.value === 'yes';
 
         if (!name) {
             el.resultArea.innerHTML = '<div class="warning">Skriv et navn før du tilføjer spilleren.</div>';
@@ -1038,9 +1116,10 @@
             return;
         }
 
-        state.roster.push({ name, level, active: true });
+        state.roster.push({ name, level, active: true, paid });
         el.newPlayerName.value = '';
         el.newPlayerLevel.value = '2';
+        el.newPlayerPaid.value = 'yes';
         renderRoster();
         renderArrivalList();
         renderPlayerStats();
