@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Badminton double-generator</title>
+    <title>Kampprogram</title>
     <style>
         :root {
             --bg: #0f172a;
@@ -37,7 +37,6 @@
         }
 
         .container {
-            max-width: 1400px;
             margin: 0 auto;
             padding: 24px;
             position: fixed;
@@ -93,6 +92,19 @@
             display: block;
             font-weight: bold;
             margin-bottom: 6px;
+        }
+
+        .settings-panel label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: normal;
+            min-height: 48px;
+        }
+
+        .settings-panel input[type="checkbox"] {
+            width: auto;
+            transform: scale(1.2);
         }
 
         input,
@@ -230,33 +242,6 @@
             color: #bae6fd;
         }
 
-        .score-box {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .score-tile {
-            background: rgba(31, 41, 55, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 12px;
-        }
-
-        .score-tile .label {
-            color: var(--muted);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .score-tile .value {
-            font-size: 24px;
-            font-weight: bold;
-            margin-top: 4px;
-        }
-
         .bench-list, .history-list {
             margin: 0;
             padding-left: 18px;
@@ -361,11 +346,16 @@
             color: var(--muted);
         }
 
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         @media (max-width: 980px) {
             .grid,
             .row-3,
             .row-4,
-            .score-box,
             .vs-grid,
             .player-manager,
             .arrival-list {
@@ -379,7 +369,7 @@
     <div class="grid">
         <div>
             <div class="panel">
-                <h2>Spillerstyring</h2>
+                <h2>Spillere</h2>
 
                 <div class="player-manager">
                     <div>
@@ -395,27 +385,27 @@
                     </div>
                 </div>
 
-                <div class="actions">
-                    <button class="ghost" id="arrivalBtn">Meld ankomst</button>
+                <div class="flex-row">
+                    <h3>Aktive spillere i dag</h3>
+                    <div class="actions">
+                        <button class="ghost" id="arrivalBtn">Meld ankomst</button>
+                    </div>
                 </div>
 
-                <h3>Aktive spillere i dag</h3>
                 <div class="player-chip-list" id="playerRosterArea"></div>
             </div>
 
             <div class="panel arrival-panel" id="arrivalPanel">
-                <h2>Meld ankomst</h2>
-                <p class="subtle">Her vises kun spillere, som findes i listen, men som ikke er aktive endnu.</p>
-
-                <div class="actions">
+                <div class="flex-row">
+                    <h2>Meld ankomst</h2>
                     <button class="ghost" id="closeArrivalBtn">Luk</button>
                 </div>
-
+                <p class="subtle">Her vises kun spillere, som findes i listen, men som ikke er aktive endnu.</p>
                 <div class="arrival-list" id="arrivalListArea"></div>
             </div>
 
             <div class="panel">
-                <h2>Input</h2>
+                <h2>Lav kampe</h2>
 
                 <div class="row-3">
                     <div>
@@ -442,51 +432,60 @@
 
             <div class="panel settings-panel" id="settingsPanel">
                 <h2>Score / straf-konfiguration</h2>
-                <p class="subtle">Du kan justere vægte direkte her. Højere tal betyder større betydning i den samlede
-                    score.</p>
-
                 <div class="row-4">
                     <div>
-                        <label for="weightTeamBalance">Straffaktor: ubalance mellem sider</label>
-                        <input id="weightTeamBalance" type="number" step="0.1" value="12"/>
+                        <label>
+                            <input id="weightTeamBalance" type="checkbox" checked />
+                            Prioritér modstander på samme niveau
+                        </label>
                     </div>
                     <div>
-                        <label for="weightPartnerBalance">Straffaktor: makkere med forskelligt niveau</label>
-                        <input id="weightPartnerBalance" type="number" step="0.1" value="3"/>
+                        <label>
+                            <input id="weightPartnerBalance" type="checkbox" checked />
+                            Prioritér partner på samme niveau
+                        </label>
                     </div>
                     <div>
-                        <label for="penaltyRepeatTeammateLast">Straf: samme makker som sidst</label>
-                        <input id="penaltyRepeatTeammateLast" type="number" step="0.1" value="10"/>
+                        <label>
+                            <input id="penaltyRepeatTeammateLast" type="checkbox" checked />
+                            Prioritér ny partner i forhold til sidste kamp
+                        </label>
                     </div>
                     <div>
-                        <label for="penaltyRepeatTeammatePrev">Straf: samme makker som forrige</label>
-                        <input id="penaltyRepeatTeammatePrev" type="number" step="0.1" value="6"/>
+                        <label>
+                            <input id="penaltyRepeatTeammatePrev" type="checkbox" checked />
+                            Prioritér ny partner i forhold til forrige kamp
+                        </label>
                     </div>
                 </div>
 
                 <div class="row-4">
                     <div>
-                        <label for="penaltyRepeatOpponentLast">Straf: samme modstander som sidst</label>
-                        <input id="penaltyRepeatOpponentLast" type="number" step="0.1" value="5"/>
+                        <label>
+                            <input id="penaltyRepeatOpponentLast" type="checkbox" checked />
+                            Prioritér ny modstander i forhold til sidste kamp
+                        </label>
                     </div>
                     <div>
-                        <label for="penaltyRepeatOpponentPrev">Straf: samme modstander som forrige</label>
-                        <input id="penaltyRepeatOpponentPrev" type="number" step="0.1" value="2.5"/>
-                    </div>
-                    <div>
-                        <label for="weightBenchPenalty">Grundstraffaktor: spillere på bænken</label>
-                        <input id="weightBenchPenalty" type="number" step="0.1" value="0.2"/>
+                        <label>
+                            <input id="penaltyRepeatOpponentPrev" type="checkbox" checked />
+                            Prioritér ny modstander i forhold til forrige kamp
+                        </label>
                     </div>
                 </div>
 
                 <div class="row-4">
                     <div>
-                        <label for="penaltyBenchLast">Straf: samme spiller sidder over som sidst</label>
-                        <input id="penaltyBenchLast" type="number" step="1" value="500"/>
+                        <label>
+                            <input id="penaltyBenchLast" type="checkbox" checked />
+                            Brug straf for samme spiller på bænken som sidst
+                        </label>
                     </div>
                     <div>
-                        <label for="penaltyBenchPrev">Straf: samme spiller sidder over som forrige</label>
-                        <input id="penaltyBenchPrev" type="number" step="1" value="120"/>
+                        <label>
+                            <input id="penaltyBenchPrev" type="checkbox" checked />
+                            Brug straf for samme spiller på bænken som forrige
+                        </label>
                     </div>
                 </div>
             </div>
@@ -494,23 +493,6 @@
 
         <div>
             <div class="panel">
-                <h2>Resultat</h2>
-
-                <div class="score-box">
-                    <div class="score-tile">
-                        <div class="label">Samlet score</div>
-                        <div class="value" id="totalScore">-</div>
-                    </div>
-                    <div class="score-tile">
-                        <div class="label">Baner i brug</div>
-                        <div class="value" id="courtsUsed">-</div>
-                    </div>
-                    <div class="score-tile">
-                        <div class="label">Testede opstillinger</div>
-                        <div class="value" id="triesUsed">-</div>
-                    </div>
-                </div>
-
                 <div id="resultArea">
                     <p class="subtle">Tryk på <strong>Lav næste kamp</strong> for at generere en opstilling.</p>
                 </div>
@@ -561,6 +543,17 @@
         {name: 'Mark', level: 3, active: false},
     ];
 
+    const FIXED_CONFIG = {
+        teamBalanceWeight: 12,
+        partnerBalanceWeight: 3,
+        teammateLastPenalty: 10,
+        teammatePrevPenalty: 6,
+        opponentLastPenalty: 5,
+        opponentPrevPenalty: 2.5,
+        benchLastPenalty: 500,
+        benchPrevPenalty: 120
+    };
+
     const state = {
         roster: [],
         history: [],
@@ -586,7 +579,6 @@
         penaltyRepeatTeammatePrev: document.getElementById('penaltyRepeatTeammatePrev'),
         penaltyRepeatOpponentLast: document.getElementById('penaltyRepeatOpponentLast'),
         penaltyRepeatOpponentPrev: document.getElementById('penaltyRepeatOpponentPrev'),
-        weightBenchPenalty: document.getElementById('weightBenchPenalty'),
         penaltyBenchLast: document.getElementById('penaltyBenchLast'),
         penaltyBenchPrev: document.getElementById('penaltyBenchPrev'),
         settingsBtn: document.getElementById('settingsBtn'),
@@ -596,9 +588,6 @@
         undoBtn: document.getElementById('undoBtn'),
         resultArea: document.getElementById('resultArea'),
         historyArea: document.getElementById('historyArea'),
-        totalScore: document.getElementById('totalScore'),
-        courtsUsed: document.getElementById('courtsUsed'),
-        triesUsed: document.getElementById('triesUsed')
     };
 
     function clonePlayers(players) {
@@ -629,15 +618,14 @@
 
     function getConfig() {
         return {
-            teamBalanceWeight: Number(el.weightTeamBalance.value),
-            partnerBalanceWeight: Number(el.weightPartnerBalance.value),
-            teammateLastPenalty: Number(el.penaltyRepeatTeammateLast.value),
-            teammatePrevPenalty: Number(el.penaltyRepeatTeammatePrev.value),
-            opponentLastPenalty: Number(el.penaltyRepeatOpponentLast.value),
-            opponentPrevPenalty: Number(el.penaltyRepeatOpponentPrev.value),
-            baseBenchPenalty: Number(el.weightBenchPenalty.value),
-            benchLastPenalty: Number(el.penaltyBenchLast.value),
-            benchPrevPenalty: Number(el.penaltyBenchPrev.value)
+            teamBalanceWeight: el.weightTeamBalance.checked ? FIXED_CONFIG.teamBalanceWeight : 0,
+            partnerBalanceWeight: el.weightPartnerBalance.checked ? FIXED_CONFIG.partnerBalanceWeight : 0,
+            teammateLastPenalty: el.penaltyRepeatTeammateLast.checked ? FIXED_CONFIG.teammateLastPenalty : 0,
+            teammatePrevPenalty: el.penaltyRepeatTeammatePrev.checked ? FIXED_CONFIG.teammatePrevPenalty : 0,
+            opponentLastPenalty: el.penaltyRepeatOpponentLast.checked ? FIXED_CONFIG.opponentLastPenalty : 0,
+            opponentPrevPenalty: el.penaltyRepeatOpponentPrev.checked ? FIXED_CONFIG.opponentPrevPenalty : 0,
+            benchLastPenalty: el.penaltyBenchLast.checked ? FIXED_CONFIG.benchLastPenalty : 0,
+            benchPrevPenalty: el.penaltyBenchPrev.checked ? FIXED_CONFIG.benchPrevPenalty : 0
         };
     }
 
@@ -718,7 +706,7 @@
         return {courts, benched};
     }
 
-    function scoreBenchRotation(round, history, config, breakdown) {
+    function scoreBenchRotation(round, history, config) {
         let scoreDelta = 0;
         const lastRound = history[history.length - 1] || null;
         const prevRound = history[history.length - 2] || null;
@@ -726,20 +714,14 @@
         const prevBenched = new Set(prevRound ? prevRound.benched.map(player => player.name) : []);
 
         for (const player of round.benched) {
-            const benchPenalty = config.baseBenchPenalty
-            scoreDelta -= benchPenalty;
-            breakdown.benchPenalty += benchPenalty;
-
             if (lastBenched.has(player.name)) {
                 const repeatPenalty = config.benchLastPenalty;
                 scoreDelta -= repeatPenalty;
-                breakdown.benchRepeatPenalty += repeatPenalty;
             }
 
             if (prevBenched.has(player.name)) {
                 const repeatPenalty = config.benchPrevPenalty;
                 scoreDelta -= repeatPenalty;
-                breakdown.benchRepeatPenalty += repeatPenalty;
             }
         }
         return scoreDelta;
@@ -747,14 +729,6 @@
 
     function scoreRound(round, history, config) {
         let score = 0;
-        const breakdown = {
-            teamBalancePenalty: 0,
-            partnerPenalty: 0,
-            teammateRepeatPenalty: 0,
-            opponentRepeatPenalty: 0,
-            benchPenalty: 0,
-            benchRepeatPenalty: 0,
-        };
 
         const lastRound = history[history.length - 1] || null;
         const prevRound = history[history.length - 2] || null;
@@ -774,8 +748,6 @@
 
             score -= teamPenalty;
             score -= partnerPenalty;
-            breakdown.teamBalancePenalty += teamPenalty;
-            breakdown.partnerPenalty += partnerPenalty;
 
             const teammatePairs = [
                 pairKey(court.teamA.players[0].name, court.teamA.players[1].name),
@@ -785,11 +757,9 @@
             for (const key of teammatePairs) {
                 if (lastMaps?.teammatePairs.has(key)) {
                     score -= config.teammateLastPenalty;
-                    breakdown.teammateRepeatPenalty += config.teammateLastPenalty;
                 }
                 if (prevMaps?.teammatePairs.has(key)) {
                     score -= config.teammatePrevPenalty;
-                    breakdown.teammateRepeatPenalty += config.teammatePrevPenalty;
                 }
             }
 
@@ -804,18 +774,16 @@
                 const key = pairKey(x, y);
                 if (lastMaps?.opponentPairs.has(key)) {
                     score -= config.opponentLastPenalty;
-                    breakdown.opponentRepeatPenalty += config.opponentLastPenalty;
                 }
                 if (prevMaps?.opponentPairs.has(key)) {
                     score -= config.opponentPrevPenalty;
-                    breakdown.opponentRepeatPenalty += config.opponentPrevPenalty;
                 }
             }
         }
 
-        score += scoreBenchRotation(round, history, config, breakdown);
+        score += scoreBenchRotation(round, history, config);
 
-        return {score, breakdown};
+        return score;
     }
 
     function findBestRound(players, courtCount, iterations, history, config) {
@@ -942,9 +910,6 @@
     }
 
     function renderRound(result, iterations) {
-        el.totalScore.textContent = result.score.toFixed(1);
-        el.courtsUsed.textContent = String(result.courts.length);
-        el.triesUsed.textContent = String(iterations);
 
         let html = '';
 
@@ -1009,7 +974,6 @@
                 <div class="result-card">
                     <div class="court-title">
                         <span>Kamp ${roundNo}</span>
-                        <span class="tag">Score ${round.score.toFixed(1)}</span>
                     </div>
                     <ul class="history-list">
                         ${round.courts.map((court, i) => `
@@ -1120,9 +1084,6 @@
         state.lastResult = null;
         renderHistory();
         renderPlayerStats();
-        el.totalScore.textContent = '-';
-        el.courtsUsed.textContent = '-';
-        el.triesUsed.textContent = '-';
         el.resultArea.innerHTML = '<p class="subtle">Historikken er nulstillet. Generér en ny kamp.</p>';
     }
 
@@ -1135,9 +1096,6 @@
         renderHistory();
         renderPlayerStats();
         el.resultArea.innerHTML = '<p class="subtle">Seneste kamp er fjernet fra historikken.</p>';
-        el.totalScore.textContent = '-';
-        el.courtsUsed.textContent = '-';
-        el.triesUsed.textContent = '-';
     }
 
     el.addPlayerBtn.addEventListener('click', addPlayer);
