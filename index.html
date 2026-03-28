@@ -16,6 +16,7 @@
                 <button class="ghost menu-item" id="settingsBtn">Indstillinger</button>
                 <button class="ghost menu-item" id="importExportBtn">Importér / eksportér</button>
                 <button class="danger menu-item" id="resetHistoryBtn">Nulstil historik</button>
+                <button class="danger menu-item" id="resetAllBtn">Nulstil alt</button>
             </div>
         </div>
     </header>
@@ -23,18 +24,16 @@
     <div class="grid">
         <div>
             <div class="panel">
-                <div class="flex-row">
-                <h2>Spillere</h2>
+                <div class="flex-row mb">
+                    <h2 class="h-no-m">Spillere</h2>
                     <div class="actions">
                         <button class="ghost" id="arrivalBtn">Meld ankomst</button>
                         <button class="secondary" id="newPlayerBtn">Ny spiller</button>
                     </div>
                 </div>
 
-                    <h3 id="activePlayersTitle">0 aktive spillere</h3>
-
-
-                <div class="player-chip-list" id="playerRosterArea"></div>
+                    <span id="activePlayersTitle">0 aktive spillere</span>
+                    <div class="player-chip-list mt" id="playerRosterArea"></div>
             </div>
 
             <div class="panel arrival-panel" id="arrivalPanel">
@@ -81,7 +80,7 @@
             </div>
 
             <div class="panel" id="resultPanel">
-                <h2>Seneste kamp</h2>
+                <h2 class="h-margin">Seneste kamp</h2>
                 <div id="resultArea" class="subtle">Ingen kamp genereret endnu.</div>
             </div>
 

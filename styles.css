@@ -94,12 +94,19 @@ body {
     text-align: center;
 }
 
-h1, h2 {
-    margin-top: 0;
+.h-no-m {
+    margin: 0;
 }
 
-h3 {
-    margin-top: 20px;
+h1, h2, h3 {
+    margin: 0 0 16px;
+}
+
+.mb {
+    margin-bottom: 16px;
+}
+.mt {
+    margin-top: 16px;
 }
 
 .subtle {
@@ -352,7 +359,6 @@ button:active {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 10px;
 }
 
 .player-chip {

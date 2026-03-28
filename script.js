@@ -28,6 +28,7 @@ const el = {
     arrivalBtn: document.getElementById('arrivalBtn'),
     closeArrivalBtn: document.getElementById('closeArrivalBtn'),
     newPlayerPanel: document.getElementById('newPlayerPanel'),
+    resultPanel: document.getElementById('resultPanel'),
     newPlayerBtn: document.getElementById('newPlayerBtn'),
     closeNewPlayerBtn: document.getElementById('closeNewPlayerBtn'),
     newPlayerName: document.getElementById('newPlayerName'),
@@ -44,6 +45,7 @@ const el = {
     settingsPanel: document.getElementById('settingsPanel'),
     generateBtn: document.getElementById('generateBtn'),
     resetHistoryBtn: document.getElementById('resetHistoryBtn'),
+    resetAllBtn: document.getElementById('resetAllBtn'),
     undoBtn: document.getElementById('undoBtn'),
     resultArea: document.getElementById('resultArea'),
     historyArea: document.getElementById('historyArea'),
@@ -122,29 +124,37 @@ function getActivePlayers() {
     return state.roster.filter(player => player.active === true);
 }
 
+function getPlayers() {
+    return state.roster;
+}
+
 function getInactivePlayers() {
     return state.roster.filter(player => player.active !== true);
 }
 
-function getActivePlayersLabel(count) {
-    if (count === 1) {
-        return '1 aktiv spiller';
-    }
-    return `${count} aktive spillere`;
+function getActivePlayersLabel(activeCount, totalCount) {
+    const spillereStr = totalCount === 1 ? "spiller" : "spillere";
+    return `${activeCount} / ${totalCount} ${spillereStr} ankommet`;
 }
 
 function updateActivePlayersTitle() {
-    const count = getActivePlayers().length;
-    el.activePlayersTitle.textContent = getActivePlayersLabel(count);
+    const activePlayersCount = getActivePlayers().length;
+    const totalPlayersCount = getPlayers().length;
+    el.activePlayersTitle.textContent = getActivePlayersLabel(activePlayersCount, totalPlayersCount);
 }
 
 function updatePanelVisibility() {
     const activePlayersCount = getActivePlayers().length;
+    const totalPlayersCount = getPlayers().length;
     const hasHistory = state.history.length > 0;
 
     el.matchPanel.classList.toggle('hidden', activePlayersCount < 1);
     el.playerStatsPanel.classList.toggle('hidden', !hasHistory);
     el.historyPanel.classList.toggle('hidden', !hasHistory);
+    el.playerRosterArea.classList.toggle('hidden', !activePlayersCount);
+    el.resultPanel.classList.toggle('hidden', !hasHistory);
+    el.arrivalBtn.classList.toggle('hidden', totalPlayersCount === 0 || activePlayersCount === totalPlayersCount);
+    el.arrivalPanel.classList.toggle('hidden', totalPlayersCount === 0 || activePlayersCount === totalPlayersCount);
 }
 
 function showStatusMessage(message, duration = 2800) {
@@ -546,6 +556,7 @@ function importPlayersFromTextarea() {
         const text = el.playerImportText.value;
         const players = parsePlayersFromText(text);
         replaceRoster(players);
+        closeOverlayPanels();
     } catch (error) {
         showStatusMessage(error.message || 'Kunne ikke importere spillerlisten.');
     }
@@ -582,11 +593,12 @@ function escapeHtml(value) {
 }
 
 function replaceRoster(newPlayers) {
-    const confirmed = window.confirm(
-        'Vil du erstatte den nuværende spillerliste? Dette nulstiller også historik og aktive spillere.'
-    );
-
-    if (!confirmed) return;
+    if (state.roster.length) {
+        const confirmed = window.confirm(
+            'Vil du erstatte den nuværende spillerliste? Dette nulstiller også historik og aktive spillere.'
+        );
+        if (!confirmed) return;
+    }
 
     state.roster = clonePlayers(newPlayers).map(player => ({
         ...player,
@@ -624,7 +636,7 @@ function addPlayer() {
         return;
     }
 
-    state.roster.push({name, level, active: false});
+    state.roster.push({name, level, active: true});
 
     el.newPlayerName.value = '';
     el.newPlayerLevel.value = '2';
@@ -768,7 +780,27 @@ function resetHistory() {
     renderHistory();
     renderPlayerStats();
     updatePanelVisibility();
-    showStatusMessage('Historikken er nulstillet. Generér en ny kamp.');
+    showStatusMessage('Historikken er nulstillet.');
+    closeMenu();
+
+    saveState();
+}
+
+function resetAll() {
+    const confirmed = window.confirm('Er du sikker på, at du vil nulstille alt, inkl spillere og matchhistorik?');
+    if (!confirmed) return;
+
+    state.history = [];
+    state.roster = [];
+    state.lastResult = null;
+    renderHistory();
+    renderPlayerStats();
+    renderRoster();
+    renderArrivalList();
+    renderPlayerStats();
+    renderHistory();
+    updatePanelVisibility();
+    showStatusMessage('Alt er nulstillet.');
     closeMenu();
 
     saveState();
@@ -813,6 +845,7 @@ el.menuToggleBtn.addEventListener('click', (event) => {
 
 el.generateBtn.addEventListener('click', generateRound);
 el.resetHistoryBtn.addEventListener('click', resetHistory);
+el.resetAllBtn.addEventListener('click', resetAll);
 el.undoBtn.addEventListener('click', undoLastRound);
 
 el.loadPresetPlayersBtn.addEventListener('click', async () => {
