@@ -4,445 +4,7 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Kampprogram</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --panel: #111827;
-            --panel-2: #1f2937;
-            --text: #e5e7eb;
-            --muted: #94a3b8;
-            --accent: #22c55e;
-            --accent-2: #38bdf8;
-            --danger: #f87171;
-            --border: #334155;
-            --warning: #f59e0b;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            color: var(--text);
-            background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
-        }
-
-        .container {
-            width: 100%;
-            min-height: 100vh;
-            padding: 24px;
-        }
-
-        .app-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 20px;
-            padding: 14px 18px;
-            background: rgba(17, 24, 39, 0.92);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-            position: relative;
-        }
-
-        .app-title {
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        .header-menu {
-            position: relative;
-        }
-
-        .menu-toggle {
-            min-width: 52px;
-            font-size: 22px;
-            line-height: 1;
-            padding: 10px 14px;
-        }
-
-        .menu-dropdown {
-            position: absolute;
-            top: calc(100% + 10px);
-            right: 0;
-            min-width: 220px;
-            background: rgba(17, 24, 39, 0.98);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 10px;
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-            display: none;
-            z-index: 20;
-        }
-
-        .menu-dropdown.open {
-            display: block;
-        }
-
-        .menu-dropdown button {
-            width: 100%;
-            text-align: left;
-            margin: 0;
-        }
-
-        .menu-dropdown .menu-item + .menu-item {
-            margin-top: 8px;
-        }
-
-        .mini-table td.center {
-            text-align: center;
-        }
-
-        .mini-table th.center {
-            text-align: center;
-        }
-
-        h1, h2 {
-            margin-top: 0;
-        }
-
-        h3 {
-            margin-top: 20px;
-        }
-
-        .subtle {
-            color: var(--muted);
-            line-height: 1.5;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1.1fr 0.9fr;
-            gap: 20px;
-            align-items: start;
-        }
-
-        .panel {
-            background: rgba(17, 24, 39, 0.92);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 18px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-        }
-
-        .panel + .panel {
-            margin-top: 20px;
-        }
-
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 6px;
-        }
-
-        .settings-panel label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: normal;
-            min-height: 48px;
-        }
-
-        .settings-panel input[type="checkbox"] {
-            width: auto;
-            transform: scale(1.2);
-        }
-
-        input,
-        button,
-        select {
-            font: inherit;
-        }
-
-        input[type="number"],
-        input[type="text"],
-        select {
-            width: 100%;
-            background: var(--panel-2);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 10px 12px;
-        }
-
-        .row-4 {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .match-row {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 14px;
-            align-items: end;
-        }
-
-        .settings-row {
-            margin-top: 16px;
-        }
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .actions.no-top-margin {
-            margin-top: 0;
-        }
-
-        button {
-            border: none;
-            border-radius: 10px;
-            padding: 11px 16px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.05s ease, opacity 0.2s ease;
-        }
-
-        button:hover {
-            opacity: 0.95;
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        .primary {
-            background: var(--accent);
-            color: #062b12;
-        }
-
-        .secondary {
-            background: var(--accent-2);
-            color: #062235;
-        }
-
-        .danger {
-            background: var(--danger);
-            color: #3b0a0a;
-        }
-
-        .ghost {
-            background: #334155;
-            color: var(--text);
-        }
-
-        .result-card {
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 14px;
-            background: rgba(31, 41, 55, 0.7);
-            margin-bottom: 14px;
-        }
-
-        .court-title {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-
-        .vs-grid {
-            display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .team {
-            background: rgba(15, 23, 42, 0.75);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 12px;
-        }
-
-        .team h4 {
-            margin: 0 0 8px 0;
-            color: #cbd5e1;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .player-line {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 6px 0;
-            border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
-        }
-
-        .player-line:last-child {
-            border-bottom: none;
-        }
-
-        .tag {
-            display: inline-block;
-            font-size: 12px;
-            padding: 4px 8px;
-            border-radius: 999px;
-            background: rgba(56, 189, 248, 0.16);
-            color: #bae6fd;
-        }
-
-        .bench-list, .history-list {
-            margin: 0;
-            padding-left: 18px;
-            line-height: 1.6;
-        }
-
-        .warning {
-            color: #fde68a;
-            background: rgba(245, 158, 11, 0.12);
-            border: 1px solid rgba(245, 158, 11, 0.4);
-            border-radius: 10px;
-            padding: 10px 12px;
-            margin-top: 12px;
-        }
-
-        .player-manager {
-            display: grid;
-            grid-template-columns: 1.1fr 0.45fr auto;
-            gap: 10px;
-            align-items: end;
-            margin-bottom: 12px;
-        }
-
-        .player-chip-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .player-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 7px 10px;
-        }
-
-        .level {
-            color: var(--muted);
-            font-size: 12px;
-        }
-
-        .player-chip button {
-            padding: 4px 8px;
-            border-radius: 999px;
-            font-size: 12px;
-        }
-
-        .mini-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .mini-table th,
-        .mini-table td {
-            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-            padding: 8px 6px;
-            text-align: left;
-            vertical-align: top;
-        }
-
-        .mini-table th {
-            color: var(--muted);
-            font-weight: bold;
-        }
-
-        .settings-panel,
-        .arrival-panel,
-        .new-player-panel {
-            display: none;
-        }
-
-        .settings-panel.open,
-        .arrival-panel.open,
-        .new-player-panel.open {
-            display: block;
-        }
-
-        .arrival-list {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .arrival-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 10px 12px;
-        }
-
-        .arrival-item.empty {
-            grid-column: 1 / -1;
-            justify-content: flex-start;
-            color: var(--muted);
-        }
-
-        .flex-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .history-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .history-header h2 {
-            margin-bottom: 0;
-        }
-
-        @media (max-width: 980px) {
-            .grid,
-            .row-4,
-            .vs-grid,
-            .player-manager,
-            .arrival-list,
-            .match-row {
-                grid-template-columns: 1fr;
-            }
-
-            .app-header,
-            .history-header,
-            .flex-row {
-                align-items: stretch;
-            }
-
-            .menu-dropdown {
-                left: 0;
-                right: 0;
-                min-width: 0;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
 <div class="container">
@@ -452,6 +14,7 @@
             <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu">☰</button>
             <div class="menu-dropdown" id="menuDropdown">
                 <button class="ghost menu-item" id="settingsBtn">Indstillinger</button>
+                <button class="ghost menu-item" id="importExportBtn">Importér / eksportér</button>
                 <button class="danger menu-item" id="resetHistoryBtn">Nulstil historik</button>
             </div>
         </div>
@@ -460,15 +23,16 @@
     <div class="grid">
         <div>
             <div class="panel">
-                <h2>Spillere</h2>
-
                 <div class="flex-row">
-                    <h3 id="activePlayersTitle">Ingen aktive spillere</h3>
+                <h2>Spillere</h2>
                     <div class="actions">
                         <button class="ghost" id="arrivalBtn">Meld ankomst</button>
                         <button class="secondary" id="newPlayerBtn">Ny spiller</button>
                     </div>
                 </div>
+
+                    <h3 id="activePlayersTitle">0 aktive spillere</h3>
+
 
                 <div class="player-chip-list" id="playerRosterArea"></div>
             </div>
@@ -478,14 +42,13 @@
                     <h2>Meld ankomst</h2>
                     <button class="ghost" id="closeArrivalBtn">Luk</button>
                 </div>
-                <p class="subtle">Her vises kun spillere, som findes i listen, men som ikke er aktive endnu.</p>
                 <div class="arrival-list" id="arrivalListArea"></div>
             </div>
 
             <div class="panel new-player-panel" id="newPlayerPanel">
                 <div class="flex-row">
                     <h2>Opret ny spiller</h2>
-                    <button class="ghost" id="closeNewPlayerBtn">Luk / Skjul</button>
+                    <button class="ghost" id="closeNewPlayerBtn">Luk</button>
                 </div>
 
                 <div class="player-manager">
@@ -503,7 +66,7 @@
                 </div>
             </div>
 
-            <div class="panel">
+            <div class="panel hidden" id="matchPanel">
                 <h2>Lav kampe</h2>
 
                 <div class="match-row">
@@ -517,37 +80,46 @@
                 </div>
             </div>
 
+            <div class="panel" id="resultPanel">
+                <h2>Seneste kamp</h2>
+                <div id="resultArea" class="subtle">Ingen kamp genereret endnu.</div>
+            </div>
+
             <div class="panel settings-panel" id="settingsPanel">
-                <h2>Score / straf-konfiguration</h2>
+                <h2>Indstillinger</h2>
 
                 <div class="settings-row">
-                    <label for="iterations">Antal random forsøg</label>
                     <input id="iterations" type="number" min="1" step="100" value="1000"/>
+                    <label for="iterations">tilfældige kampprogrammer genereres hver gang, hvorfra bedste sammensætning vælges</label>
                 </div>
 
                 <div class="row-4" style="margin-top: 16px;">
                     <div>
                         <label>
                             <input id="weightTeamBalance" type="checkbox" checked />
-                            Prioritér modstander på samme niveau
+                            Prioritér modstandere på samme niveau
                         </label>
                     </div>
                     <div>
                         <label>
                             <input id="weightPartnerBalance" type="checkbox" checked />
-                            Prioritér partner på samme niveau
+                            Prioritér partnere på samme niveau
+                        </label>
+                    </div>
+
+                </div>
+
+                <div class="row-4">
+                    <div>
+                        <label>
+                            <input id="penaltyRepeatTeammate" type="checkbox" checked />
+                            Prioritér nye partnere
                         </label>
                     </div>
                     <div>
                         <label>
-                            <input id="penaltyRepeatTeammateLast" type="checkbox" checked />
-                            Prioritér ny partner i forhold til sidste kamp
-                        </label>
-                    </div>
-                    <div>
-                        <label>
-                            <input id="penaltyRepeatTeammatePrev" type="checkbox" checked />
-                            Prioritér ny partner i forhold til forrige kamp
+                            <input id="penaltyRepeatOpponent" type="checkbox" checked />
+                            Prioritér nye modstandere
                         </label>
                     </div>
                 </div>
@@ -555,48 +127,54 @@
                 <div class="row-4">
                     <div>
                         <label>
-                            <input id="penaltyRepeatOpponentLast" type="checkbox" checked />
-                            Prioritér ny modstander i forhold til sidste kamp
-                        </label>
-                    </div>
-                    <div>
-                        <label>
-                            <input id="penaltyRepeatOpponentPrev" type="checkbox" checked />
-                            Prioritér ny modstander i forhold til forrige kamp
+                            <input id="penaltyBench" type="checkbox" checked />
+                            Prioritér kampe til spillere, der for nyligt har været på bænken
                         </label>
                     </div>
                 </div>
 
-                <div class="row-4">
-                    <div>
-                        <label>
-                            <input id="penaltyBenchLast" type="checkbox" checked />
-                            Brug straf for samme spiller på bænken som sidst
-                        </label>
+            </div>
+
+            <div class="panel import-export-panel" id="importExportPanel">
+                <div class="flex-row">
+                    <h2>Importér / eksportér spillere</h2>
+                    <button class="ghost" id="closeImportExportBtn">Luk</button>
+                </div>
+
+                <div class="settings-row">
+                    <label for="presetPlayerList">Hent spillere fra prædefineret liste</label>
+                    <div class="actions">
+                        <select id="presetPlayerList">
+                            <option value="">Vælg liste</option>
+                            <option value="voksenfjer.txt">Voksenfjer</option>
+                        </select>
+                        <button class="secondary" id="loadPresetPlayersBtn">Hent spillere</button>
                     </div>
-                    <div>
-                        <label>
-                            <input id="penaltyBenchPrev" type="checkbox" checked />
-                            Brug straf for samme spiller på bænken som forrige
-                        </label>
-                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <label for="playerImportText">Indsæt spillerliste</label>
+                    <textarea
+                            id="playerImportText"
+                            rows="10"
+                            placeholder="Esben,3&#10;Palle,3&#10;Ditte,1"
+                    ></textarea>
+                </div>
+
+                <div class="actions" style="margin-top: 12px;">
+                    <button class="secondary" id="importPlayersBtn">Importér spillere</button>
+                    <button class="ghost" id="copyPlayersBtn">Kopiér nuværende spillerliste</button>
                 </div>
             </div>
         </div>
 
         <div>
-            <div class="panel">
-                <div id="resultArea">
-                    <p class="subtle">Tryk på <strong>Lav næste kamp</strong> for at generere en opstilling.</p>
-                </div>
-            </div>
-
-            <div class="panel">
+            <div class="panel hidden" id="playerStatsPanel">
                 <h2>Status på spillere</h2>
                 <div id="playerStatsArea" class="subtle">Ingen data endnu.</div>
             </div>
 
-            <div class="panel">
+            <div class="panel hidden" id="historyPanel">
                 <div class="history-header">
                     <h2>Historik</h2>
                     <button class="ghost" id="undoBtn">Fjern seneste kamp fra historik</button>
@@ -606,650 +184,7 @@
         </div>
     </div>
 </div>
-
-<script>
-    const DEFAULT_PLAYERS = [
-        {name: 'Esben', level: 3, active: false},
-        {name: 'Palle', level: 3, active: false},
-        {name: 'Ditte', level: 1, active: false},
-        {name: 'Lene', level: 1, active: false},
-        {name: 'Mette', level: 1, active: false},
-        {name: 'Dishaan', level: 3, active: false},
-        {name: 'Karina', level: 2, active: false},
-        {name: 'Martin', level: 3, active: false},
-        {name: 'Paw', level: 3, active: false},
-        {name: 'Kent', level: 3, active: false},
-        {name: 'Jonas', level: 3, active: false},
-        {name: 'Mads', level: 2, active: false},
-        {name: 'Mona', level: 2, active: false},
-        {name: 'Peter', level: 2, active: false},
-        {name: 'Louise', level: 2, active: false},
-        {name: 'Thor', level: 2, active: false},
-        {name: 'Ioana', level: 2, active: false},
-        {name: 'Christoffer', level: 3, active: false},
-        {name: 'Klaus', level: 3, active: false},
-        {name: 'Varsha', level: 2, active: false},
-        {name: 'Anders', level: 2, active: false},
-        {name: 'Trine', level: 2, active: false},
-        {name: 'Esra', level: 1, active: false},
-        {name: 'Istahil', level: 1, active: false},
-        {name: 'Katrine', level: 2, active: false},
-        {name: 'Philip', level: 2, active: false},
-        {name: 'Laura', level: 2, active: false},
-        {name: 'Mark', level: 3, active: false},
-    ];
-
-    const FIXED_CONFIG = {
-        teamBalanceWeight: 12,
-        partnerBalanceWeight: 3,
-        teammateLastPenalty: 10,
-        teammatePrevPenalty: 6,
-        opponentLastPenalty: 5,
-        opponentPrevPenalty: 2.5,
-        benchLastPenalty: 500,
-        benchPrevPenalty: 120
-    };
-
-    const state = {
-        roster: [],
-        history: [],
-        lastResult: null
-    };
-
-    const el = {
-        activePlayersTitle: document.getElementById('activePlayersTitle'),
-        playerRosterArea: document.getElementById('playerRosterArea'),
-        playerStatsArea: document.getElementById('playerStatsArea'),
-        arrivalListArea: document.getElementById('arrivalListArea'),
-        arrivalPanel: document.getElementById('arrivalPanel'),
-        arrivalBtn: document.getElementById('arrivalBtn'),
-        closeArrivalBtn: document.getElementById('closeArrivalBtn'),
-        newPlayerPanel: document.getElementById('newPlayerPanel'),
-        newPlayerBtn: document.getElementById('newPlayerBtn'),
-        closeNewPlayerBtn: document.getElementById('closeNewPlayerBtn'),
-        newPlayerName: document.getElementById('newPlayerName'),
-        newPlayerLevel: document.getElementById('newPlayerLevel'),
-        addPlayerBtn: document.getElementById('addPlayerBtn'),
-        courtCount: document.getElementById('courtCount'),
-        iterations: document.getElementById('iterations'),
-        weightTeamBalance: document.getElementById('weightTeamBalance'),
-        weightPartnerBalance: document.getElementById('weightPartnerBalance'),
-        penaltyRepeatTeammateLast: document.getElementById('penaltyRepeatTeammateLast'),
-        penaltyRepeatTeammatePrev: document.getElementById('penaltyRepeatTeammatePrev'),
-        penaltyRepeatOpponentLast: document.getElementById('penaltyRepeatOpponentLast'),
-        penaltyRepeatOpponentPrev: document.getElementById('penaltyRepeatOpponentPrev'),
-        penaltyBenchLast: document.getElementById('penaltyBenchLast'),
-        penaltyBenchPrev: document.getElementById('penaltyBenchPrev'),
-        settingsBtn: document.getElementById('settingsBtn'),
-        settingsPanel: document.getElementById('settingsPanel'),
-        generateBtn: document.getElementById('generateBtn'),
-        resetHistoryBtn: document.getElementById('resetHistoryBtn'),
-        undoBtn: document.getElementById('undoBtn'),
-        resultArea: document.getElementById('resultArea'),
-        historyArea: document.getElementById('historyArea'),
-        menuToggleBtn: document.getElementById('menuToggleBtn'),
-        menuDropdown: document.getElementById('menuDropdown')
-    };
-
-    function clonePlayers(players) {
-        return players.map(player => ({...player, active: Boolean(player.active)}));
-    }
-
-    function normalizeName(name) {
-        return String(name || '').trim();
-    }
-
-    function updateActivePlayersTitle() {
-        const count = getActivePlayers().length;
-        el.activePlayersTitle.textContent = count === 0
-            ? 'Ingen aktive spillere'
-            : `${count} aktive spillere i dag`;
-    }
-
-    function loadDefaults() {
-        state.roster = clonePlayers(DEFAULT_PLAYERS).map(player => ({
-            ...player,
-            active: false
-        }));
-        renderRoster();
-        renderArrivalList();
-        renderPlayerStats();
-    }
-
-    function getActivePlayers() {
-        return state.roster.filter(player => player.active === true);
-    }
-
-    function getInactivePlayers() {
-        return state.roster.filter(player => player.active !== true);
-    }
-
-    function getConfig() {
-        return {
-            teamBalanceWeight: el.weightTeamBalance.checked ? FIXED_CONFIG.teamBalanceWeight : 0,
-            partnerBalanceWeight: el.weightPartnerBalance.checked ? FIXED_CONFIG.partnerBalanceWeight : 0,
-            teammateLastPenalty: el.penaltyRepeatTeammateLast.checked ? FIXED_CONFIG.teammateLastPenalty : 0,
-            teammatePrevPenalty: el.penaltyRepeatTeammatePrev.checked ? FIXED_CONFIG.teammatePrevPenalty : 0,
-            opponentLastPenalty: el.penaltyRepeatOpponentLast.checked ? FIXED_CONFIG.opponentLastPenalty : 0,
-            opponentPrevPenalty: el.penaltyRepeatOpponentPrev.checked ? FIXED_CONFIG.opponentPrevPenalty : 0,
-            benchLastPenalty: el.penaltyBenchLast.checked ? FIXED_CONFIG.benchLastPenalty : 0,
-            benchPrevPenalty: el.penaltyBenchPrev.checked ? FIXED_CONFIG.benchPrevPenalty : 0
-        };
-    }
-
-    function shuffle(arr) {
-        const copy = [...arr];
-        for (let i = copy.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [copy[i], copy[j]] = [copy[j], copy[i]];
-        }
-        return copy;
-    }
-
-    function pairKey(a, b) {
-        return [a, b].sort().join('::');
-    }
-
-    function buildRelationMaps(round) {
-        const teammatePairs = new Set();
-        const opponentPairs = new Set();
-
-        for (const court of round.courts) {
-            const [a1, a2] = court.teamA.players;
-            const [b1, b2] = court.teamB.players;
-
-            teammatePairs.add(pairKey(a1.name, a2.name));
-            teammatePairs.add(pairKey(b1.name, b2.name));
-
-            const opponents = [
-                [a1.name, b1.name], [a1.name, b2.name],
-                [a2.name, b1.name], [a2.name, b2.name]
-            ];
-
-            for (const [x, y] of opponents) {
-                opponentPairs.add(pairKey(x, y));
-            }
-        }
-
-        return {
-            teammatePairs,
-            opponentPairs,
-            benched: new Set(round.benched.map(player => player.name))
-        };
-    }
-
-    function createRandomRound(players, courtCount) {
-        const shuffled = shuffle(players);
-
-        const maxSlots = Math.min(courtCount * 4, shuffled.length);
-        const usablePlayers = Math.floor(maxSlots / 4) * 4;
-
-        const selected = shuffled.slice(0, usablePlayers);
-        const benched = shuffled.slice(usablePlayers);
-        const courts = [];
-
-        for (let i = 0; i < selected.length; i += 4) {
-            const group = selected.slice(i, i + 4);
-
-            const arrangements = [
-                {teamA: [group[0], group[1]], teamB: [group[2], group[3]]},
-                {teamA: [group[0], group[2]], teamB: [group[1], group[3]]},
-                {teamA: [group[0], group[3]], teamB: [group[1], group[2]]}
-            ];
-
-            const chosen = arrangements[Math.floor(Math.random() * arrangements.length)];
-
-            courts.push({
-                teamA: {
-                    players: chosen.teamA,
-                    totalLevel: chosen.teamA.reduce((sum, p) => sum + p.level, 0)
-                },
-                teamB: {
-                    players: chosen.teamB,
-                    totalLevel: chosen.teamB.reduce((sum, p) => sum + p.level, 0)
-                }
-            });
-        }
-
-        return {courts, benched};
-    }
-
-    function scoreBenchRotation(round, history, config) {
-        let scoreDelta = 0;
-        const lastRound = history[history.length - 1] || null;
-        const prevRound = history[history.length - 2] || null;
-        const lastBenched = new Set(lastRound ? lastRound.benched.map(player => player.name) : []);
-        const prevBenched = new Set(prevRound ? prevRound.benched.map(player => player.name) : []);
-
-        for (const player of round.benched) {
-            if (lastBenched.has(player.name)) {
-                scoreDelta -= config.benchLastPenalty;
-            }
-
-            if (prevBenched.has(player.name)) {
-                scoreDelta -= config.benchPrevPenalty;
-            }
-        }
-        return scoreDelta;
-    }
-
-    function scoreRound(round, history, config) {
-        let score = 0;
-
-        const lastRound = history[history.length - 1] || null;
-        const prevRound = history[history.length - 2] || null;
-        const lastMaps = lastRound ? buildRelationMaps(lastRound) : null;
-        const prevMaps = prevRound ? buildRelationMaps(prevRound) : null;
-
-        for (const court of round.courts) {
-            const sumA = court.teamA.totalLevel;
-            const sumB = court.teamB.totalLevel;
-            const teamDiff = Math.abs(sumA - sumB);
-
-            const partnerDiffA = Math.abs(court.teamA.players[0].level - court.teamA.players[1].level);
-            const partnerDiffB = Math.abs(court.teamB.players[0].level - court.teamB.players[1].level);
-
-            score -= teamDiff * config.teamBalanceWeight;
-            score -= (partnerDiffA + partnerDiffB) * config.partnerBalanceWeight;
-
-            const teammatePairs = [
-                pairKey(court.teamA.players[0].name, court.teamA.players[1].name),
-                pairKey(court.teamB.players[0].name, court.teamB.players[1].name)
-            ];
-
-            for (const key of teammatePairs) {
-                if (lastMaps?.teammatePairs.has(key)) score -= config.teammateLastPenalty;
-                if (prevMaps?.teammatePairs.has(key)) score -= config.teammatePrevPenalty;
-            }
-
-            const opponents = [
-                [court.teamA.players[0].name, court.teamB.players[0].name],
-                [court.teamA.players[0].name, court.teamB.players[1].name],
-                [court.teamA.players[1].name, court.teamB.players[0].name],
-                [court.teamA.players[1].name, court.teamB.players[1].name]
-            ];
-
-            for (const [x, y] of opponents) {
-                const key = pairKey(x, y);
-                if (lastMaps?.opponentPairs.has(key)) score -= config.opponentLastPenalty;
-                if (prevMaps?.opponentPairs.has(key)) score -= config.opponentPrevPenalty;
-            }
-        }
-
-        score += scoreBenchRotation(round, history, config);
-        return score;
-    }
-
-    function findBestRound(players, courtCount, iterations, history, config) {
-        let best = null;
-
-        for (let i = 0; i < iterations; i++) {
-            const round = createRandomRound(players, courtCount);
-            const score = scoreRound(round, history, config);
-            const candidate = {...round, score, iteration: i + 1};
-
-            if (!best || candidate.score > best.score) {
-                best = candidate;
-            }
-        }
-
-        return best;
-    }
-
-    function getPlayerStats() {
-        return state.roster.filter(player => player.active).map(player => {
-            let played = 0;
-            let benched = 0;
-            let benchedLast = false;
-            let benchedPrev = false;
-
-            state.history.forEach((round, index) => {
-                const onBench = round.benched.some(p => p.name === player.name);
-                const onCourt = round.courts.some(court =>
-                    [...court.teamA.players, ...court.teamB.players].some(p => p.name === player.name)
-                );
-
-                if (onBench) benched += 1;
-                if (onCourt) played += 1;
-
-                if (index === state.history.length - 1) benchedLast = onBench;
-                if (index === state.history.length - 2) benchedPrev = onBench;
-            });
-
-            return {
-                ...player,
-                played,
-                benched,
-                benchedLast,
-                benchedPrev
-            };
-        });
-    }
-
-    function renderRoster() {
-        const activePlayers = getActivePlayers();
-        updateActivePlayersTitle();
-
-        if (activePlayers.length === 0) {
-            el.playerRosterArea.innerHTML = '<div class="subtle">Ingen aktive spillere endnu.</div>';
-            return;
-        }
-
-        el.playerRosterArea.innerHTML = activePlayers.map(player => {
-            const index = state.roster.findIndex(p => p.name === player.name);
-            return `
-                <div class="player-chip">
-                    <span><strong>${escapeHtml(player.name)}</strong> <span class="level">${player.level}</span></span>
-                    <button class="danger" onclick="removePlayer(${index})">Fjern</button>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function renderArrivalList() {
-        const inactivePlayers = getInactivePlayers();
-
-        if (inactivePlayers.length === 0) {
-            el.arrivalListArea.innerHTML = '<div class="arrival-item empty">Alle spillere er allerede aktive.</div>';
-            return;
-        }
-
-        el.arrivalListArea.innerHTML = inactivePlayers.map(player => {
-            const index = state.roster.findIndex(p => p.name === player.name);
-            return `
-                <div class="arrival-item">
-                    <div>
-                        <strong>${escapeHtml(player.name)} <span class="level">${player.level}</span></strong>
-                    </div>
-                    <button class="secondary" onclick="markArrived(${index})">Ankommet</button>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function renderPlayerStats() {
-        const stats = getPlayerStats();
-
-        if (stats.length === 0) {
-            el.playerStatsArea.innerHTML = '<div class="subtle">Ingen data endnu.</div>';
-            return;
-        }
-
-        el.playerStatsArea.innerHTML = `
-            <table class="mini-table">
-                <thead>
-                    <tr>
-                        <th>Spiller</th>
-                        <th class="center">Niveau</th>
-                        <th class="center">Spillet</th>
-                        <th class="center">Siddet over</th>
-                        <th class="center">Seneste bænk</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${stats.map(player => `
-                        <tr>
-                            <td>${escapeHtml(player.name)}</td>
-                            <td class="center">${player.level}</td>
-                            <td class="center">${player.played}</td>
-                            <td class="center">${player.benched}</td>
-                            <td class="center">
-                                ${player.benchedLast ? 'Sidst' : (player.benchedPrev ? 'Forrige' : ' ')}
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    }
-
-    function renderRound(result) {
-        let html = '';
-
-        if (result.courts.length === 0) {
-            html += '<p class="warning">Der var ikke nok aktive spillere til at fylde en bane.</p>';
-        }
-
-        result.courts.forEach((court, index) => {
-            html += `
-                <div class="result-card">
-                    <div class="court-title">
-                        <span>Bane ${index + 1}</span>
-                        <span class="tag">Samlet niveau: ${court.teamA.totalLevel} vs ${court.teamB.totalLevel}</span>
-                    </div>
-                    <div class="vs-grid">
-                        <div class="team">
-                            <h4>Hold A</h4>
-                            ${court.teamA.players.map(player => `
-                                <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div><strong>VS</strong></div>
-                        <div class="team">
-                            <h4>Hold B</h4>
-                            ${court.teamB.players.map(player => `
-                                <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-
-        if (result.benched.length > 0) {
-            html += `
-                <div class="result-card">
-                    <h3>Sidder over</h3>
-                    <ul class="bench-list">
-                        ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${p.level}</span></li>`).join('')}
-                    </ul>
-                </div>
-            `;
-        }
-
-        el.resultArea.innerHTML = html;
-    }
-
-    function renderHistory() {
-        if (state.history.length === 0) {
-            el.historyArea.innerHTML = '<div class="subtle">Ingen kampe endnu.</div>';
-            return;
-        }
-
-        const recent = state.history.slice(-6).reverse();
-        el.historyArea.innerHTML = recent.map((round, idx) => {
-            const roundNo = state.history.length - idx;
-            return `
-                <div class="result-card">
-                    <div class="court-title">
-                        <span>Kamp ${roundNo}</span>
-                    </div>
-                    <ul class="history-list">
-                        ${round.courts.map((court, i) => `
-                            <li>
-                                Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} + ${escapeHtml(court.teamA.players[1].name)}
-                                mod
-                                ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
-                            </li>
-                        `).join('')}
-                        ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>`).join(', ')}</li>` : ''}
-                    </ul>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function escapeHtml(value) {
-        return String(value)
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#039;');
-    }
-
-    function addPlayer() {
-        const name = normalizeName(el.newPlayerName.value);
-        const level = Number(el.newPlayerLevel.value);
-
-        if (!name) {
-            el.resultArea.innerHTML = '<div class="warning">Skriv et navn før du tilføjer spilleren.</div>';
-            return;
-        }
-
-        if (![1, 2, 3].includes(level)) {
-            el.resultArea.innerHTML = '<div class="warning">Niveau skal være 1, 2 eller 3.</div>';
-            return;
-        }
-
-        if (state.roster.some(player => player.name.toLowerCase() === name.toLowerCase())) {
-            el.resultArea.innerHTML = `<div class="warning">Spilleren ${escapeHtml(name)} findes allerede.</div>`;
-            return;
-        }
-
-        state.roster.push({name, level, active: false});
-
-        el.newPlayerName.value = '';
-        el.newPlayerLevel.value = '2';
-
-        renderRoster();
-        renderArrivalList();
-        renderPlayerStats();
-
-        el.newPlayerPanel.classList.remove('open');
-        el.resultArea.innerHTML = `<div class="subtle">Spilleren <strong>${escapeHtml(name)}</strong> er oprettet. Brug <strong>Meld ankomst</strong> for at aktivere spilleren.</div>`;
-    }
-
-    function markArrived(index) {
-        const player = state.roster[index];
-        if (!player) return;
-
-        player.active = true;
-        renderRoster();
-        renderArrivalList();
-        renderPlayerStats();
-    }
-
-    function removePlayer(index) {
-        const player = state.roster[index];
-        if (!player) return;
-
-        player.active = false;
-        renderRoster();
-        renderArrivalList();
-        renderPlayerStats();
-    }
-
-    window.markArrived = markArrived;
-    window.removePlayer = removePlayer;
-
-    function generateRound() {
-        try {
-            const players = getActivePlayers();
-            const courtCount = Math.max(1, Number(el.courtCount.value) || 1);
-            const iterations = Math.max(1, Number(el.iterations.value) || 1000);
-            const config = getConfig();
-
-            if (players.length < 4) {
-                throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Markér flere spillere som ankommet først.');
-            }
-
-            const best = findBestRound(players, courtCount, iterations, state.history, config);
-
-            if (!best) {
-                throw new Error('Kunne ikke finde en gyldig opstilling.');
-            }
-
-            state.lastResult = best;
-            state.history.push(best);
-
-            renderRound(best);
-            renderHistory();
-            renderPlayerStats();
-        } catch (err) {
-            el.resultArea.innerHTML = `<div class="warning">${escapeHtml(err.message)}</div>`;
-        }
-    }
-
-    function resetHistory() {
-        const confirmed = window.confirm('Er du sikker på, at du vil nulstille hele historikken?');
-        if (!confirmed) return;
-
-        state.history = [];
-        state.lastResult = null;
-        renderHistory();
-        renderPlayerStats();
-        el.resultArea.innerHTML = '<p class="subtle">Historikken er nulstillet. Generér en ny kamp.</p>';
-        closeMenu();
-    }
-
-    function undoLastRound() {
-        if (state.history.length === 0) return;
-
-        const confirmed = window.confirm('Er du sikker på, at du vil fjerne seneste kamp fra historikken?');
-        if (!confirmed) return;
-
-        state.history.pop();
-        state.lastResult = state.history[state.history.length - 1] || null;
-
-        renderHistory();
-        renderPlayerStats();
-        el.resultArea.innerHTML = '<p class="subtle">Seneste kamp er fjernet fra historikken.</p>';
-    }
-
-    function toggleMenu() {
-        el.menuDropdown.classList.toggle('open');
-    }
-
-    function closeMenu() {
-        el.menuDropdown.classList.remove('open');
-    }
-
-    el.addPlayerBtn.addEventListener('click', addPlayer);
-
-    el.arrivalBtn.addEventListener('click', () => {
-        el.arrivalPanel.classList.toggle('open');
-    });
-
-    el.closeArrivalBtn.addEventListener('click', () => {
-        el.arrivalPanel.classList.remove('open');
-    });
-
-    el.newPlayerBtn.addEventListener('click', () => {
-        el.newPlayerPanel.classList.toggle('open');
-    });
-
-    el.closeNewPlayerBtn.addEventListener('click', () => {
-        el.newPlayerPanel.classList.remove('open');
-    });
-
-    el.menuToggleBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        toggleMenu();
-    });
-
-    el.settingsBtn.addEventListener('click', () => {
-        el.settingsPanel.classList.toggle('open');
-        closeMenu();
-    });
-
-    el.generateBtn.addEventListener('click', generateRound);
-    el.resetHistoryBtn.addEventListener('click', resetHistory);
-    el.undoBtn.addEventListener('click', undoLastRound);
-
-    document.addEventListener('click', (event) => {
-        const clickedInsideMenu = event.target.closest('.header-menu');
-        if (!clickedInsideMenu) {
-            closeMenu();
-        }
-    });
-
-    loadDefaults();
-    renderHistory();
-</script>
+<div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+<script src="script.js" lang="javascript"></script>
 </body>
 </html>
