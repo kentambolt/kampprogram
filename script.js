@@ -24,6 +24,7 @@ const el = {
     playerRosterArea: document.getElementById('playerRosterArea'),
     playerStatsArea: document.getElementById('playerStatsArea'),
     arrivalListArea: document.getElementById('arrivalListArea'),
+    playersPanel: document.getElementById('playersPanel'),
     arrivalPanel: document.getElementById('arrivalPanel'),
     arrivalBtn: document.getElementById('arrivalBtn'),
     closeArrivalBtn: document.getElementById('closeArrivalBtn'),
@@ -63,6 +64,7 @@ const el = {
     playerImportText: document.getElementById('playerImportText'),
     importPlayersBtn: document.getElementById('importPlayersBtn'),
     copyPlayersBtn: document.getElementById('copyPlayersBtn'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
 };
 
 function saveState() {
@@ -97,7 +99,7 @@ function restoreState() {
 
         if (data.ui) {
             el.courtCount.value = data.ui.courtCount ?? '2';
-            el.iterations.value = data.ui.iterations ?? '1000';
+            el.iterations.value = data.ui.iterations ?? '10000';
             el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
             el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
             el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
@@ -134,7 +136,7 @@ function getInactivePlayers() {
 
 function getActivePlayersLabel(activeCount, totalCount) {
     const spillereStr = totalCount === 1 ? "spiller" : "spillere";
-    return `${activeCount} / ${totalCount} ${spillereStr} ankommet`;
+    return `${activeCount} / ${totalCount} ${spillereStr} aktive`;
 }
 
 function updateActivePlayersTitle() {
@@ -153,8 +155,8 @@ function updatePanelVisibility() {
     el.historyPanel.classList.toggle('hidden', !hasHistory);
     el.playerRosterArea.classList.toggle('hidden', !activePlayersCount);
     el.resultPanel.classList.toggle('hidden', !hasHistory);
-    el.arrivalBtn.classList.toggle('hidden', totalPlayersCount === 0 || activePlayersCount === totalPlayersCount);
-    el.arrivalPanel.classList.toggle('hidden', totalPlayersCount === 0 || activePlayersCount === totalPlayersCount);
+    el.arrivalBtn.classList.toggle('hidden', totalPlayersCount === 0);
+    el.arrivalPanel.classList.toggle('hidden', totalPlayersCount === 0);
 }
 
 function showStatusMessage(message, duration = 2800) {
@@ -392,10 +394,9 @@ function renderRoster() {
     el.playerRosterArea.innerHTML = activePlayers.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
         return `
-                <div class="player-chip">
-                    <span><strong>${escapeHtml(player.name)}</strong> <span class="level">${player.level}</span></span>
-                    <button class="danger" onclick="removePlayer(${index})">Fjern</button>
-                </div>
+                <button class="player-chip" type="button" onclick="removePlayer(${index})">
+                    ${escapeHtml(player.name)}<span class="lowered">${player.level}</span>
+                </button>
             `;
     }).join('');
 }
@@ -404,7 +405,7 @@ function renderArrivalList() {
     const inactivePlayers = getInactivePlayers();
 
     if (inactivePlayers.length === 0) {
-        el.arrivalListArea.innerHTML = '<div class="arrival-item empty">Alle spillere er allerede aktive.</div>';
+        el.arrivalListArea.innerHTML = '<span class="muted">Ingen inaktive</span>';
         return;
     }
 
@@ -412,8 +413,7 @@ function renderArrivalList() {
         const index = state.roster.findIndex(p => p.name === player.name);
         return `
             <button class="arrival-chip" type="button" onclick="markArrived(${index})">
-                <strong>${escapeHtml(player.name)}</strong>
-                <span class="level">${player.level}</span>
+                ${escapeHtml(player.name)}<span class="lowered">${player.level}</span>
             </button>
         `;
     }).join('');
@@ -433,7 +433,6 @@ function renderPlayerStats() {
                 <thead>
                     <tr>
                         <th>Spiller</th>
-                        <th class="center">Niveau</th>
                         <th class="center">Spillet</th>
                         <th class="center">Siddet over</th>
                         <th class="center">Seneste bænk</th>
@@ -443,7 +442,6 @@ function renderPlayerStats() {
                     ${stats.map(player => `
                         <tr>
                             <td>${escapeHtml(player.name)}</td>
-                            <td class="center">${player.level}</td>
                             <td class="center">${player.played}</td>
                             <td class="center">${player.benched}</td>
                             <td class="center">
@@ -475,19 +473,17 @@ function renderRound(result) {
                     </div>
                     <div class="vs-grid">
                         <div class="team">
-                            <h4>Hold A</h4>
                             ${court.teamA.players.map(player => `
                                 <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
+                                    <span>${escapeHtml(player.name)}</span>
                                 </div>
                             `).join('')}
                         </div>
                         <div><strong>VS</strong></div>
                         <div class="team">
-                            <h4>Hold B</h4>
                             ${court.teamB.players.map(player => `
                                 <div class="player-line">
-                                    <span>${escapeHtml(player.name)} <span class="level">${player.level}</span></span>
+                                    <span>${escapeHtml(player.name)}</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -501,7 +497,7 @@ function renderRound(result) {
                 <div class="result-card">
                     <h3>Sidder over</h3>
                     <ul class="bench-list">
-                        ${result.benched.map(p => `<li>${escapeHtml(p.name)} <span class="level">${p.level}</span></li>`).join('')}
+                        ${result.benched.map(p => `<li>${escapeHtml(p.name)}</li>`).join('')}
                     </ul>
                 </div>
             `;
@@ -529,9 +525,9 @@ function renderHistory() {
                     <ul class="history-list">
                         ${round.courts.map((court, i) => `
                             <li>
-                                Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} + ${escapeHtml(court.teamA.players[1].name)}
+                                Bane ${i + 1}: ${escapeHtml(court.teamA.players[0].name)} og ${escapeHtml(court.teamA.players[1].name)}
                                 mod
-                                ${escapeHtml(court.teamB.players[0].name)} + ${escapeHtml(court.teamB.players[1].name)}
+                                ${escapeHtml(court.teamB.players[0].name)} og ${escapeHtml(court.teamB.players[1].name)}
                             </li>
                         `).join('')}
                         ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>`).join(', ')}</li>` : ''}
@@ -626,8 +622,8 @@ function addPlayer() {
         return;
     }
 
-    if (![1, 2, 3].includes(level)) {
-        showStatusMessage('Niveau skal være 1, 2 eller 3.');
+    if (!Number.isInteger(level) || level < 0) {
+        showStatusMessage('Niveau skal være et heltal større end eller lig med 0.');
         return;
     }
 
@@ -646,7 +642,7 @@ function addPlayer() {
     renderPlayerStats();
 
     el.newPlayerPanel.classList.remove('open');
-    showStatusMessage(`Spilleren ${name} er oprettet. Brug Meld ankomst for at aktivere spilleren.`);
+    showStatusMessage(`Spilleren ${name} er oprettet.`);
 
     saveState();
 }
@@ -674,8 +670,8 @@ function parsePlayersFromText(text) {
             throw new Error(`Mangler navn i linjen: "${line}"`);
         }
 
-        if (![1, 2, 3, 4, 5].includes(level)) {
-            throw new Error(`Ugyldigt niveau for "${name}". Niveau skal være 1, 2, 3, 4 eller 5.`);
+        if (!Number.isInteger(level) || level < 0) {
+            throw new Error(`Ugyldigt niveau for "${name}". Niveau skal være et heltal større end eller lig med 0.`);
         }
 
         const lowerName = name.toLowerCase();
@@ -741,7 +737,7 @@ function generateRound() {
         const config = getConfig();
 
         if (players.length < 4) {
-            throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Markér flere spillere som ankommet først.');
+            throw new Error('Der skal være mindst 4 aktive spillere for at lave en kamp. Markér flere spillere som aktive først.');
         }
 
         const best = findBestRound(players, courtCount, iterations, state.history, config);
@@ -769,6 +765,7 @@ function closeOverlayPanels() {
     el.arrivalPanel.classList.remove('open');
     el.newPlayerPanel.classList.remove('open');
     el.importExportPanel.classList.remove('open');
+    setSettingsMode(false);
 }
 
 function resetHistory() {
@@ -828,6 +825,32 @@ function undoLastRound() {
     saveState();
 }
 
+function setSettingsMode(enabled) {
+    const panelsToHide = [
+        el.playersPanel,
+        el.arrivalPanel,
+        el.newPlayerPanel,
+        el.matchPanel,
+        el.resultPanel,
+        el.importExportPanel,
+        el.playerStatsPanel,
+        el.historyPanel
+    ];
+
+    panelsToHide.forEach(panel => {
+        if (!panel) return;
+        panel.classList.toggle('hidden', enabled);
+    });
+
+    if (enabled) {
+        el.settingsPanel.classList.add('open');
+        el.settingsPanel.classList.remove('hidden');
+    } else {
+        el.settingsPanel.classList.remove('open');
+        updatePanelVisibility();
+    }
+}
+
 function toggleMenu() {
     el.menuDropdown.classList.toggle('open');
 }
@@ -882,10 +905,16 @@ el.closeNewPlayerBtn.addEventListener('click', () => {
 el.settingsBtn.addEventListener('click', () => {
     const shouldOpen = !el.settingsPanel.classList.contains('open');
     closeOverlayPanels();
+
     if (shouldOpen) {
-        el.settingsPanel.classList.add('open');
+        setSettingsMode(true);
     }
+
     closeMenu();
+});
+
+el.closeSettingsBtn.addEventListener('click', () => {
+    setSettingsMode(false);
 });
 
 el.importExportBtn.addEventListener('click', () => {

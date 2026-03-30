@@ -1,6 +1,6 @@
 Esben,3
 Palle,3
-Ditte,1
+Ditte,2
 Lene,1
 Mette,1
 Dishaan,3

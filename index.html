@@ -24,24 +24,24 @@
 
     <div class="grid">
         <div>
-            <div class="panel">
+            <div class="panel" id="playersPanel">
                 <div class="flex-row mb">
                     <h2 class="h-no-m">Spillere</h2>
                     <div class="actions">
-                        <button class="ghost" id="arrivalBtn">Meld ankomst</button>
+                        <button class="ghost" id="arrivalBtn">Se spillere</button>
                         <button class="secondary" id="newPlayerBtn">Ny spiller</button>
                     </div>
                 </div>
-
-                    <span id="activePlayersTitle">0 aktive spillere</span>
-                    <div class="player-chip-list mt" id="playerRosterArea"></div>
+                <span id="activePlayersTitle">0 aktive spillere</span>
             </div>
 
             <div class="panel arrival-panel" id="arrivalPanel">
                 <div class="flex-row">
-                    <h2>Meld ankomst</h2>
+                    <h2 class="h-no-m">Aktive spillere</h2>
                     <button class="ghost" id="closeArrivalBtn">Luk</button>
                 </div>
+                <div class="player-chip-list mt" id="playerRosterArea"></div>
+                <h3 style="margin-top: 46px;" class="h-margin">Inaktive</h3>
                 <div class="arrival-list" id="arrivalListArea"></div>
             </div>
 
@@ -58,7 +58,7 @@
                     </div>
                     <div>
                         <label for="newPlayerLevel">Niveau</label>
-                        <input id="newPlayerLevel" type="number" min="1" max="3" value="2"/>
+                        <input id="newPlayerLevel" type="number" min="0" value="2"/>
                     </div>
                     <div>
                         <button class="secondary" id="addPlayerBtn">Tilføj spiller</button>
@@ -86,7 +86,10 @@
             </div>
 
             <div class="panel settings-panel" id="settingsPanel">
-                <h2>Indstillinger</h2>
+                <div class="flex-row">
+                    <h2 class="h-no-m">Indstillinger</h2>
+                    <button class="ghost" id="closeSettingsBtn">Luk</button>
+                </div>
 
                 <div class="settings-row">
                     <input id="iterations" type="number" min="1" step="100" value="1000"/>
@@ -123,8 +126,6 @@
                         Prioritér kampe til spillere, der for nyligt har været på bænken
                     </label>
                 </div>
-
-
             </div>
 
             <div class="panel import-export-panel" id="importExportPanel">
@@ -145,11 +146,11 @@
                 </div>
 
                 <div class="settings-row">
-                    <label for="playerImportText">Indsæt spillerliste</label>
+                    <label for="playerImportText">Indsæt spillerliste (navn,niveau)</label>
                     <textarea
                             id="playerImportText"
                             rows="10"
-                            placeholder="Esben,3&#10;Palle,3&#10;Ditte,1"
+                            placeholder="Hans,3&#10;Anne,7&#10;Lotte,2"
                     ></textarea>
                 </div>
 
