@@ -16,7 +16,6 @@
             <div class="menu-dropdown" id="menuDropdown">
                 <button class="ghost menu-item" id="settingsBtn">Indstillinger</button>
                 <button class="ghost menu-item" id="importExportBtn">Importér / eksportér</button>
-                <button class="danger menu-item" id="resetHistoryBtn">Nulstil historik</button>
                 <button class="danger menu-item" id="resetAllBtn">Nulstil alt</button>
             </div>
         </div>
@@ -26,39 +25,57 @@
         <div>
             <div class="panel" id="playersPanel">
                 <div class="flex-row mb">
-                    <h2 class="h-no-m">Spillere</h2>
+                    <h2 class="h-no-m">Aktive spillere</h2>
                     <div class="actions">
-                        <button class="ghost" id="arrivalBtn">Se spillere</button>
-                        <button class="secondary" id="newPlayerBtn">Ny spiller</button>
+                        <button class="ghost" id="arrivalBtn">Vis alle</button>
+                        <button class="secondary" id="newPlayerBtn">Opret</button>
                     </div>
                 </div>
                 <span id="activePlayersTitle">0 aktive spillere</span>
+                <div class="player-chip-list mt" id="playerRosterArea"></div>
             </div>
 
             <div class="panel arrival-panel" id="arrivalPanel">
                 <div class="flex-row">
-                    <h2 class="h-no-m">Aktive spillere</h2>
+                    <h2 class="h-no-m">Alle spillere</h2>
                     <button class="ghost" id="closeArrivalBtn">Luk</button>
                 </div>
-                <div class="player-chip-list mt" id="playerRosterArea"></div>
-                <h3 style="margin-top: 46px;" class="h-margin">Inaktive</h3>
-                <div class="arrival-list" id="arrivalListArea"></div>
+
+                <div class="settings-row">
+                    <div class="subtle">Her kan du aktivere/deaktivere spillere og ændre deres præference for single/double.</div>
+                </div>
+
+                <div id="playerManagerListArea" class="player-manager-list mt"></div>
             </div>
 
             <div class="panel new-player-panel" id="newPlayerPanel">
                 <div class="flex-row">
-                    <h2>Opret ny spiller</h2>
+                    <h2>Opret spiller</h2>
                     <button class="ghost" id="closeNewPlayerBtn">Luk</button>
                 </div>
 
-                <div class="player-manager">
+                <div class="player-manager-form">
                     <div>
                         <label for="newPlayerName">Navn</label>
                         <input id="newPlayerName" type="text" placeholder="Fx Frederik"/>
                     </div>
                     <div>
                         <label for="newPlayerLevel">Niveau</label>
-                        <input id="newPlayerLevel" type="number" min="0" value="2"/>
+                        <select id="newPlayerLevel">
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="newPlayerPreference">Præference</label>
+                        <select id="newPlayerPreference"></select>
                     </div>
                     <div>
                         <button class="secondary" id="addPlayerBtn">Tilføj spiller</button>
@@ -78,6 +95,20 @@
                         <button class="primary" id="generateBtn">Lav næste kamp</button>
                     </div>
                 </div>
+
+                <div class="prefill-panel collapsible-panel collapsed" id="prefillPanel">
+                    <button class="prefill-header collapsible-toggle" id="prefillToggleBtn" type="button">
+                        <h3 class="h-no-m">Præudfyld næste runde</h3>
+                        <span class="collapse-indicator">▾</span>
+                    </button>
+
+                    <div class="collapsible-content">
+                        <div class="prefill-actions">
+                            <button class="ghost" id="clearPrefillBtn" type="button">Nulstil</button>
+                        </div>
+                        <div id="prefillArea" class="prefill-area"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="panel" id="resultPanel">
@@ -89,6 +120,15 @@
                 <div class="flex-row">
                     <h2 class="h-no-m">Indstillinger</h2>
                     <button class="ghost" id="closeSettingsBtn">Luk</button>
+                </div>
+
+                <div class="settings-row">
+                    <label for="matchMode">Kampformat</label>
+                    <select id="matchMode">
+                        <option value="doubles_only">Kun Doubler</option>
+                        <option value="singles_only">Kun Singler</option>
+                        <option value="both">Begge</option>
+                    </select>
                 </div>
 
                 <div class="settings-row">
@@ -146,11 +186,11 @@
                 </div>
 
                 <div class="settings-row">
-                    <label for="playerImportText">Indsæt spillerliste (navn,niveau)</label>
+                    <label for="playerImportText">Indsæt spillerliste (navn,niveau[,præference])</label>
                     <textarea
                             id="playerImportText"
                             rows="10"
-                            placeholder="Hans,3&#10;Anne,7&#10;Lotte,2"
+                            placeholder="Hans,3&#10;Anne,7,single&#10;Lotte,2&#10;Peter,4,double,1&#10;Mie,2,double"
                     ></textarea>
                 </div>
 
@@ -162,17 +202,30 @@
         </div>
 
         <div>
-            <div class="panel hidden" id="playerStatsPanel">
-                <h2>Status på spillere</h2>
-                <div id="playerStatsArea" class="subtle">Ingen data endnu.</div>
+            <div class="panel hidden collapsible-panel collapsed" id="playerStatsPanel">
+                <button class="collapsible-toggle panel-toggle" type="button" data-target="playerStatsPanel">
+                    <span>Status på spillere</span>
+                    <span class="collapse-indicator">▾</span>
+                </button>
+                <div class="collapsible-content">
+                    <div id="playerStatsArea" class="subtle">Ingen data endnu.</div>
+                </div>
             </div>
 
-            <div class="panel hidden" id="historyPanel">
-                <div class="history-header">
-                    <h2>Historik</h2>
-                    <button class="ghost" id="undoBtn">Fjern seneste</button>
+            <div class="panel hidden collapsible-panel collapsed" id="historyPanel">
+                <button class="collapsible-toggle panel-toggle" type="button" data-target="historyPanel">
+                    <span>Historik</span>
+                    <span class="collapse-indicator">▾</span>
+                </button>
+
+                <div class="collapsible-content">
+                    <div class="history-header">
+
+                        <button class="ghost" id="undoBtn">Fjern seneste</button>
+                        <button class="danger menu-item" id="resetHistoryBtn">Fjern alle</button>
+                    </div>
+                    <div id="historyArea" class="subtle">Ingen kampe endnu.</div>
                 </div>
-                <div id="historyArea" class="subtle">Ingen kampe endnu.</div>
             </div>
         </div>
     </div>
