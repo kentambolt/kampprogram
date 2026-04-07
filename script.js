@@ -7,17 +7,8 @@ const FIXED_CONFIG = {
     opponentPrevPenalty: 2.5,
     benchLastPenalty: 500,
     benchPrevPenalty: 120,
-    singlesPreferenceReward: 10,
-    singlesPreferencePenalty: 8,
-    doublesPreferenceReward: 10,
-    doublesPreferencePenalty: 8,
 };
 
-const MATCH_MODES = {
-    DOUBLES_ONLY: 'doubles_only',
-    SINGLES_ONLY: 'singles_only',
-    BOTH: 'both'
-};
 
 const COURT_FORMATS = {
     BOTH: 'both',
@@ -32,9 +23,9 @@ const PLAYER_PREFERENCES = {
 };
 
 const PLAYER_PREFERENCE_OPTIONS = [
-    { value: PLAYER_PREFERENCES.NONE, label: 'Flex', shortLabel: '' },
-    { value: PLAYER_PREFERENCES.NO_DOUBLE, label: 'Single', shortLabel: 'S' },
-    { value: PLAYER_PREFERENCES.NO_SINGLE, label: 'Double', shortLabel: 'D' },
+    {value: PLAYER_PREFERENCES.NONE, label: 'Flex', shortLabel: ''},
+    {value: PLAYER_PREFERENCES.NO_DOUBLE, label: 'Single', shortLabel: 'S'},
+    {value: PLAYER_PREFERENCES.NO_SINGLE, label: 'Double', shortLabel: 'D'},
 ];
 
 const state = {
@@ -48,14 +39,14 @@ const STORAGE_KEY = 'kampprogram-state-v2';
 let toastTimer = null;
 
 const el = {
+    mainPage: document.getElementById('mainPage'),
     activePlayersTitle: document.getElementById('activePlayersTitle'),
+    allPlayersTitle: document.getElementById('allPlayersTitle'),
     playerRosterArea: document.getElementById('playerRosterArea'),
     playerStatsArea: document.getElementById('playerStatsArea'),
     playerManagerListArea: document.getElementById('playerManagerListArea'),
     playersPanel: document.getElementById('playersPanel'),
     arrivalPanel: document.getElementById('arrivalPanel'),
-    arrivalBtn: document.getElementById('arrivalBtn'),
-    closeArrivalBtn: document.getElementById('closeArrivalBtn'),
     newPlayerPanel: document.getElementById('newPlayerPanel'),
     resultPanel: document.getElementById('resultPanel'),
     newPlayerBtn: document.getElementById('newPlayerBtn'),
@@ -66,7 +57,6 @@ const el = {
     addPlayerBtn: document.getElementById('addPlayerBtn'),
     courtCount: document.getElementById('courtCount'),
     iterations: document.getElementById('iterations'),
-    matchMode: document.getElementById('matchMode'),
     weightTeamBalance: document.getElementById('weightTeamBalance'),
     weightPartnerBalance: document.getElementById('weightPartnerBalance'),
     penaltyRepeatTeammate: document.getElementById('penaltyRepeatTeammate'),
@@ -102,7 +92,7 @@ const el = {
 };
 
 function createDefaultPrefills(courtCount) {
-    return Array.from({ length: courtCount }, () => ({
+    return Array.from({length: courtCount}, () => ({
         format: COURT_FORMATS.BOTH,
         slots: {
             A1: '',
@@ -139,7 +129,7 @@ function normalizePlayerPreference(value) {
 }
 
 function getLevelOptions(selectedLevel = 1) {
-    return Array.from({ length: 9 }, (_, i) => i + 1)
+    return Array.from({length: 9}, (_, i) => i + 1)
         .map(level => `<option value="${level}" ${Number(selectedLevel) === level ? 'selected' : ''}>${level}</option>`)
         .join('');
 }
@@ -188,7 +178,6 @@ function saveState() {
         ui: {
             courtCount: el.courtCount.value,
             iterations: el.iterations.value,
-            matchMode: el.matchMode.value,
             weightTeamBalance: el.weightTeamBalance.checked,
             weightPartnerBalance: el.weightPartnerBalance.checked,
             penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
@@ -196,6 +185,7 @@ function saveState() {
             penaltyBench: el.penaltyBench.checked,
             prefills: getPrefillStateFromUi(),
             collapsedPanels: {
+                arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
                 prefillPanel: el.prefillPanel?.classList.contains('collapsed') ?? true,
                 playerStatsPanel: el.playerStatsPanel?.classList.contains('collapsed') ?? true,
                 historyPanel: el.historyPanel?.classList.contains('collapsed') ?? true
@@ -220,7 +210,6 @@ function restoreState() {
         if (data.ui) {
             el.courtCount.value = data.ui.courtCount ?? '2';
             el.iterations.value = data.ui.iterations ?? '1000';
-            el.matchMode.value = data.ui.matchMode ?? MATCH_MODES.DOUBLES_ONLY;
             el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
             el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
             el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
@@ -260,7 +249,7 @@ function toggleCollapsiblePanel(panel) {
 
 function normalizeRoundFromStorage(round) {
     if (!round || !Array.isArray(round.courts)) {
-        return { courts: [], benched: [] };
+        return {courts: [], benched: []};
     }
 
     return {
@@ -309,20 +298,16 @@ function getPlayers() {
     return state.roster;
 }
 
-function getActivePlayersLabel(activeCount, totalCount) {
-    const spillereStr = totalCount === 1 ? 'spiller' : 'spillere';
-    return `${activeCount} / ${totalCount} ${spillereStr} aktive`;
-}
 
 function updateActivePlayersTitle() {
     const activePlayersCount = getActivePlayers().length;
     const totalPlayersCount = getPlayers().length;
-    el.activePlayersTitle.textContent = getActivePlayersLabel(activePlayersCount, totalPlayersCount);
+    el.activePlayersTitle.textContent = `Aktive spillere (${activePlayersCount})`;
+    el.allPlayersTitle.textContent = `Alle spillere (${totalPlayersCount})`;
 }
 
 function updatePanelVisibility() {
     const activePlayersCount = getActivePlayers().length;
-    const totalPlayersCount = getPlayers().length;
     const hasHistory = state.history.length > 0;
 
     el.matchPanel.classList.toggle('hidden', activePlayersCount < 2);
@@ -330,8 +315,6 @@ function updatePanelVisibility() {
     el.historyPanel.classList.toggle('hidden', !hasHistory);
     el.playerRosterArea.classList.toggle('hidden', activePlayersCount === 0);
     el.resultPanel.classList.toggle('hidden', !hasHistory);
-    el.arrivalBtn.classList.toggle('hidden', totalPlayersCount === 0);
-    el.arrivalPanel.classList.toggle('hidden', totalPlayersCount === 0 && !el.arrivalPanel.classList.contains('open'));
 }
 
 function showStatusMessage(message, duration = 2800) {
@@ -401,11 +384,6 @@ function getConfig() {
         opponentPrevPenalty: el.penaltyRepeatOpponent.checked ? FIXED_CONFIG.opponentPrevPenalty : 0,
         benchLastPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchLastPenalty : 0,
         benchPrevPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchPrevPenalty : 0,
-        singlesPreferenceReward: FIXED_CONFIG.singlesPreferenceReward,
-        singlesPreferencePenalty: FIXED_CONFIG.singlesPreferencePenalty,
-        doublesPreferenceReward: FIXED_CONFIG.doublesPreferenceReward,
-        doublesPreferencePenalty: FIXED_CONFIG.doublesPreferencePenalty,
-        matchMode: el.matchMode.value
     };
 }
 
@@ -492,21 +470,26 @@ function renderPrefillArea(prefills) {
     while (safePrefills.length < courtCount) {
         safePrefills.push({
             format: COURT_FORMATS.BOTH,
-            slots: { A1: '', A2: '', B1: '', B2: '' }
+            slots: {A1: '', A2: '', B1: '', B2: ''}
         });
     }
 
     const playerOptions = getPlayerSelectOptions(true);
 
-    el.prefillArea.innerHTML = safePrefills.map((prefill, index) => {
-        const slots = prefill?.slots || { A1: '', A2: '', B1: '', B2: '' };
 
+    el.prefillArea.innerHTML = safePrefills.map((prefill, index) => {
+        const a2 = prefill.format !== COURT_FORMATS.SINGLE ? `
+                    <select data-role="slot" data-slot="A2" data-court-index="${index}">${playerOptions}</select>
+    ` : '';
+
+        const b2 = prefill.format !== COURT_FORMATS.SINGLE ? `
+                    <select data-role="slot" data-slot="B2" data-court-index="${index}">${playerOptions}</select>
+    ` : '';
         return `
             <div class="prefill-card" data-court-index="${index}">
                 <div class="prefill-card-header">
                     <strong>Bane ${index + 1}</strong>
                     <div class="prefill-format">
-                        <label for="prefill-format-${index}">Banetype</label>
                         <select id="prefill-format-${index}" class="prefill-format-select" data-role="format" data-court-index="${index}">
                             <option value="${COURT_FORMATS.BOTH}" ${prefill.format === COURT_FORMATS.BOTH ? 'selected' : ''}>Begge</option>
                             <option value="${COURT_FORMATS.DOUBLE}" ${prefill.format === COURT_FORMATS.DOUBLE ? 'selected' : ''}>Double</option>
@@ -517,29 +500,15 @@ function renderPrefillArea(prefills) {
 
                 <div class="prefill-grid">
                     <div class="prefill-side">
-                        <div class="prefill-side-title">Side A</div>
-                        <label>
-                            <span>A1</span>
-                            <select data-role="slot" data-slot="A1" data-court-index="${index}">${playerOptions}</select>
-                        </label>
-                        <label>
-                            <span>A2</span>
-                            <select data-role="slot" data-slot="A2" data-court-index="${index}">${playerOptions}</select>
-                        </label>
+                        <select data-role="slot" data-slot="A1" data-court-index="${index}">${playerOptions}</select>
+                        ${a2}
                     </div>
 
                     <div class="prefill-vs">VS</div>
 
                     <div class="prefill-side">
-                        <div class="prefill-side-title">Side B</div>
-                        <label>
-                            <span>B1</span>
-                            <select data-role="slot" data-slot="B1" data-court-index="${index}">${playerOptions}</select>
-                        </label>
-                        <label>
-                            <span>B2</span>
-                            <select data-role="slot" data-slot="B2" data-court-index="${index}">${playerOptions}</select>
-                        </label>
+                        <select data-role="slot" data-slot="B1" data-court-index="${index}">${playerOptions}</select>
+                        ${b2}
                     </div>
                 </div>
             </div>
@@ -565,6 +534,9 @@ function getPrefillStateFromUi() {
 
     for (let courtIndex = 0; courtIndex < courtCount; courtIndex++) {
         const formatSelect = el.prefillArea.querySelector(`select[data-role="format"][data-court-index="${courtIndex}"]`);
+        if (!formatSelect) {
+            continue;
+        }
         const slots = {};
 
         ['A1', 'A2', 'B1', 'B2'].forEach(slotKey => {
@@ -573,7 +545,7 @@ function getPrefillStateFromUi() {
         });
 
         prefills.push({
-            format: formatSelect ? formatSelect.value : COURT_FORMATS.AUTO,
+            format: formatSelect.value,
             slots
         });
     }
@@ -587,103 +559,33 @@ function updatePrefillSlotState() {
     prefills.forEach((prefill, courtIndex) => {
         const isSingle = prefill.format === COURT_FORMATS.SINGLE;
         ['A2', 'B2'].forEach(slotKey => {
+            const label = el.prefillArea.querySelector(`label[data-court-index="${courtIndex}"][data-slot-label="${slotKey}"]`);
             const select = el.prefillArea.querySelector(`select[data-role="slot"][data-court-index="${courtIndex}"][data-slot="${slotKey}"]`);
-            if (!select) return;
-
-            select.disabled = isSingle;
-            if (isSingle) {
+            if (select && isSingle) {
                 select.value = '';
+            }
+            if (label) {
+                label.style.display = isSingle ? 'none' : 'block';
             }
         });
     });
 }
 
-function validatePrefills(prefills, activePlayers, matchMode) {
-    const activeNames = new Set(activePlayers.map(player => player.name));
-    const lockedPlayers = new Set();
-
-    prefills.forEach((prefill, index) => {
-        const slots = prefill.slots || { A1: '', A2: '', B1: '', B2: '' };
-        const filled = Object.entries(slots).filter(([, value]) => normalizeName(value));
-        const courtNo = index + 1;
-
-        for (const [slotKey, playerName] of filled) {
-            if (!activeNames.has(playerName)) {
-                throw new Error(`Spilleren "${playerName}" på bane ${courtNo} er ikke aktiv.`);
-            }
-
-            if (lockedPlayers.has(playerName)) {
-                throw new Error(`Spilleren "${playerName}" er låst flere steder i præudfyldningen.`);
-            }
-
-            lockedPlayers.add(playerName);
-
-            if (matchMode === MATCH_MODES.SINGLES_ONLY && (slotKey === 'A2' || slotKey === 'B2')) {
-                throw new Error(`Bane ${courtNo} kan ikke bruge A2/B2 når kampformat er "Single".`);
-            }
-        }
-
-        const sideACount = [slots.A1, slots.A2].filter(Boolean).length;
-        const sideBCount = [slots.B1, slots.B2].filter(Boolean).length;
-
-        if (prefill.format === COURT_FORMATS.SINGLE) {
-            if (slots.A2 || slots.B2) {
-                throw new Error(`Bane ${courtNo} står til single, men A2 eller B2 er udfyldt.`);
-            }
-            if (sideACount > 1 || sideBCount > 1) {
-                throw new Error(`Bane ${courtNo} står til single, men en side har mere end én spiller.`);
-            }
-        }
-
-        if (matchMode === MATCH_MODES.DOUBLES_ONLY && prefill.format === COURT_FORMATS.SINGLE) {
-            throw new Error(`Bane ${courtNo} står til single, men kampformat er "Double".`);
-        }
-
-        if (matchMode === MATCH_MODES.SINGLES_ONLY && prefill.format === COURT_FORMATS.DOUBLE) {
-            throw new Error(`Bane ${courtNo} står til double, men kampformat er "Singlr".`);
-        }
-    });
-
-    return true;
-}
-
-function getPossibleFormatsForPrefill(prefill, matchMode) {
-    const slots = prefill.slots || { A1: '', A2: '', B1: '', B2: '' };
+function getPossibleFormatsForPrefill(prefill) {
+    const slots = prefill.slots || {A1: '', A2: '', B1: '', B2: ''};
     const filledCount = Object.values(slots).filter(Boolean).length;
     const sideACount = [slots.A1, slots.A2].filter(Boolean).length;
     const sideBCount = [slots.B1, slots.B2].filter(Boolean).length;
     const hasBackSlots = Boolean(slots.A2 || slots.B2);
 
-    const courtType = prefill.format || COURT_FORMATS.BOTH;
-
-    const allowedByCourtType = [];
-    if (courtType === COURT_FORMATS.BOTH) {
-        allowedByCourtType.push(COURT_FORMATS.DOUBLE, COURT_FORMATS.SINGLE);
-    } else if (courtType === COURT_FORMATS.DOUBLE) {
-        allowedByCourtType.push(COURT_FORMATS.DOUBLE);
-    } else if (courtType === COURT_FORMATS.SINGLE) {
-        allowedByCourtType.push(COURT_FORMATS.SINGLE);
-    }
-
-    const allowedByMatchMode = [];
-    if (matchMode === MATCH_MODES.DOUBLES_ONLY) {
-        allowedByMatchMode.push(COURT_FORMATS.DOUBLE);
-    } else if (matchMode === MATCH_MODES.SINGLES_ONLY) {
-        allowedByMatchMode.push(COURT_FORMATS.SINGLE);
-    } else {
-        allowedByMatchMode.push(COURT_FORMATS.DOUBLE, COURT_FORMATS.SINGLE);
-    }
-
-    const allowedFormats = allowedByCourtType.filter(format => allowedByMatchMode.includes(format));
     const result = [];
 
-    for (const format of allowedFormats) {
-        if (format === COURT_FORMATS.DOUBLE && canSupportDouble(slots, sideACount, sideBCount)) {
-            result.push(COURT_FORMATS.DOUBLE);
-        }
-        if (format === COURT_FORMATS.SINGLE && canSupportSingle(slots, sideACount, sideBCount)) {
-            result.push(COURT_FORMATS.SINGLE);
-        }
+    if (prefill.format !== COURT_FORMATS.SINGLE && canSupportDouble(slots, sideACount, sideBCount)) {
+        result.push(COURT_FORMATS.DOUBLE);
+    }
+
+    if (prefill.format !== COURT_FORMATS.DOUBLE && canSupportSingle(slots, sideACount, sideBCount)) {
+        result.push(COURT_FORMATS.SINGLE);
     }
 
     if (filledCount === 0) {
@@ -732,7 +634,7 @@ function comparePlanScore(candidateKey, bestKey) {
     return 0;
 }
 
-function chooseCourtFormats(prefills, availableCount, matchMode) {
+function chooseCourtFormats(prefills, availableCount) {
     let bestPlan = null;
     let bestKey = null;
 
@@ -748,13 +650,13 @@ function chooseCourtFormats(prefills, availableCount, matchMode) {
         }
 
         const prefill = prefills[index];
-        const possibleFormats = getPossibleFormatsForPrefill(prefill, matchMode);
+        const possibleFormats = getPossibleFormatsForPrefill(prefill);
 
         for (const format of possibleFormats) {
             const needed = getNeededPlayersForFormat(prefill, format);
             if (needed > remainingPlayers) continue;
 
-            const nextStats = { ...stats };
+            const nextStats = {...stats};
             if (format === COURT_FORMATS.DOUBLE) {
                 nextStats.doubleCount += 1;
                 nextStats.usedPlayers += 4;
@@ -771,7 +673,7 @@ function chooseCourtFormats(prefills, availableCount, matchMode) {
 
         if (!possibleFormats.includes('unused') && Object.values(prefill.slots).every(value => !value)) {
             currentPlan.push('unused');
-            backtrack(index + 1, remainingPlayers, currentPlan, { ...stats });
+            backtrack(index + 1, remainingPlayers, currentPlan, {...stats});
             currentPlan.pop();
         }
     }
@@ -828,16 +730,14 @@ function fillCourtSlots(prefill, format, availablePlayers) {
     return createCourtFromSlots(format, slotMap, lockedSlots);
 }
 
-function createRandomRound(players, courtCount, prefills, matchMode) {
+function createRandomRound(players, courtCount, prefills) {
     const prefillsForCourts = prefills.slice(0, courtCount);
     while (prefillsForCourts.length < courtCount) {
         prefillsForCourts.push({
             format: COURT_FORMATS.BOTH,
-            slots: { A1: '', A2: '', B1: '', B2: '' }
+            slots: {A1: '', A2: '', B1: '', B2: ''}
         });
     }
-
-    validatePrefills(prefillsForCourts, players, matchMode);
 
     const lockedNames = new Set();
     prefillsForCourts.forEach(prefill => {
@@ -859,7 +759,7 @@ function createRandomRound(players, courtCount, prefills, matchMode) {
 
     const playerMap = new Map(players.map(player => [player.name, player]));
     const availablePool = shuffle(unlockedPlayers);
-    const chosenPlan = chooseCourtFormats(prefillsForCourts, availablePool.length, matchMode);
+    const chosenPlan = chooseCourtFormats(prefillsForCourts, availablePool.length);
 
     if (!chosenPlan) {
         throw new Error('Kunne ikke finde en gyldig kombination af singler/doubler ud fra de valgte låsninger.');
@@ -898,7 +798,7 @@ function createRandomRound(players, courtCount, prefills, matchMode) {
 
     const benched = players.filter(player => !usedPlayerNames.has(player.name));
 
-    return { courts, benched };
+    return {courts, benched};
 }
 
 function scoreBenchRotation(round, history, config) {
@@ -993,9 +893,9 @@ function findBestRound(players, courtCount, iterations, history, config, prefill
 
     for (let i = 0; i < iterations; i++) {
         try {
-            const round = createRandomRound(players, courtCount, prefills, config.matchMode);
+            const round = createRandomRound(players, courtCount, prefills);
             const score = scoreRound(round, history, config);
-            const candidate = { ...round, score, iteration: i + 1 };
+            const candidate = {...round, score, iteration: i + 1};
 
             if (!best || candidate.score > best.score) {
                 best = candidate;
@@ -1075,6 +975,7 @@ function renderRoster() {
 
     renderPrefillArea(getPrefillStateFromUi());
 }
+
 function renderPlayerManagerList() {
     const players = state.roster
         .slice()
@@ -1142,7 +1043,7 @@ function renderPlayerStats() {
                     <tr>
                         <td>
                             ${escapeHtml(player.name)}
-                            <div class="table-subtle">${escapeHtml(getPreferenceLabel(player.matchPreference))}</div>
+                            <div class="table-subtle">${escapeHtml(getPreferenceShortLabel(player.matchPreference))}</div>
                         </td>
                         <td class="center">${player.played}</td>
                         <td class="center">${player.doubles}</td>
@@ -1178,7 +1079,6 @@ function renderRound(result) {
                     <span>Bane ${index + 1}</span>
                     <div class="court-tags">
                         <span class="tag">${formatLabel}</span>
-                        <span class="tag">Samlet niveau: ${court.teamA.totalLevel} vs ${court.teamB.totalLevel}</span>
                     </div>
                 </div>
                 <div class="vs-grid">
@@ -1190,7 +1090,7 @@ function renderRound(result) {
                             </div>
                         `).join('')}
                     </div>
-                    <div><strong>VS</strong></div>
+                    <div class="flex-center"><strong>VS</strong></div>
                     <div class="team">
                         ${court.teamB.players.map(player => `
                             <div class="player-line">
@@ -1205,14 +1105,7 @@ function renderRound(result) {
     });
 
     if (result.benched.length > 0) {
-        html += `
-            <div class="result-card">
-                <h3>Sidder over</h3>
-                <ul class="bench-list">
-                    ${result.benched.map(p => `<li>${escapeHtml(p.name)}</li>`).join('')}
-                </ul>
-            </div>
-        `;
+        html += `Sidder over: ${result.benched.map(p => `${escapeHtml(p.name)}`).join(', ')}`;
     }
 
     el.resultArea.innerHTML = html;
@@ -1222,10 +1115,10 @@ function describeCourtForHistory(court, courtIndex) {
     const format = court.format || inferCourtFormat(court);
 
     if (format === COURT_FORMATS.SINGLE) {
-        return `Bane ${courtIndex + 1} (single): ${escapeHtml(court.teamA.players[0].name)} mod ${escapeHtml(court.teamB.players[0].name)}`;
+        return `${escapeHtml(court.teamA.players[0].name)} mod ${escapeHtml(court.teamB.players[0].name)}`;
     }
 
-    return `Bane ${courtIndex + 1} (double): ${escapeHtml(court.teamA.players[0].name)} og ${escapeHtml(court.teamA.players[1].name)} mod ${escapeHtml(court.teamB.players[0].name)} og ${escapeHtml(court.teamB.players[1].name)}`;
+    return `${escapeHtml(court.teamA.players[0].name)} og ${escapeHtml(court.teamA.players[1].name)} mod ${escapeHtml(court.teamB.players[0].name)} og ${escapeHtml(court.teamB.players[1].name)}`;
 }
 
 function renderHistory() {
@@ -1246,7 +1139,7 @@ function renderHistory() {
                 </div>
                 <ul class="history-list">
                     ${round.courts.map((court, i) => `<li>${describeCourtForHistory(court, i)}</li>`).join('')}
-                    ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)} <span class="level">${p.level}</span>`).join(', ')}</li>` : ''}
+                    ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)}`).join(', ')}</li>` : ''}
                 </ul>
             </div>
         `;
@@ -1268,7 +1161,7 @@ function importPlayersFromTextarea() {
         const text = el.playerImportText.value;
         const players = parsePlayersFromText(text);
         replaceRoster(players);
-        closeOverlayPanels();
+        closeStandAlone();
     } catch (error) {
         showStatusMessage(error.message || 'Kunne ikke importere spillerlisten.');
     }
@@ -1281,7 +1174,7 @@ async function loadPlayersFromFile(filename) {
     }
 
     try {
-        const response = await fetch(filename, { cache: 'no-store' });
+        const response = await fetch(filename, {cache: 'no-store'});
 
         if (!response.ok) {
             throw new Error(`Kunne ikke hente filen: ${filename}`);
@@ -1350,7 +1243,7 @@ function addPlayer() {
         return;
     }
 
-    state.roster.push({ name, level, active: true, matchPreference });
+    state.roster.push({name, level, active: true, matchPreference});
 
     el.newPlayerName.value = '';
     el.newPlayerLevel.value = '2';
@@ -1479,20 +1372,9 @@ function generateRound() {
     try {
         const players = getActivePlayers();
         const courtCount = getCourtCount();
-        const iterations = Math.max(1, Number(el.iterations.value) || 1000);
+        const iterations = Math.max(1, Number(el.iterations.value) || 10000);
         const config = getConfig();
         const prefills = getPrefillStateFromUi();
-
-        validatePrefills(prefills, players, config.matchMode);
-
-        const minPlayersNeeded = config.matchMode === MATCH_MODES.DOUBLES_ONLY ? 4 : 2;
-
-        if (players.length < minPlayersNeeded) {
-            if (config.matchMode === MATCH_MODES.DOUBLES_ONLY) {
-                throw new Error('Der skal være mindst 4 aktive spillere for at lave doubler.');
-            }
-            throw new Error('Der skal være mindst 2 aktive spillere for at lave singler.');
-        }
 
         const best = findBestRound(players, courtCount, iterations, state.history, config, prefills);
 
@@ -1518,14 +1400,6 @@ function clearPrefills() {
     renderPrefillArea(createDefaultPrefills(getCourtCount()));
     saveState();
     showStatusMessage('Låsninger til næste runde er nulstillet.');
-}
-
-function closeOverlayPanels() {
-    el.settingsPanel.classList.remove('open');
-    el.arrivalPanel.classList.remove('open');
-    el.newPlayerPanel.classList.remove('open');
-    el.importExportPanel.classList.remove('open');
-    setSettingsMode(false);
 }
 
 function resetHistory() {
@@ -1585,32 +1459,6 @@ function undoLastRound() {
     saveState();
 }
 
-function setSettingsMode(enabled) {
-    const panelsToHide = [
-        el.playersPanel,
-        el.arrivalPanel,
-        el.newPlayerPanel,
-        el.matchPanel,
-        el.resultPanel,
-        el.importExportPanel,
-        el.playerStatsPanel,
-        el.historyPanel
-    ];
-
-    panelsToHide.forEach(panel => {
-        if (!panel) return;
-        panel.classList.toggle('hidden', enabled);
-    });
-
-    if (enabled) {
-        el.settingsPanel.classList.add('open');
-        el.settingsPanel.classList.remove('hidden');
-    } else {
-        el.settingsPanel.classList.remove('open');
-        updatePanelVisibility();
-    }
-}
-
 function toggleMenu() {
     el.menuDropdown.classList.toggle('open');
 }
@@ -1618,6 +1466,24 @@ function toggleMenu() {
 function closeMenu() {
     el.menuDropdown.classList.remove('open');
 }
+
+function showStandAlone(panel) {
+    for (let element of document.getElementsByClassName("standalone")) {
+        element.style.display = 'none';
+    }
+    el.mainPage.style.display = "none";
+    panel.style.display = "block";
+    closeMenu();
+}
+
+
+function closeStandAlone() {
+    for (let element of document.getElementsByClassName("standalone")) {
+        element.style.display = 'none';
+    }
+    el.mainPage.style.display = "block";
+}
+
 
 el.addPlayerBtn.addEventListener('click', addPlayer);
 
@@ -1639,65 +1505,35 @@ el.loadPresetPlayersBtn.addEventListener('click', async () => {
 el.importPlayersBtn.addEventListener('click', importPlayersFromTextarea);
 el.copyPlayersBtn.addEventListener('click', copyCurrentPlayersToClipboard);
 
-el.arrivalBtn.addEventListener('click', () => {
-    const shouldOpen = !el.arrivalPanel.classList.contains('open');
-    closeOverlayPanels();
-    if (shouldOpen) {
-        el.arrivalPanel.classList.add('open');
-    }
-});
-
-el.closeArrivalBtn.addEventListener('click', () => {
-    el.arrivalPanel.classList.remove('open');
-});
 
 el.newPlayerBtn.addEventListener('click', () => {
-    const shouldOpen = !el.newPlayerPanel.classList.contains('open');
-    closeOverlayPanels();
-    if (shouldOpen) {
-        el.newPlayerPanel.classList.add('open');
-    }
+    showStandAlone(el.newPlayerPanel);
 });
 
 el.closeNewPlayerBtn.addEventListener('click', () => {
-    el.newPlayerPanel.classList.remove('open');
+    closeStandAlone();
 });
 
 el.settingsBtn.addEventListener('click', () => {
-    const shouldOpen = !el.settingsPanel.classList.contains('open');
-    closeOverlayPanels();
-
-    if (shouldOpen) {
-        setSettingsMode(true);
-    }
-
-    closeMenu();
+    showStandAlone(el.settingsPanel);
 });
 
 el.closeSettingsBtn.addEventListener('click', () => {
-    setSettingsMode(false);
+    closeStandAlone();
 });
 
 el.importExportBtn.addEventListener('click', () => {
-    const shouldOpen = !el.importExportPanel.classList.contains('open');
-    closeOverlayPanels();
-
-    if (shouldOpen) {
-        el.playerImportText.value = playersToText(state.roster);
-        el.importExportPanel.classList.add('open');
-    }
-
-    closeMenu();
+    el.playerImportText.value = playersToText(state.roster);
+    showStandAlone(el.importExportPanel);
 });
 
 el.closeImportExportBtn.addEventListener('click', () => {
-    el.importExportPanel.classList.remove('open');
+    closeStandAlone();
 });
 
 [
     el.courtCount,
     el.iterations,
-    el.matchMode,
     el.weightTeamBalance,
     el.weightPartnerBalance,
     el.penaltyRepeatTeammate,
@@ -1705,14 +1541,13 @@ el.closeImportExportBtn.addEventListener('click', () => {
     el.penaltyBench
 ].forEach(input => {
     input.addEventListener('change', () => {
-        if (input === el.courtCount) {
-            renderPrefillArea(getPrefillStateFromUi());
-        }
+        renderPrefillArea(getPrefillStateFromUi());
         saveState();
     });
 });
 
 el.prefillArea.addEventListener('change', (event) => {
+
     const target = event.target;
     if (!(target instanceof HTMLSelectElement)) return;
 
@@ -1782,12 +1617,19 @@ el.prefillToggleBtn?.addEventListener('click', () => {
 });
 
 document.addEventListener('click', (event) => {
-    const toggle = event.target.closest('.panel-toggle');
-    if (!toggle) return;
-
-    const targetId = toggle.dataset.target;
-    if (!targetId) return;
-
+    let button = null;
+    if (event.target.classList.contains("collapsible-toggle")) {
+        button = event.target;
+    } else if (event.target.parentElement && event.target.parentElement.classList.contains("collapsible-toggle")) {
+        button = event.target.parentElement;
+    }
+    if (!button) {
+        return;
+    }
+    const targetId = button.dataset.target;
+    if (!targetId) {
+        return;
+    }
     const panel = document.getElementById(targetId);
     toggleCollapsiblePanel(panel);
 });
