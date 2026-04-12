@@ -36,10 +36,13 @@ const state = {
 
 const STORAGE_KEY = 'kampprogram-state-v2';
 
+const PRESET_LISTS_STORAGE_KEY = 'kampprogram-playerlists-v1';
+
 let toastTimer = null;
 
 const el = {
     mainPage: document.getElementById('mainPage'),
+    fetchPlayersPanel: document.getElementById('fetchPlayersPanel'),
     activePlayersTitle: document.getElementById('activePlayersTitle'),
     allPlayersTitle: document.getElementById('allPlayersTitle'),
     playerRosterArea: document.getElementById('playerRosterArea'),
@@ -89,6 +92,11 @@ const el = {
     clearPrefillBtn: document.getElementById('clearPrefillBtn'),
     prefillPanel: document.getElementById('prefillPanel'),
     prefillToggleBtn: document.getElementById('prefillToggleBtn'),
+    playerListsPanel: document.getElementById('playerListsPanel'),
+    newPresetListName: document.getElementById('newPresetListName'),
+    savePresetPlayersBtn: document.getElementById('savePresetPlayersBtn'),
+    deletePresetPlayerList: document.getElementById('deletePresetPlayerList'),
+    deletePresetPlayersBtn: document.getElementById('deletePresetPlayersBtn'),
 };
 
 function createDefaultPrefills(courtCount) {
@@ -186,9 +194,11 @@ function saveState() {
             prefills: getPrefillStateFromUi(),
             collapsedPanels: {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
+                fetchPlayersPanel: el.fetchPlayersPanel?.classList.contains('collapsed') ?? true,
                 prefillPanel: el.prefillPanel?.classList.contains('collapsed') ?? true,
                 playerStatsPanel: el.playerStatsPanel?.classList.contains('collapsed') ?? true,
-                historyPanel: el.historyPanel?.classList.contains('collapsed') ?? true
+                historyPanel: el.historyPanel?.classList.contains('collapsed') ?? true,
+                playerListsPanel: el.playerListsPanel?.classList.contains('collapsed') ?? true,
             }
         }
     };
@@ -217,6 +227,23 @@ function restoreState() {
             el.penaltyBench.checked = Boolean(data.ui.penaltyBench);
         }
         const collapsedPanels = data.ui.collapsedPanels || {};
+
+
+        if (collapsedPanels.playerListsPanel !== false) {
+            el.playerListsPanel?.classList.add('collapsed');
+        } else {
+            el.playerListsPanel?.classList.remove('collapsed');
+        }
+        if (collapsedPanels.arrivalPanel !== false) {
+            el.arrivalPanel?.classList.add('collapsed');
+        } else {
+            el.arrivalPanel?.classList.remove('collapsed');
+        }
+        if (collapsedPanels.fetchPlayersPanel !== false) {
+            el.fetchPlayersPanel?.classList.add('collapsed');
+        } else {
+            el.fetchPlayersPanel?.classList.remove('collapsed');
+        }
         if (collapsedPanels.prefillPanel !== false) {
             el.prefillPanel?.classList.add('collapsed');
         } else {
@@ -363,6 +390,7 @@ function loadDefaults() {
         renderPrefillArea(createDefaultPrefills(getCourtCount()));
     }
 
+    renderStoredPlayerLists();
     renderRoster();
     renderPlayerManagerList();
     renderPlayerStats();
@@ -372,6 +400,137 @@ function loadDefaults() {
     if (state.lastResult && el.resultArea) {
         renderRound(state.lastResult);
     }
+}
+
+function getStoredPlayerLists() {
+    try {
+        const raw = localStorage.getItem(PRESET_LISTS_STORAGE_KEY);
+        if (!raw) return {};
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {};
+        }
+
+        const sanitized = {};
+
+        Object.entries(parsed).forEach(([listName, players]) => {
+            if (!listName || !Array.isArray(players)) return;
+
+            try {
+                const normalizedPlayers = players.map(normalizePlayer).map(player => ({
+                    ...player,
+                    active: false
+                }));
+
+                if (normalizedPlayers.length > 0) {
+                    sanitized[listName] = normalizedPlayers;
+                }
+            } catch (error) {
+                // spring ugyldige lister over
+            }
+        });
+
+        return sanitized;
+    } catch (error) {
+        console.error('Kunne ikke læse gemte spillerlister:', error);
+        return {};
+    }
+}
+
+function saveStoredPlayerLists(lists) {
+    localStorage.setItem(PRESET_LISTS_STORAGE_KEY, JSON.stringify(lists));
+}
+
+function renderStoredPlayerLists() {
+    const lists = getStoredPlayerLists();
+    const names = Object.keys(lists).sort((a, b) => a.localeCompare(b, 'da'));
+
+    const options = [
+        '<option value="">Vælg liste</option>',
+        ...names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+    ].join('');
+
+    if (el.presetPlayerList) {
+        el.presetPlayerList.innerHTML = options;
+    }
+
+    if (el.deletePresetPlayerList) {
+        el.deletePresetPlayerList.innerHTML = options;
+    }
+}
+
+function saveCurrentPlayersAsStoredList() {
+    const listName = normalizeName(el.newPresetListName?.value);
+
+    if (!listName) {
+        showStatusMessage('Skriv et navn til spillerlisten.');
+        return;
+    }
+
+    if (state.roster.length === 0) {
+        showStatusMessage('Der er ingen spillere at gemme.');
+        return;
+    }
+
+    const lists = getStoredPlayerLists();
+    const existingName = Object.keys(lists).find(name => name.toLowerCase() === listName.toLowerCase());
+
+    if (existingName) {
+        const confirmed = window.confirm(`Spillerlisten "${existingName}" findes allerede. Vil du overskrive den?`);
+        if (!confirmed) return;
+    }
+
+    lists[existingName || listName] = clonePlayers(state.roster).map(player => ({
+        ...player,
+        active: false
+    }));
+
+    saveStoredPlayerLists(lists);
+    renderStoredPlayerLists();
+
+    if (el.newPresetListName) {
+        el.newPresetListName.value = '';
+    }
+
+    showStatusMessage(`Spillerlisten "${existingName || listName}" er gemt.`);
+}
+
+function loadPlayersFromStoredList(listName) {
+    if (!listName) {
+        showStatusMessage('Vælg først en spillerliste.');
+        return;
+    }
+
+    const lists = getStoredPlayerLists();
+    const players = lists[listName];
+
+    if (!players || !Array.isArray(players) || players.length === 0) {
+        showStatusMessage('Kunne ikke finde den valgte spillerliste.');
+        renderStoredPlayerLists();
+        return;
+    }
+
+    replaceRoster(players);
+}
+
+function deleteStoredPlayerList() {
+    const listName = normalizeName(el.deletePresetPlayerList?.value);
+
+    if (!listName) {
+        showStatusMessage('Vælg først en spillerliste, der skal slettes.');
+        return;
+    }
+
+    const confirmed = window.confirm(`Er du sikker på, at du vil slette spillerlisten "${listName}"?`);
+    if (!confirmed) return;
+
+    const lists = getStoredPlayerLists();
+    delete lists[listName];
+    saveStoredPlayerLists(lists);
+    renderStoredPlayerLists();
+
+    showStatusMessage(`Spillerlisten "${listName}" er slettet.`);
 }
 
 function getConfig() {
@@ -1167,27 +1326,6 @@ function importPlayersFromTextarea() {
     }
 }
 
-async function loadPlayersFromFile(filename) {
-    if (!filename) {
-        showStatusMessage('Vælg først en spillerliste.');
-        return;
-    }
-
-    try {
-        const response = await fetch(filename, {cache: 'no-store'});
-
-        if (!response.ok) {
-            throw new Error(`Kunne ikke hente filen: ${filename}`);
-        }
-
-        const text = await response.text();
-        const players = parsePlayersFromText(text);
-        replaceRoster(players);
-    } catch (error) {
-        showStatusMessage(error.message || 'Der opstod en fejl ved hentning af spillerlisten.');
-    }
-}
-
 function escapeHtml(value) {
     return String(value)
         .replaceAll('&', '&amp;')
@@ -1418,7 +1556,7 @@ function resetHistory() {
 }
 
 function resetAll() {
-    const confirmed = window.confirm('Er du sikker på, at du vil nulstille alt, inkl spillere og matchhistorik?');
+    const confirmed = window.confirm('Dette ville nulstille alt pånær dine gemte spillerlister. Er du sikker?');
     if (!confirmed) return;
 
     state.history = [];
@@ -1498,9 +1636,12 @@ el.resetAllBtn.addEventListener('click', resetAll);
 el.undoBtn.addEventListener('click', undoLastRound);
 el.clearPrefillBtn.addEventListener('click', clearPrefills);
 
-el.loadPresetPlayersBtn.addEventListener('click', async () => {
-    await loadPlayersFromFile(el.presetPlayerList.value);
+el.loadPresetPlayersBtn.addEventListener('click', () => {
+    loadPlayersFromStoredList(el.presetPlayerList.value);
 });
+
+el.savePresetPlayersBtn?.addEventListener('click', saveCurrentPlayersAsStoredList);
+el.deletePresetPlayersBtn?.addEventListener('click', deleteStoredPlayerList);
 
 el.importPlayersBtn.addEventListener('click', importPlayersFromTextarea);
 el.copyPlayersBtn.addEventListener('click', copyCurrentPlayersToClipboard);

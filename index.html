@@ -16,7 +16,7 @@
             <div class="menu-dropdown" id="menuDropdown">
                 <button class="ghost menu-item" id="settingsBtn">Indstillinger</button>
                 <button class="ghost menu-item" id="importExportBtn">Importér / eksportér</button>
-                <button class="danger menu-item" id="resetAllBtn">Nulstil alt</button>
+                <button class="danger menu-item" id="resetAllBtn">Nulstil</button>
             </div>
         </div>
     </header>
@@ -48,6 +48,43 @@
                             <span class="collapse-indicator">▾</span>
                         </button>
                         <div id="playerManagerListArea" class="player-manager-list mt collapsible-content"></div>
+                    </div>
+
+                    <div class="collapsible-panel collapsed mt24" id="playerListsPanel">
+                        <button class="prefill-header collapsible-toggle" type="button" data-target="playerListsPanel">
+                            <span class="h-no-m">Spillerlister</span>
+                            <span class="collapse-indicator">▾</span>
+                        </button>
+
+                        <div class="collapsible-content">
+                            <div class="settings-row" style="margin-top: 0;">
+                                <label for="presetPlayerList">Hent gemt spillerliste</label>
+                                <div class="actions">
+                                    <select id="presetPlayerList">
+                                        <option value="">Vælg liste</option>
+                                    </select>
+                                    <button class="secondary" id="loadPresetPlayersBtn">Hent spillere</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-row">
+                                <label for="newPresetListName">Gem nuværende spillere som ny liste</label>
+                                <div class="actions">
+                                    <input id="newPresetListName" type="text" placeholder="Fx Torsdagsholdet"/>
+                                    <button class="secondary" id="savePresetPlayersBtn">Gem liste</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-row">
+                                <label for="deletePresetPlayerList">Slet gemt spillerliste</label>
+                                <div class="actions">
+                                    <select id="deletePresetPlayerList">
+                                        <option value="">Vælg liste</option>
+                                    </select>
+                                    <button class="danger" id="deletePresetPlayersBtn">Slet liste</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -161,22 +198,11 @@
                 </div>
 
                 <div class="settings-row">
-                    <label for="presetPlayerList">Hent spillere fra prædefineret liste</label>
-                    <div class="actions">
-                        <select id="presetPlayerList">
-                            <option value="">Vælg liste</option>
-                            <option value="voksenfjer.txt">Voksenfjer</option>
-                        </select>
-                        <button class="secondary" id="loadPresetPlayersBtn">Hent spillere</button>
-                    </div>
-                </div>
-
-                <div class="settings-row">
                     <label for="playerImportText">Indsæt spillerliste (navn,niveau[,præference])</label>
                     <textarea
                             id="playerImportText"
                             rows="10"
-                            placeholder="Hans,3&#10;Anne,7,single&#10;Lotte,2&#10;Peter,4,double,1&#10;Mie,2,double"
+                            placeholder="Hans,3&#10;Anne,7,single&#10;Lotte,2&#10;Peter,4,double&#10;Mie,2,double"
                     ></textarea>
                 </div>
 
