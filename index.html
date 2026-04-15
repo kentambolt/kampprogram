@@ -4,7 +4,22 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Kampprogram</title>
-    <link rel="icon" type="image/png" href="favicon.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico"/>
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
+
+    <!-- iOS / iPadOS "Add to Home Screen" -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="Kampprogram"/>
+
+    <!-- Android / Chrome "Add to Home Screen" -->
+    <link rel="manifest" href="site.webmanifest"/>
+    <meta name="theme-color" content="#e85d04"/>
+
     <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
@@ -161,16 +176,33 @@
 
                 <div class="settings-row">
                     <label>
-                        <input id="weightTeamBalance" type="checkbox" checked />
-                        Prioritér modstandere på samme niveau
+                        <input id="useSkillLevels" type="checkbox" checked />
+                        Brug færdighedsniveauer
                     </label>
                 </div>
-                <div class="settings-row">
+
+                <div class="settings-sub-row" id="hideSkillLevelsRow">
                     <label>
-                        <input id="weightPartnerBalance" type="checkbox" checked />
-                        Prioritér partnere på samme niveau
+                        <input id="hideSkillLevels" type="checkbox" />
+                        Skjul niveauer i appen (privat tilstand)
                     </label>
                 </div>
+
+                <div id="levelSettingsGroup">
+                    <div class="settings-row">
+                        <label>
+                            <input id="weightTeamBalance" type="checkbox" checked />
+                            Prioritér modstandere på samme niveau
+                        </label>
+                    </div>
+                    <div class="settings-row">
+                        <label>
+                            <input id="weightPartnerBalance" type="checkbox" checked />
+                            Prioritér partnere på samme niveau
+                        </label>
+                    </div>
+                </div>
+
                 <div class="settings-row">
                     <label>
                         <input id="penaltyRepeatTeammate" type="checkbox" checked />
@@ -189,6 +221,35 @@
                         Prioritér kampe til spillere, der for nyligt har været på bænken
                     </label>
                 </div>
+
+                <div class="settings-row">
+                    <div class="settings-label">Tilladte holdstørrelser:</div>
+                    <div class="format-sizes-group" id="formatSizesGroup">
+                        <label class="format-size-label"><input type="checkbox" id="format-1v1" checked /> 1v1</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-2v2" checked /> 2v2</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-3v3" /> 3v3</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-4v4" /> 4v4</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-5v5" /> 5v5</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-6v6" /> 6v6</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-7v7" /> 7v7</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-8v8" /> 8v8</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-9v9" /> 9v9</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-10v10" /> 10v10</label>
+                        <label class="format-size-label"><input type="checkbox" id="format-11v11" /> 11v11</label>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <label>
+                        <input id="maximizeCourts" type="checkbox" checked />
+                        Brug flest mulige baner (ellers brug færreste mulige)
+                    </label>
+                </div>
+
+                <div class="settings-row">
+                    <label for="defaultCourtCount">Standard antal baner</label>
+                    <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
+                </div>
             </div>
 
             <div class="panel import-export-panel standalone" id="importExportPanel">
@@ -198,11 +259,11 @@
                 </div>
 
                 <div class="settings-row">
-                    <label for="playerImportText">Indsæt spillerliste (navn,niveau[,præference])</label>
+                    <label for="playerImportText">Indsæt spillerliste (navn,niveau)</label>
                     <textarea
                             id="playerImportText"
                             rows="10"
-                            placeholder="Hans,3&#10;Anne,7,single&#10;Lotte,2&#10;Peter,4,double&#10;Mie,2,double"
+                            placeholder="Hans,3&#10;Anne,7&#10;Lotte,2&#10;Peter,4&#10;Mie,2"
                     ></textarea>
                 </div>
 
@@ -236,10 +297,6 @@
                             <option value="8">8</option>
                             <option value="9">9</option>
                         </select>
-                    </div>
-                    <div>
-                        <label for="newPlayerPreference">Præference</label>
-                        <select id="newPlayerPreference"></select>
                     </div>
                 </div>
                 <div>

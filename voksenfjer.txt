@@ -13,6 +13,7 @@ Mads,2
 Mona,2
 Peter,2
 Louise,2
+Mukhund,3
 Thor,2
 Ioana,2
 Christoffer,3

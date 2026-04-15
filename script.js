@@ -10,23 +10,11 @@ const FIXED_CONFIG = {
 };
 
 
-const COURT_FORMATS = {
-    BOTH: 'both',
-    DOUBLE: 'double',
-    SINGLE: 'single'
-};
+// Format is an integer N meaning "NvN" (N players per team).
+// COURT_FORMAT_AUTO means "any enabled format" (the algorithm chooses).
+const COURT_FORMAT_AUTO = 'auto';
+const MAX_TEAM_SIZE = 11;
 
-const PLAYER_PREFERENCES = {
-    NONE: 'none',
-    NO_SINGLE: 'no_single',
-    NO_DOUBLE: 'no_double'
-};
-
-const PLAYER_PREFERENCE_OPTIONS = [
-    {value: PLAYER_PREFERENCES.NONE, label: 'Flex', shortLabel: ''},
-    {value: PLAYER_PREFERENCES.NO_DOUBLE, label: 'Single', shortLabel: 'S'},
-    {value: PLAYER_PREFERENCES.NO_SINGLE, label: 'Double', shortLabel: 'D'},
-];
 
 const state = {
     roster: [],
@@ -56,7 +44,6 @@ const el = {
     closeNewPlayerBtn: document.getElementById('closeNewPlayerBtn'),
     newPlayerName: document.getElementById('newPlayerName'),
     newPlayerLevel: document.getElementById('newPlayerLevel'),
-    newPlayerPreference: document.getElementById('newPlayerPreference'),
     addPlayerBtn: document.getElementById('addPlayerBtn'),
     courtCount: document.getElementById('courtCount'),
     iterations: document.getElementById('iterations'),
@@ -97,17 +84,48 @@ const el = {
     savePresetPlayersBtn: document.getElementById('savePresetPlayersBtn'),
     deletePresetPlayerList: document.getElementById('deletePresetPlayerList'),
     deletePresetPlayersBtn: document.getElementById('deletePresetPlayersBtn'),
+    useSkillLevels: document.getElementById('useSkillLevels'),
+    hideSkillLevels: document.getElementById('hideSkillLevels'),
+    hideSkillLevelsRow: document.getElementById('hideSkillLevelsRow'),
+    levelSettingsGroup: document.getElementById('levelSettingsGroup'),
+    maximizeCourts: document.getElementById('maximizeCourts'),
+    defaultCourtCount: document.getElementById('defaultCourtCount'),
 };
+
+function getEnabledFormats() {
+    const formats = [];
+    for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+        if (document.getElementById(`format-${n}v${n}`)?.checked) {
+            formats.push(n);
+        }
+    }
+    return formats.length > 0 ? formats : [1]; // always at least 1v1
+}
+
+function getMaxEnabledFormat() {
+    const formats = getEnabledFormats();
+    return Math.max(...formats);
+}
+
+function formatLabel(n) {
+    return `${n}v${n}`;
+}
+
+// Migrate old format string values ('single'/'double'/'both') to the new system.
+function normalizePrefillFormat(format, enabledFormats) {
+    if (format === 'both' || format === undefined || format === null) return COURT_FORMAT_AUTO;
+    if (format === 'single') return '1';
+    if (format === 'double') return '2';
+    if (format === COURT_FORMAT_AUTO) return COURT_FORMAT_AUTO;
+    const n = Number(format);
+    if (!isNaN(n) && n >= 1 && n <= MAX_TEAM_SIZE) return String(n);
+    return COURT_FORMAT_AUTO;
+}
 
 function createDefaultPrefills(courtCount) {
     return Array.from({length: courtCount}, () => ({
-        format: COURT_FORMATS.BOTH,
-        slots: {
-            A1: '',
-            A2: '',
-            B1: '',
-            B2: ''
-        }
+        format: COURT_FORMAT_AUTO,
+        slots: {}
     }));
 }
 
@@ -116,40 +134,13 @@ function normalizePlayer(player) {
         name: normalizeName(player.name),
         level: Math.min(9, Math.max(1, Number(player.level) || 1)),
         active: Boolean(player.active),
-        matchPreference: normalizePlayerPreference(player.matchPreference)
     };
-}
-
-function normalizePlayerPreference(value) {
-    const normalized = String(value || '').trim().toLowerCase();
-
-    if (Object.values(PLAYER_PREFERENCES).includes(normalized)) {
-        return normalized;
-    }
-
-    const aliasMap = {
-        single: PLAYER_PREFERENCES.NO_DOUBLE,
-        double: PLAYER_PREFERENCES.NO_SINGLE,
-        flex: PLAYER_PREFERENCES.NONE
-    };
-
-    return aliasMap[normalized] || PLAYER_PREFERENCES.NONE;
 }
 
 function getLevelOptions(selectedLevel = 1) {
     return Array.from({length: 9}, (_, i) => i + 1)
         .map(level => `<option value="${level}" ${Number(selectedLevel) === level ? 'selected' : ''}>${level}</option>`)
         .join('');
-}
-
-function getPreferenceLabel(value) {
-    const option = PLAYER_PREFERENCE_OPTIONS.find(item => item.value === value);
-    return option ? option.label : '';
-}
-
-function getPreferenceShortLabel(value) {
-    const option = PLAYER_PREFERENCE_OPTIONS.find(item => item.value === value);
-    return option ? option.shortLabel : '';
 }
 
 function getPlayerSelectOptions(includeEmpty = true) {
@@ -163,19 +154,11 @@ function getPlayerSelectOptions(includeEmpty = true) {
         .sort((a, b) => a.name.localeCompare(b.name, 'da'));
 
     activePlayers.forEach(player => {
-        options.push(`<option value="${escapeHtml(player.name)}">${escapeHtml(player.name)} (${player.level})</option>`);
+        const levelSuffix = shouldShowLevels() ? ` (${player.level})` : '';
+        options.push(`<option value="${escapeHtml(player.name)}">${escapeHtml(player.name)}${levelSuffix}</option>`);
     });
 
     return options.join('');
-}
-
-function populatePreferenceSelect(selectEl, selectedValue = PLAYER_PREFERENCES.NONE) {
-    if (!selectEl) return;
-    selectEl.innerHTML = PLAYER_PREFERENCE_OPTIONS.map(option => `
-        <option value="${option.value}" ${option.value === selectedValue ? 'selected' : ''}>
-            ${option.label}
-        </option>
-    `).join('');
 }
 
 function saveState() {
@@ -191,6 +174,11 @@ function saveState() {
             penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
             penaltyRepeatOpponent: el.penaltyRepeatOpponent.checked,
             penaltyBench: el.penaltyBench.checked,
+            useSkillLevels: el.useSkillLevels?.checked ?? true,
+            hideSkillLevels: el.hideSkillLevels?.checked ?? false,
+            enabledFormats: getEnabledFormats(),
+            maximizeCourts: el.maximizeCourts?.checked ?? true,
+            defaultCourtCount: el.defaultCourtCount?.value ?? '2',
             prefills: getPrefillStateFromUi(),
             collapsedPanels: {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
@@ -218,13 +206,27 @@ function restoreState() {
         state.lastResult = data.lastResult ? normalizeRoundFromStorage(data.lastResult) : null;
 
         if (data.ui) {
-            el.courtCount.value = data.ui.courtCount ?? '2';
+            const defaultCourts = data.ui.defaultCourtCount ?? '2';
+            if (el.defaultCourtCount) el.defaultCourtCount.value = defaultCourts;
+            el.courtCount.value = defaultCourts;
             el.iterations.value = data.ui.iterations ?? '1000';
             el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
             el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
             el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
             el.penaltyRepeatOpponent.checked = Boolean(data.ui.penaltyRepeatOpponent);
             el.penaltyBench.checked = Boolean(data.ui.penaltyBench);
+            // Default useSkillLevels to true for backward compatibility
+            el.useSkillLevels.checked = data.ui.useSkillLevels !== false;
+            el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
+            updateSkillLevelSettingsUI();
+
+            // Restore enabled formats (default: 1v1 and 2v2)
+            const savedFormats = Array.isArray(data.ui.enabledFormats) ? data.ui.enabledFormats : [1, 2];
+            for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+                const cb = document.getElementById(`format-${n}v${n}`);
+                if (cb) cb.checked = savedFormats.includes(n);
+            }
+            if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts !== false;
         }
         const collapsedPanels = data.ui.collapsedPanels || {};
 
@@ -283,7 +285,7 @@ function normalizeRoundFromStorage(round) {
         ...round,
         courts: round.courts.map(court => ({
             ...court,
-            format: court.format || inferCourtFormat(court),
+            format: normalizeCourtFormat(court.format) || inferCourtFormat(court),
             teamA: {
                 ...court.teamA,
                 players: Array.isArray(court.teamA?.players) ? court.teamA.players.map(normalizePlayerForRound) : [],
@@ -305,7 +307,6 @@ function normalizePlayerForRound(player) {
         name: normalizeName(player.name),
         level: Math.min(9, Math.max(1, Number(player.level) || 1)),
         active: true,
-        matchPreference: normalizePlayerPreference(player.matchPreference)
     };
 }
 
@@ -357,39 +358,20 @@ function showStatusMessage(message, duration = 2800) {
     }, duration);
 }
 
-function playerCanPlayFormat(player, format) {
-    const preference = normalizePlayerPreference(player.matchPreference);
 
-    if (format === COURT_FORMATS.SINGLE && preference === PLAYER_PREFERENCES.NO_SINGLE) {
-        return false;
-    }
-
-    if (format === COURT_FORMATS.DOUBLE && preference === PLAYER_PREFERENCES.NO_DOUBLE) {
-        return false;
-    }
-
-    return true;
-}
-
-function popNextEligiblePlayer(availablePlayers, format) {
-    for (let i = availablePlayers.length - 1; i >= 0; i--) {
-        const player = availablePlayers[i];
-        if (playerCanPlayFormat(player, format)) {
-            availablePlayers.splice(i, 1);
-            return player;
-        }
-    }
-    return null;
+function popNextEligiblePlayer(availablePlayers) {
+    if (availablePlayers.length === 0) return null;
+    return availablePlayers.pop();
 }
 
 function loadDefaults() {
-    populatePreferenceSelect(el.newPlayerPreference, PLAYER_PREFERENCES.NONE);
 
     const restored = restoreState();
     if (!restored) {
         renderPrefillArea(createDefaultPrefills(getCourtCount()));
     }
 
+    updateSkillLevelSettingsUI();
     renderStoredPlayerLists();
     renderRoster();
     renderPlayerManagerList();
@@ -534,9 +516,10 @@ function deleteStoredPlayerList() {
 }
 
 function getConfig() {
+    const usingLevels = isUsingSkillLevels();
     return {
-        teamBalanceWeight: el.weightTeamBalance.checked ? FIXED_CONFIG.teamBalanceWeight : 0,
-        partnerBalanceWeight: el.weightPartnerBalance.checked ? FIXED_CONFIG.partnerBalanceWeight : 0,
+        teamBalanceWeight: (usingLevels && el.weightTeamBalance.checked) ? FIXED_CONFIG.teamBalanceWeight : 0,
+        partnerBalanceWeight: (usingLevels && el.weightPartnerBalance.checked) ? FIXED_CONFIG.partnerBalanceWeight : 0,
         teammateLastPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammateLastPenalty : 0,
         teammatePrevPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammatePrevPenalty : 0,
         opponentLastPenalty: el.penaltyRepeatOpponent.checked ? FIXED_CONFIG.opponentLastPenalty : 0,
@@ -544,6 +527,27 @@ function getConfig() {
         benchLastPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchLastPenalty : 0,
         benchPrevPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchPrevPenalty : 0,
     };
+}
+
+function isUsingSkillLevels() {
+    return el.useSkillLevels?.checked ?? true;
+}
+
+function shouldShowLevels() {
+    return isUsingSkillLevels() && !(el.hideSkillLevels?.checked ?? false);
+}
+
+function updateSkillLevelSettingsUI() {
+    const using = isUsingSkillLevels();
+    // Show or hide the "hide levels" sub-option
+    el.hideSkillLevelsRow?.classList.toggle('settings-sub-row--hidden', !using);
+    // Dim and disable the level-balance settings when levels are off
+    if (el.levelSettingsGroup) {
+        el.levelSettingsGroup.classList.toggle('settings-group-disabled', !using);
+        el.levelSettingsGroup.querySelectorAll('input').forEach(input => {
+            input.disabled = !using;
+        });
+    }
 }
 
 function getCourtCount() {
@@ -571,12 +575,13 @@ function buildRelationMaps(round) {
         const teamAPlayers = court.teamA.players || [];
         const teamBPlayers = court.teamB.players || [];
 
-        if (teamAPlayers.length === 2) {
-            teammatePairs.add(pairKey(teamAPlayers[0].name, teamAPlayers[1].name));
-        }
-
-        if (teamBPlayers.length === 2) {
-            teammatePairs.add(pairKey(teamBPlayers[0].name, teamBPlayers[1].name));
+        // All within-team pairs (works for any team size)
+        for (const team of [teamAPlayers, teamBPlayers]) {
+            for (let i = 0; i < team.length; i++) {
+                for (let j = i + 1; j < team.length; j++) {
+                    teammatePairs.add(pairKey(team[i].name, team[j].name));
+                }
+            }
         }
 
         for (const a of teamAPlayers) {
@@ -593,24 +598,36 @@ function buildRelationMaps(round) {
     };
 }
 
+// Converts old string format values to integers (backward compat).
+function normalizeCourtFormat(format) {
+    if (typeof format === 'number') return format;
+    if (format === 'single') return 1;
+    if (format === 'double') return 2;
+    return null;
+}
+
+// Returns the actual team size (integer) by counting players.
 function inferCourtFormat(court) {
     const teamASize = court.teamA?.players?.length || 0;
     const teamBSize = court.teamB?.players?.length || 0;
-
-    if (teamASize === 1 && teamBSize === 1) return COURT_FORMATS.SINGLE;
-    return COURT_FORMATS.DOUBLE;
+    return Math.max(teamASize, teamBSize, 1);
 }
 
 function sumTeamLevel(players) {
     return players.reduce((sum, player) => sum + Number(player.level || 0), 0);
 }
 
-function createCourtFromSlots(format, slotMap, lockedSlotsForCourt = null) {
-    const teamAPlayers = [slotMap.A1, slotMap.A2].filter(Boolean);
-    const teamBPlayers = [slotMap.B1, slotMap.B2].filter(Boolean);
+// teamSize is an integer; slotMap has keys A1..AN and B1..BN.
+function createCourtFromSlots(teamSize, slotMap, lockedSlotsForCourt = null) {
+    const teamAPlayers = [];
+    const teamBPlayers = [];
+    for (let i = 1; i <= teamSize; i++) {
+        if (slotMap[`A${i}`]) teamAPlayers.push(slotMap[`A${i}`]);
+        if (slotMap[`B${i}`]) teamBPlayers.push(slotMap[`B${i}`]);
+    }
 
     return {
-        format,
+        format: teamSize,
         teamA: {
             players: teamAPlayers,
             totalLevel: sumTeamLevel(teamAPlayers)
@@ -625,66 +642,70 @@ function createCourtFromSlots(format, slotMap, lockedSlotsForCourt = null) {
 
 function renderPrefillArea(prefills) {
     const courtCount = getCourtCount();
-    const safePrefills = Array.isArray(prefills) ? prefills.slice(0, courtCount) : [];
+    const enabledFormats = getEnabledFormats();
+    const maxEnabled = getMaxEnabledFormat();
+
+    // Normalise incoming prefills (handles old 'single'/'double'/'both' values)
+    const safePrefills = (Array.isArray(prefills) ? prefills.slice(0, courtCount) : []).map(p => ({
+        format: normalizePrefillFormat(p?.format, enabledFormats),
+        slots: p?.slots || {}
+    }));
     while (safePrefills.length < courtCount) {
-        safePrefills.push({
-            format: COURT_FORMATS.BOTH,
-            slots: {A1: '', A2: '', B1: '', B2: ''}
-        });
+        safePrefills.push({ format: COURT_FORMAT_AUTO, slots: {} });
     }
 
     const playerOptions = getPlayerSelectOptions(true);
 
-
     el.prefillArea.innerHTML = safePrefills.map((prefill, index) => {
-        const a2 = prefill.format !== COURT_FORMATS.SINGLE ? `
-                    <select data-role="slot" data-slot="A2" data-court-index="${index}">${playerOptions}</select>
-    ` : '';
+        // How many slot rows to render: auto → max enabled, specific → that number
+        const displaySize = prefill.format === COURT_FORMAT_AUTO ? maxEnabled : Number(prefill.format);
 
-        const b2 = prefill.format !== COURT_FORMATS.SINGLE ? `
-                    <select data-role="slot" data-slot="B2" data-court-index="${index}">${playerOptions}</select>
-    ` : '';
+        // Build player slot selects for each side
+        let aSlotsHtml = '';
+        let bSlotsHtml = '';
+        for (let i = 1; i <= displaySize; i++) {
+            aSlotsHtml += `<select data-role="slot" data-slot="A${i}" data-court-index="${index}">${playerOptions}</select>`;
+            bSlotsHtml += `<select data-role="slot" data-slot="B${i}" data-court-index="${index}">${playerOptions}</select>`;
+        }
+
+        // Format dropdown: "Automatisk" + each enabled size
+        const formatOptions = [
+            `<option value="${COURT_FORMAT_AUTO}" ${prefill.format === COURT_FORMAT_AUTO ? 'selected' : ''}>Automatisk</option>`,
+            ...enabledFormats.map(n =>
+                `<option value="${n}" ${String(n) === String(prefill.format) ? 'selected' : ''}>${formatLabel(n)}</option>`)
+        ].join('');
+
         return `
             <div class="prefill-card" data-court-index="${index}">
                 <div class="prefill-card-header">
                     <strong>Bane ${index + 1}</strong>
                     <div class="prefill-format">
                         <select id="prefill-format-${index}" class="prefill-format-select" data-role="format" data-court-index="${index}">
-                            <option value="${COURT_FORMATS.BOTH}" ${prefill.format === COURT_FORMATS.BOTH ? 'selected' : ''}>Begge</option>
-                            <option value="${COURT_FORMATS.DOUBLE}" ${prefill.format === COURT_FORMATS.DOUBLE ? 'selected' : ''}>Double</option>
-                            <option value="${COURT_FORMATS.SINGLE}" ${prefill.format === COURT_FORMATS.SINGLE ? 'selected' : ''}>Single</option>
+                            ${formatOptions}
                         </select>
                     </div>
                 </div>
-
                 <div class="prefill-grid">
-                    <div class="prefill-side">
-                        <select data-role="slot" data-slot="A1" data-court-index="${index}">${playerOptions}</select>
-                        ${a2}
-                    </div>
-
+                    <div class="prefill-side">${aSlotsHtml}</div>
                     <div class="prefill-vs">VS</div>
-
-                    <div class="prefill-side">
-                        <select data-role="slot" data-slot="B1" data-court-index="${index}">${playerOptions}</select>
-                        ${b2}
-                    </div>
+                    <div class="prefill-side">${bSlotsHtml}</div>
                 </div>
             </div>
         `;
     }).join('');
 
+    // Restore slot selections (only for rendered slots)
     safePrefills.forEach((prefill, index) => {
-        const slots = prefill?.slots || {};
-        ['A1', 'A2', 'B1', 'B2'].forEach(slotKey => {
-            const select = el.prefillArea.querySelector(`select[data-role="slot"][data-court-index="${index}"][data-slot="${slotKey}"]`);
-            if (select) {
-                select.value = slots[slotKey] || '';
+        const slots = prefill.slots || {};
+        const displaySize = prefill.format === COURT_FORMAT_AUTO ? maxEnabled : Number(prefill.format);
+        for (let i = 1; i <= displaySize; i++) {
+            for (const side of ['A', 'B']) {
+                const key = `${side}${i}`;
+                const select = el.prefillArea.querySelector(`select[data-role="slot"][data-court-index="${index}"][data-slot="${key}"]`);
+                if (select && slots[key]) select.value = slots[key];
             }
-        });
+        }
     });
-
-    updatePrefillSlotState();
 }
 
 function getPrefillStateFromUi() {
@@ -693,114 +714,89 @@ function getPrefillStateFromUi() {
 
     for (let courtIndex = 0; courtIndex < courtCount; courtIndex++) {
         const formatSelect = el.prefillArea.querySelector(`select[data-role="format"][data-court-index="${courtIndex}"]`);
-        if (!formatSelect) {
-            continue;
-        }
+        if (!formatSelect) continue;
+
         const slots = {};
-
-        ['A1', 'A2', 'B1', 'B2'].forEach(slotKey => {
-            const select = el.prefillArea.querySelector(`select[data-role="slot"][data-court-index="${courtIndex}"][data-slot="${slotKey}"]`);
-            slots[slotKey] = select ? normalizeName(select.value) : '';
+        // Read all slot selects that are currently rendered for this court
+        el.prefillArea.querySelectorAll(`select[data-role="slot"][data-court-index="${courtIndex}"]`).forEach(select => {
+            const slotKey = select.dataset.slot;
+            const val = normalizeName(select.value);
+            if (val) slots[slotKey] = val;
         });
 
-        prefills.push({
-            format: formatSelect.value,
-            slots
-        });
+        prefills.push({ format: formatSelect.value, slots });
     }
 
     return prefills;
 }
 
-function updatePrefillSlotState() {
-    const prefills = getPrefillStateFromUi();
 
-    prefills.forEach((prefill, courtIndex) => {
-        const isSingle = prefill.format === COURT_FORMATS.SINGLE;
-        ['A2', 'B2'].forEach(slotKey => {
-            const label = el.prefillArea.querySelector(`label[data-court-index="${courtIndex}"][data-slot-label="${slotKey}"]`);
-            const select = el.prefillArea.querySelector(`select[data-role="slot"][data-court-index="${courtIndex}"][data-slot="${slotKey}"]`);
-            if (select && isSingle) {
-                select.value = '';
-            }
-            if (label) {
-                label.style.display = isSingle ? 'none' : 'block';
-            }
-        });
-    });
-}
+// Returns which team sizes (integers) are actually playable on this court,
+// given its locked slots and the globally enabled formats.
+function getPossibleFormatsForPrefill(prefill, enabledFormats) {
+    const slots = prefill.slots || {};
 
-function getPossibleFormatsForPrefill(prefill) {
-    const slots = prefill.slots || {A1: '', A2: '', B1: '', B2: ''};
-    const filledCount = Object.values(slots).filter(Boolean).length;
-    const sideACount = [slots.A1, slots.A2].filter(Boolean).length;
-    const sideBCount = [slots.B1, slots.B2].filter(Boolean).length;
-    const hasBackSlots = Boolean(slots.A2 || slots.B2);
+    // Find the highest locked slot index on either side (determines minimum team size)
+    let minRequired = 0;
+    for (let i = 1; i <= MAX_TEAM_SIZE; i++) {
+        if (slots[`A${i}`] || slots[`B${i}`]) minRequired = i;
+    }
+
+    // Court's configured max: 'auto' means no cap
+    const maxAllowed = prefill.format === COURT_FORMAT_AUTO
+        ? MAX_TEAM_SIZE
+        : Number(prefill.format);
 
     const result = [];
-
-    if (prefill.format !== COURT_FORMATS.SINGLE && canSupportDouble(slots, sideACount, sideBCount)) {
-        result.push(COURT_FORMATS.DOUBLE);
+    for (const n of enabledFormats) {
+        if (n < minRequired) continue; // locked player in a higher slot → can't shrink
+        if (n > maxAllowed) continue;  // exceeds this court's configured maximum
+        result.push(n);
     }
 
-    if (prefill.format !== COURT_FORMATS.DOUBLE && canSupportSingle(slots, sideACount, sideBCount)) {
-        result.push(COURT_FORMATS.SINGLE);
-    }
-
-    if (filledCount === 0) {
-        result.push('unused');
-    }
-
-    if (hasBackSlots) {
-        return result.filter(f => f !== COURT_FORMATS.SINGLE || !hasBackSlots);
-    }
+    // Court can be left empty only if no slots are locked
+    if (minRequired === 0) result.push('unused');
 
     return result;
 }
 
-function canSupportDouble(slots, sideACount, sideBCount) {
-    if (sideACount > 2 || sideBCount > 2) return false;
-    if (Object.values(slots).filter(Boolean).length > 4) return false;
-    return true;
-}
-
-function canSupportSingle(slots, sideACount, sideBCount) {
-    if (slots.A2 || slots.B2) return false;
-    if (sideACount > 1 || sideBCount > 1) return false;
-    if (Object.values(slots).filter(Boolean).length > 2) return false;
-    return true;
-}
-
-function getNeededPlayersForFormat(prefill, format) {
-    const filledCount = Object.values(prefill.slots || {}).filter(Boolean).length;
-    if (format === COURT_FORMATS.DOUBLE) {
-        return 4 - filledCount;
+// How many players must be drawn from the pool to fill a court at teamSize N.
+function getNeededPlayersForFormat(prefill, teamSize) {
+    const slots = prefill.slots || {};
+    let needed = teamSize * 2;
+    for (let i = 1; i <= teamSize; i++) {
+        if (slots[`A${i}`]) needed--;
+        if (slots[`B${i}`]) needed--;
     }
-    if (format === COURT_FORMATS.SINGLE) {
-        return 2 - filledCount;
-    }
-    return 0;
+    return Math.max(0, needed);
 }
 
+// Compares two plan score keys [usedFromPool, usedCourts, totalTeamSize].
+// Returns positive if candidate is better than best.
 function comparePlanScore(candidateKey, bestKey) {
     if (!bestKey) return 1;
 
-    for (let i = 0; i < candidateKey.length; i++) {
-        if (candidateKey[i] > bestKey[i]) return 1;
-        if (candidateKey[i] < bestKey[i]) return -1;
+    // Always prefer more players on court
+    if (candidateKey[0] !== bestKey[0]) return candidateKey[0] - bestKey[0];
+
+    // Court count preference: maximise or minimise based on setting
+    if (candidateKey[1] !== bestKey[1]) {
+        const maximize = el.maximizeCourts?.checked ?? true;
+        return maximize ? (candidateKey[1] - bestKey[1]) : (bestKey[1] - candidateKey[1]);
     }
 
-    return 0;
+    // Tiebreaker: prefer larger total team size (better use of court capacity)
+    return candidateKey[2] - bestKey[2];
 }
 
 function chooseCourtFormats(prefills, availableCount) {
+    const enabledFormats = getEnabledFormats();
     let bestPlan = null;
     let bestKey = null;
 
     function backtrack(index, remainingPlayers, currentPlan, stats) {
         if (index >= prefills.length) {
-            const candidateKey = [stats.usedPlayers, stats.usedCourts, stats.doubleCount];
-
+            const candidateKey = [stats.usedFromPool, stats.usedCourts, stats.totalTeamSize];
             if (comparePlanScore(candidateKey, bestKey) > 0) {
                 bestKey = candidateKey;
                 bestPlan = [...currentPlan];
@@ -809,93 +805,71 @@ function chooseCourtFormats(prefills, availableCount) {
         }
 
         const prefill = prefills[index];
-        const possibleFormats = getPossibleFormatsForPrefill(prefill);
+        const possibleFormats = getPossibleFormatsForPrefill(prefill, enabledFormats);
 
-        for (const format of possibleFormats) {
-            const needed = getNeededPlayersForFormat(prefill, format);
+        for (const teamSize of possibleFormats) {
+            if (teamSize === 'unused') continue;
+            const needed = getNeededPlayersForFormat(prefill, teamSize);
             if (needed > remainingPlayers) continue;
 
-            const nextStats = {...stats};
-            if (format === COURT_FORMATS.DOUBLE) {
-                nextStats.doubleCount += 1;
-                nextStats.usedPlayers += 4;
-                nextStats.usedCourts += 1;
-            } else if (format === COURT_FORMATS.SINGLE) {
-                nextStats.usedPlayers += 2;
-                nextStats.usedCourts += 1;
-            }
-
-            currentPlan.push(format);
-            backtrack(index + 1, remainingPlayers - needed, currentPlan, nextStats);
+            currentPlan.push(teamSize);
+            backtrack(index + 1, remainingPlayers - needed, currentPlan, {
+                usedFromPool: stats.usedFromPool + needed,
+                usedCourts: stats.usedCourts + 1,
+                totalTeamSize: stats.totalTeamSize + teamSize
+            });
             currentPlan.pop();
         }
 
-        if (!possibleFormats.includes('unused') && Object.values(prefill.slots).every(value => !value)) {
+        if (possibleFormats.includes('unused')) {
             currentPlan.push('unused');
             backtrack(index + 1, remainingPlayers, currentPlan, {...stats});
             currentPlan.pop();
         }
     }
 
-    backtrack(0, availableCount, [], {
-        doubleCount: 0,
-        usedPlayers: 0,
-        usedCourts: 0
-    });
-
+    backtrack(0, availableCount, [], { usedFromPool: 0, usedCourts: 0, totalTeamSize: 0 });
     return bestPlan;
 }
 
-function fillCourtSlots(prefill, format, availablePlayers) {
-    const slotMap = {
-        A1: null,
-        A2: null,
-        B1: null,
-        B2: null
-    };
+// Fills a court's slots for a given teamSize, drawing unlocked players from the pool.
+function fillCourtSlots(prefill, teamSize, availablePlayers) {
+    const slotMap = {};
 
-    for (const slotKey of Object.keys(slotMap)) {
-        if (prefill.slots[slotKey]) {
-            slotMap[slotKey] = prefill.slots[slotKey];
+    // Copy pre-locked player objects into the slot map
+    for (let i = 1; i <= teamSize; i++) {
+        slotMap[`A${i}`] = prefill.slots?.[`A${i}`] || null;
+        slotMap[`B${i}`] = prefill.slots?.[`B${i}`] || null;
+    }
+
+    // Draw from pool to fill remaining slots (A first, then B, slot by slot)
+    for (let i = 1; i <= teamSize; i++) {
+        if (!slotMap[`A${i}`]) {
+            const player = popNextEligiblePlayer(availablePlayers);
+            if (!player) throw new Error('Ikke nok spillere til at udfylde den valgte præudfyldning.');
+            slotMap[`A${i}`] = player;
+        }
+        if (!slotMap[`B${i}`]) {
+            const player = popNextEligiblePlayer(availablePlayers);
+            if (!player) throw new Error('Ikke nok spillere til at udfylde den valgte præudfyldning.');
+            slotMap[`B${i}`] = player;
         }
     }
 
-    const neededSlots = format === COURT_FORMATS.DOUBLE
-        ? ['A1', 'A2', 'B1', 'B2']
-        : ['A1', 'B1'];
-
-    for (const slotKey of neededSlots) {
-        if (!slotMap[slotKey]) {
-            const nextPlayer = popNextEligiblePlayer(availablePlayers, format);
-            if (!nextPlayer) {
-                throw new Error('Ikke nok spillere til at udfylde den valgte præudfyldning.');
-            }
-            slotMap[slotKey] = nextPlayer;
-        }
-    }
-
-    if (format === COURT_FORMATS.SINGLE) {
-        slotMap.A2 = null;
-        slotMap.B2 = null;
-    }
-
+    // Collect locked slots (by name, for the court record)
     const lockedSlots = {};
-    Object.keys(prefill.slots).forEach(key => {
-        if (prefill.slots[key]) {
-            lockedSlots[key] = prefill.slots[key];
-        }
-    });
+    for (let i = 1; i <= teamSize; i++) {
+        if (prefill.slots?.[`A${i}`]) lockedSlots[`A${i}`] = prefill.slots[`A${i}`];
+        if (prefill.slots?.[`B${i}`]) lockedSlots[`B${i}`] = prefill.slots[`B${i}`];
+    }
 
-    return createCourtFromSlots(format, slotMap, lockedSlots);
+    return createCourtFromSlots(teamSize, slotMap, lockedSlots);
 }
 
 function createRandomRound(players, courtCount, prefills) {
     const prefillsForCourts = prefills.slice(0, courtCount);
     while (prefillsForCourts.length < courtCount) {
-        prefillsForCourts.push({
-            format: COURT_FORMATS.BOTH,
-            slots: {A1: '', A2: '', B1: '', B2: ''}
-        });
+        prefillsForCourts.push({ format: COURT_FORMAT_AUTO, slots: {} });
     }
 
     const lockedNames = new Set();
@@ -921,19 +895,20 @@ function createRandomRound(players, courtCount, prefills) {
     const chosenPlan = chooseCourtFormats(prefillsForCourts, availablePool.length);
 
     if (!chosenPlan) {
-        throw new Error('Kunne ikke finde en gyldig kombination af singler/doubler ud fra de valgte låsninger.');
+        throw new Error('Kunne ikke finde en gyldig holdsammensætning ud fra de valgte låsninger og tilladte formater.');
     }
 
     const courts = [];
 
     for (let i = 0; i < chosenPlan.length; i++) {
-        const format = chosenPlan[i];
-        if (format === 'unused') continue;
+        const teamSize = chosenPlan[i];
+        if (teamSize === 'unused') continue;
 
         const prefill = prefillsForCourts[i];
         const filledCourt = fillCourtSlots(
             {
                 ...prefill,
+                // Convert player-name strings in slots → player objects
                 slots: Object.fromEntries(
                     Object.entries(prefill.slots).map(([slotKey, playerName]) => [
                         slotKey,
@@ -941,7 +916,7 @@ function createRandomRound(players, courtCount, prefills) {
                     ])
                 )
             },
-            format,
+            teamSize,
             availablePool
         );
 
@@ -980,19 +955,6 @@ function scoreBenchRotation(round, history, config) {
     return scoreDelta;
 }
 
-function getPreferenceScore(player, format) {
-    const preference = normalizePlayerPreference(player.matchPreference);
-
-    if (format === COURT_FORMATS.SINGLE && preference === PLAYER_PREFERENCES.NO_SINGLE) {
-        return -100000;
-    }
-
-    if (format === COURT_FORMATS.DOUBLE && preference === PLAYER_PREFERENCES.NO_DOUBLE) {
-        return -100000;
-    }
-
-    return 0;
-}
 
 function scoreRound(round, history, config) {
     let score = 0;
@@ -1003,32 +965,33 @@ function scoreRound(round, history, config) {
     const prevMaps = prevRound ? buildRelationMaps(prevRound) : null;
 
     for (const court of round.courts) {
-        const format = court.format || inferCourtFormat(court);
         const teamAPlayers = court.teamA.players;
         const teamBPlayers = court.teamB.players;
 
+        // Team-level balance (total level difference between sides)
         const sumA = court.teamA.totalLevel;
         const sumB = court.teamB.totalLevel;
-        const teamDiff = Math.abs(sumA - sumB);
+        score -= Math.abs(sumA - sumB) * config.teamBalanceWeight;
 
-        score -= teamDiff * config.teamBalanceWeight;
+        // Partner-level balance (level spread within each team, generalised for N players)
+        if (teamAPlayers.length > 1) {
+            const spreadA = Math.max(...teamAPlayers.map(p => p.level)) - Math.min(...teamAPlayers.map(p => p.level));
+            const spreadB = Math.max(...teamBPlayers.map(p => p.level)) - Math.min(...teamBPlayers.map(p => p.level));
+            score -= (spreadA + spreadB) * config.partnerBalanceWeight;
+        }
 
-        if (format === COURT_FORMATS.DOUBLE) {
-            const partnerDiffA = Math.abs(teamAPlayers[0].level - teamAPlayers[1].level);
-            const partnerDiffB = Math.abs(teamBPlayers[0].level - teamBPlayers[1].level);
-            score -= (partnerDiffA + partnerDiffB) * config.partnerBalanceWeight;
-
-            const teammatePairs = [
-                pairKey(teamAPlayers[0].name, teamAPlayers[1].name),
-                pairKey(teamBPlayers[0].name, teamBPlayers[1].name)
-            ];
-
-            for (const key of teammatePairs) {
-                if (lastMaps?.teammatePairs.has(key)) score -= config.teammateLastPenalty;
-                if (prevMaps?.teammatePairs.has(key)) score -= config.teammatePrevPenalty;
+        // Teammate-pair penalties (all within-team combinations)
+        for (const team of [teamAPlayers, teamBPlayers]) {
+            for (let i = 0; i < team.length; i++) {
+                for (let j = i + 1; j < team.length; j++) {
+                    const key = pairKey(team[i].name, team[j].name);
+                    if (lastMaps?.teammatePairs.has(key)) score -= config.teammateLastPenalty;
+                    if (prevMaps?.teammatePairs.has(key)) score -= config.teammatePrevPenalty;
+                }
             }
         }
 
+        // Opponent-pair penalties (all cross-team combinations)
         for (const a of teamAPlayers) {
             for (const b of teamBPlayers) {
                 const key = pairKey(a.name, b.name);
@@ -1036,11 +999,6 @@ function scoreRound(round, history, config) {
                 if (prevMaps?.opponentPairs.has(key)) score -= config.opponentPrevPenalty;
             }
         }
-
-        [...teamAPlayers, ...teamBPlayers].forEach(player => {
-            score += getPreferenceScore(player, format);
-        });
-
     }
 
     score += scoreBenchRotation(round, history, config);
@@ -1071,8 +1029,6 @@ function getPlayerStats() {
     return state.roster.filter(player => player.active).map(player => {
         let played = 0;
         let benched = 0;
-        let singles = 0;
-        let doubles = 0;
         let benchedLast = false;
         let benchedPrev = false;
 
@@ -1083,12 +1039,7 @@ function getPlayerStats() {
             );
 
             if (onBench) benched += 1;
-            if (courtPlayed) {
-                played += 1;
-                const format = courtPlayed.format || inferCourtFormat(courtPlayed);
-                if (format === COURT_FORMATS.SINGLE) singles += 1;
-                if (format === COURT_FORMATS.DOUBLE) doubles += 1;
-            }
+            if (courtPlayed) played += 1;
 
             if (index === state.history.length - 1) benchedLast = onBench;
             if (index === state.history.length - 2) benchedPrev = onBench;
@@ -1098,8 +1049,6 @@ function getPlayerStats() {
             ...player,
             played,
             benched,
-            singles,
-            doubles,
             benchedLast,
             benchedPrev
         };
@@ -1121,13 +1070,11 @@ function renderRoster() {
         .sort((a, b) => a.name.localeCompare(b.name, 'da'))
         .map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
-            const pref = getPreferenceShortLabel(player.matchPreference);
 
             return `
             <button class="player-chip" type="button" onclick="removePlayer(${index})" title="Klik for at sætte spilleren som inaktiv">
                 ${escapeHtml(player.name)}
-                <span class="lowered">${player.level}</span>
-                ${pref ? `<span class="player-chip-pref">${escapeHtml(pref)}</span>` : ''}
+                ${shouldShowLevels() ? `<span class="lowered">${player.level}</span>` : ''}
             </button>
         `;
         }).join('');
@@ -1147,8 +1094,35 @@ function renderPlayerManagerList() {
         return;
     }
 
+    const hiding = isUsingSkillLevels() && !shouldShowLevels();
+
     el.playerManagerListArea.innerHTML = players.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
+
+        let levelControls;
+        if (!isUsingSkillLevels()) {
+            // Skill levels feature is off entirely — no level UI at all
+            levelControls = '';
+        } else if (hiding) {
+            // Levels are hidden — show a reveal toggle button; level select starts hidden
+            levelControls = `
+                <div class="player-row-inline-controls">
+                    <button class="level-reveal-btn" onclick="togglePlayerLevelReveal(this, ${index})" title="Vis/skjul niveau">•••</button>
+                    <div class="level-reveal-area">
+                        <select class="level-select" data-player-level-index="${index}">
+                            ${getLevelOptions(player.level)}
+                        </select>
+                    </div>
+                </div>`;
+        } else {
+            // Levels visible — show select directly
+            levelControls = `
+                <div class="player-row-inline-controls">
+                    <select class="level-select" data-player-level-index="${index}">
+                        ${getLevelOptions(player.level)}
+                    </select>
+                </div>`;
+        }
 
         return `
             <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}">
@@ -1156,24 +1130,18 @@ function renderPlayerManagerList() {
                     <button class="player-row-name" onclick="${player.active ? `removePlayer(${index})` : `markArrived(${index})`}">
                         <strong>${escapeHtml(player.name)}</strong>
                     </button>
-
-                    <div class="player-row-inline-controls">
-                        <select class="level-select" data-player-level-index="${index}">
-                            ${getLevelOptions(player.level)}
-                        </select>
-
-                        <select data-player-preference-index="${index}">
-                            ${PLAYER_PREFERENCE_OPTIONS.map(option => `
-                                <option value="${option.value}" ${option.value === player.matchPreference ? 'selected' : ''}>
-                                    ${option.label}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </div>
+                    ${levelControls}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+function togglePlayerLevelReveal(btn, index) {
+    const area = btn.closest('.player-row-inline-controls').querySelector('.level-reveal-area');
+    const isVisible = area.classList.toggle('level-reveal-area--open');
+    btn.textContent = isVisible ? '▲' : '•••';
+    btn.title = isVisible ? 'Skjul niveau' : 'Vis niveau';
 }
 
 function renderPlayerStats() {
@@ -1191,8 +1159,6 @@ function renderPlayerStats() {
                 <tr>
                     <th>Spiller</th>
                     <th class="center">Spillet</th>
-                    <th class="center">Double</th>
-                    <th class="center">Single</th>
                     <th class="center">Siddet over</th>
                     <th class="center">Seneste bænk</th>
                 </tr>
@@ -1202,11 +1168,8 @@ function renderPlayerStats() {
                     <tr>
                         <td>
                             ${escapeHtml(player.name)}
-                            <div class="table-subtle">${escapeHtml(getPreferenceShortLabel(player.matchPreference))}</div>
                         </td>
                         <td class="center">${player.played}</td>
-                        <td class="center">${player.doubles}</td>
-                        <td class="center">${player.singles}</td>
                         <td class="center">${player.benched}</td>
                         <td class="center">
                             ${player.benchedLast ? 'Sidst' : (player.benchedPrev ? 'Forrige' : '')}
@@ -1229,15 +1192,15 @@ function renderRound(result) {
     }
 
     result.courts.forEach((court, index) => {
-        const format = court.format || inferCourtFormat(court);
-        const formatLabel = format === COURT_FORMATS.SINGLE ? 'Single' : 'Double';
+        const teamSize = normalizeCourtFormat(court.format) || inferCourtFormat(court);
+        const fmtLabel = formatLabel(teamSize);
 
         html += `
             <div class="result-card">
                 <div class="court-title">
                     <span>Bane ${index + 1}</span>
                     <div class="court-tags">
-                        <span class="tag">${formatLabel}</span>
+                        <span class="tag">${fmtLabel}</span>
                     </div>
                 </div>
                 <div class="vs-grid">
@@ -1245,7 +1208,7 @@ function renderRound(result) {
                         ${court.teamA.players.map(player => `
                             <div class="player-line">
                                 <span>${escapeHtml(player.name)}</span>
-                                <span class="level">${player.level}</span>
+                                ${shouldShowLevels() ? `<span class="level">${player.level}</span>` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -1254,7 +1217,7 @@ function renderRound(result) {
                         ${court.teamB.players.map(player => `
                             <div class="player-line">
                                 <span>${escapeHtml(player.name)}</span>
-                                <span class="level">${player.level}</span>
+                                ${shouldShowLevels() ? `<span class="level">${player.level}</span>` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -1264,20 +1227,18 @@ function renderRound(result) {
     });
 
     if (result.benched.length > 0) {
-        html += `Sidder over: ${result.benched.map(p => `${escapeHtml(p.name)}`).join(', ')}`;
+        html += `<div class="benched-line">Sidder over: ${result.benched.map(p => escapeHtml(p.name)).join(', ')}</div>`;
     }
+
+    html += `<div class="retry-row"><button class="ghost retry-btn" onclick="retryRound()" title="Kassér dette resultat og generér et nyt">↺ Prøv igen</button></div>`;
 
     el.resultArea.innerHTML = html;
 }
 
 function describeCourtForHistory(court, courtIndex) {
-    const format = court.format || inferCourtFormat(court);
-
-    if (format === COURT_FORMATS.SINGLE) {
-        return `${escapeHtml(court.teamA.players[0].name)} mod ${escapeHtml(court.teamB.players[0].name)}`;
-    }
-
-    return `${escapeHtml(court.teamA.players[0].name)} og ${escapeHtml(court.teamA.players[1].name)} mod ${escapeHtml(court.teamB.players[0].name)} og ${escapeHtml(court.teamB.players[1].name)}`;
+    const aNames = court.teamA.players.map(p => escapeHtml(p.name)).join(' og ');
+    const bNames = court.teamB.players.map(p => escapeHtml(p.name)).join(' og ');
+    return `${aNames} mod ${bNames}`;
 }
 
 function renderHistory() {
@@ -1346,7 +1307,6 @@ function replaceRoster(newPlayers) {
     state.roster = clonePlayers(newPlayers).map(player => ({
         ...player,
         active: false,
-        matchPreference: normalizePlayerPreference(player.matchPreference)
     }));
     state.history = [];
     state.lastResult = null;
@@ -1364,7 +1324,6 @@ function replaceRoster(newPlayers) {
 function addPlayer() {
     const name = normalizeName(el.newPlayerName.value);
     const level = Number(el.newPlayerLevel.value);
-    const matchPreference = normalizePlayerPreference(el.newPlayerPreference.value);
 
     if (!name) {
         showStatusMessage('Skriv et navn før du tilføjer spilleren.');
@@ -1381,11 +1340,10 @@ function addPlayer() {
         return;
     }
 
-    state.roster.push({name, level, active: true, matchPreference});
+    state.roster.push({name, level, active: true});
 
     el.newPlayerName.value = '';
     el.newPlayerLevel.value = '2';
-    el.newPlayerPreference.value = PLAYER_PREFERENCES.NONE;
 
     renderRoster();
     renderPlayerManagerList();
@@ -1409,13 +1367,12 @@ function parsePlayersFromText(text) {
     for (const line of lines) {
         const parts = line.split(',').map(part => part.trim());
 
-        if (parts.length < 2 || parts.length > 3) {
-            throw new Error(`Ugyldigt format: "${line}". Brug formatet navn,niveau eller navn,niveau,præference`);
+        if (parts.length !== 2) {
+            throw new Error(`Ugyldigt format: "${line}". Brug formatet navn,niveau`);
         }
 
-        const [name, levelText, preferenceText = PLAYER_PREFERENCES.NONE] = parts;
+        const [name, levelText] = parts;
         const level = Number(levelText);
-        const matchPreference = normalizePlayerPreference(preferenceText);
 
         if (!name) {
             throw new Error(`Mangler navn i linjen: "${line}"`);
@@ -1434,8 +1391,7 @@ function parsePlayersFromText(text) {
         players.push({
             name,
             level,
-            active: false,
-            matchPreference
+            active: false
         });
     }
 
@@ -1448,7 +1404,7 @@ function parsePlayersFromText(text) {
 
 function playersToText(players) {
     return players
-        .map(player => `${player.name},${player.level},${getPreferenceLabel(normalizePlayerPreference(player.matchPreference))}`)
+        .map(player => `${player.name},${player.level}`)
         .join('\n');
 }
 
@@ -1492,17 +1448,6 @@ function updatePlayerLevel(index, level) {
     saveState();
 }
 
-function updatePlayerPreference(index, preference) {
-    const player = state.roster[index];
-    if (!player) return;
-
-    player.matchPreference = normalizePlayerPreference(preference);
-    renderRoster();
-    renderPlayerManagerList();
-    renderPlayerStats();
-    saveState();
-}
-
 window.markArrived = markArrived;
 window.removePlayer = removePlayer;
 
@@ -1533,6 +1478,15 @@ function generateRound() {
 
     saveState();
 }
+
+function retryRound() {
+    if (state.history.length === 0) return;
+    // Silently undo the last round then generate a fresh one
+    state.history.pop();
+    state.lastResult = state.history[state.history.length - 1] || null;
+    generateRound();
+}
+window.retryRound = retryRound;
 
 function clearPrefills() {
     renderPrefillArea(createDefaultPrefills(getCourtCount()));
@@ -1679,12 +1633,44 @@ el.closeImportExportBtn.addEventListener('click', () => {
     el.weightPartnerBalance,
     el.penaltyRepeatTeammate,
     el.penaltyRepeatOpponent,
-    el.penaltyBench
+    el.penaltyBench,
+    el.useSkillLevels,
+    el.hideSkillLevels,
+    el.maximizeCourts,
 ].forEach(input => {
     input.addEventListener('change', () => {
         renderPrefillArea(getPrefillStateFromUi());
         saveState();
     });
+});
+
+// Format size checkboxes (1v1 through 11v11)
+for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+    document.getElementById(`format-${n}v${n}`)?.addEventListener('change', () => {
+        renderPrefillArea(getPrefillStateFromUi());
+        saveState();
+    });
+}
+
+el.defaultCourtCount?.addEventListener('change', () => {
+    const val = Math.max(1, parseInt(el.defaultCourtCount.value, 10) || 1);
+    el.defaultCourtCount.value = val;
+    el.courtCount.value = val;
+    renderPrefillArea(getPrefillStateFromUi());
+    saveState();
+});
+
+el.useSkillLevels.addEventListener('change', () => {
+    updateSkillLevelSettingsUI();
+    renderRoster();
+    renderPlayerManagerList();
+    if (state.lastResult) renderRound(state.lastResult);
+});
+
+el.hideSkillLevels.addEventListener('change', () => {
+    renderRoster();
+    renderPlayerManagerList();
+    if (state.lastResult) renderRound(state.lastResult);
 });
 
 el.prefillArea.addEventListener('change', (event) => {
@@ -1696,7 +1682,8 @@ el.prefillArea.addEventListener('change', (event) => {
     const courtIndex = Number(target.dataset.courtIndex);
 
     if (role === 'format') {
-        updatePrefillSlotState();
+        // Re-render with new slot count for this court's format
+        renderPrefillArea(getPrefillStateFromUi());
         saveState();
         return;
     }
@@ -1704,32 +1691,25 @@ el.prefillArea.addEventListener('change', (event) => {
     if (role === 'slot') {
         const prefills = getPrefillStateFromUi();
         const selectedName = normalizeName(target.value);
+        const currentSlotKey = target.dataset.slot;
 
         if (selectedName) {
-            let duplicateFound = false;
-
+            // If this player already occupies another slot, silently move them here
+            // (clear every other slot that held this player name)
+            let moved = false;
             prefills.forEach((prefill, idx) => {
-                if (idx === courtIndex) return;
-                Object.values(prefill.slots).forEach(name => {
-                    if (name === selectedName) {
-                        duplicateFound = true;
+                Object.keys(prefill.slots).forEach(slotKey => {
+                    if (prefill.slots[slotKey] === selectedName) {
+                        if (idx !== courtIndex || slotKey !== currentSlotKey) {
+                            delete prefill.slots[slotKey];
+                            moved = true;
+                        }
                     }
                 });
             });
 
-            const currentCourtPrefill = prefills[courtIndex];
-            const currentSlotKey = target.dataset.slot;
-
-            Object.entries(currentCourtPrefill.slots).forEach(([slotKey, value]) => {
-                if (slotKey !== currentSlotKey && value === selectedName) {
-                    duplicateFound = true;
-                }
-            });
-
-            if (duplicateFound) {
-                target.value = '';
-                showStatusMessage(`Spilleren "${selectedName}" er allerede brugt i præudfyldningen.`);
-                return;
+            if (moved) {
+                renderPrefillArea(prefills);
             }
         }
 
@@ -1740,12 +1720,6 @@ el.prefillArea.addEventListener('change', (event) => {
 el.playerManagerListArea.addEventListener('change', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLSelectElement)) return;
-
-    const prefIndex = Number(target.dataset.playerPreferenceIndex);
-    if (Number.isInteger(prefIndex)) {
-        updatePlayerPreference(prefIndex, target.value);
-        return;
-    }
 
     const levelIndex = Number(target.dataset.playerLevelIndex);
     if (Number.isInteger(levelIndex)) {

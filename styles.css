@@ -406,14 +406,6 @@ button:active {
     cursor: pointer;
 }
 
-.player-chip-pref {
-    font-size: 11px;
-    opacity: 0.82;
-    background: rgba(255, 255, 255, 0.35);
-    color: #0b1b10;
-    padding: 3px 8px;
-    border-radius: 999px;
-}
 
 .level {
     font-size: 12px;
@@ -456,9 +448,6 @@ button:active {
 
 #newPlayerLevel {
     width: 60px;
-}
-#newPlayerPreference {
-    width: 100px;
 }
 #newPlayerName {
     width: 100%;
@@ -761,6 +750,68 @@ prefill-card-header {
 
 .settings-row {
     margin: 30px 0;
+}
+
+/* Label for settings sections that aren't checkboxes */
+.settings-label {
+    font-size: 14px;
+    margin-bottom: 10px;
+    opacity: 0.85;
+}
+
+/* Inline grid of format-size checkboxes */
+.format-sizes-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+}
+
+.format-size-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.settings-sub-row {
+    margin-left: 24px;
+}
+
+.settings-sub-row--hidden {
+    display: none;
+}
+
+/* Dims the level-balance settings when skill levels are turned off */
+.settings-group-disabled {
+    opacity: 0.38;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Reveal-level button in the player manager list */
+.level-reveal-btn {
+    font-size: 13px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    line-height: 1.4;
+    transition: background 0.15s;
+}
+
+.level-reveal-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+/* The level select area that appears after reveal */
+.level-reveal-area {
+    display: none;
+}
+
+.level-reveal-area--open {
+    display: block;
 }
 
 @media (max-width: 980px) {
