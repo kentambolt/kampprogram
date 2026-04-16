@@ -46,7 +46,7 @@ const el = {
     newPlayerLevel: document.getElementById('newPlayerLevel'),
     addPlayerBtn: document.getElementById('addPlayerBtn'),
     courtCount: document.getElementById('courtCount'),
-    iterations: document.getElementById('iterations'),
+    generateSpinner: document.getElementById('generateSpinner'),
     weightTeamBalance: document.getElementById('weightTeamBalance'),
     weightPartnerBalance: document.getElementById('weightPartnerBalance'),
     penaltyRepeatTeammate: document.getElementById('penaltyRepeatTeammate'),
@@ -168,7 +168,6 @@ function saveState() {
         lastResult: state.lastResult,
         ui: {
             courtCount: el.courtCount.value,
-            iterations: el.iterations.value,
             weightTeamBalance: el.weightTeamBalance.checked,
             weightPartnerBalance: el.weightPartnerBalance.checked,
             penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
@@ -209,7 +208,6 @@ function restoreState() {
             const defaultCourts = data.ui.defaultCourtCount ?? '2';
             if (el.defaultCourtCount) el.defaultCourtCount.value = defaultCourts;
             el.courtCount.value = defaultCourts;
-            el.iterations.value = data.ui.iterations ?? '1000';
             el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
             el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
             el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
@@ -1005,24 +1003,39 @@ function scoreRound(round, history, config) {
     return score;
 }
 
-function findBestRound(players, courtCount, iterations, history, config, prefills) {
-    let best = null;
+// Runs as many iterations as possible within `durationMs` milliseconds,
+// yielding to the browser periodically so the UI (spinner) stays responsive.
+function findBestRoundAsync(players, courtCount, history, config, prefills, durationMs = 1000) {
+    return new Promise(resolve => {
+        let best = null;
+        let iteration = 0;
+        const deadline = performance.now() + durationMs;
+        const CHUNK_SIZE = 50; // iterations per chunk before yielding
 
-    for (let i = 0; i < iterations; i++) {
-        try {
-            const round = createRandomRound(players, courtCount, prefills);
-            const score = scoreRound(round, history, config);
-            const candidate = {...round, score, iteration: i + 1};
-
-            if (!best || candidate.score > best.score) {
-                best = candidate;
+        function runChunk() {
+            const chunkEnd = performance.now() + 8; // yield after ~8 ms per chunk
+            while (performance.now() < chunkEnd && performance.now() < deadline) {
+                try {
+                    const round = createRandomRound(players, courtCount, prefills);
+                    const score = scoreRound(round, history, config);
+                    const candidate = {...round, score, iteration: ++iteration};
+                    if (!best || candidate.score > best.score) {
+                        best = candidate;
+                    }
+                } catch (_) {
+                    // skip invalid iterations
+                }
             }
-        } catch (error) {
-            // spring ugyldige iterationer over
-        }
-    }
 
-    return best;
+            if (performance.now() < deadline) {
+                setTimeout(runChunk, 0); // yield to browser, then continue
+            } else {
+                resolve(best);
+            }
+        }
+
+        setTimeout(runChunk, 0);
+    });
 }
 
 function getPlayerStats() {
@@ -1451,15 +1464,18 @@ function updatePlayerLevel(index, level) {
 window.markArrived = markArrived;
 window.removePlayer = removePlayer;
 
-function generateRound() {
-    try {
-        const players = getActivePlayers();
-        const courtCount = getCourtCount();
-        const iterations = Math.max(1, Number(el.iterations.value) || 10000);
-        const config = getConfig();
-        const prefills = getPrefillStateFromUi();
+async function generateRound() {
+    const players = getActivePlayers();
+    const courtCount = getCourtCount();
+    const config = getConfig();
+    const prefills = getPrefillStateFromUi();
 
-        const best = findBestRound(players, courtCount, iterations, state.history, config, prefills);
+    // Show spinner, disable button
+    el.generateBtn.disabled = true;
+    el.generateSpinner?.classList.add('generate-spinner--visible');
+
+    try {
+        const best = await findBestRoundAsync(players, courtCount, state.history, config, prefills, 1000);
 
         if (!best || best.courts.length === 0) {
             throw new Error('Kunne ikke finde en gyldig opstilling.');
@@ -1474,6 +1490,9 @@ function generateRound() {
         updatePanelVisibility();
     } catch (err) {
         showStatusMessage(err.message);
+    } finally {
+        el.generateBtn.disabled = false;
+        el.generateSpinner?.classList.remove('generate-spinner--visible');
     }
 
     saveState();
@@ -1628,7 +1647,6 @@ el.closeImportExportBtn.addEventListener('click', () => {
 
 [
     el.courtCount,
-    el.iterations,
     el.weightTeamBalance,
     el.weightPartnerBalance,
     el.penaltyRepeatTeammate,

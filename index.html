@@ -112,6 +112,7 @@
                             <label for="courtCount">Baner</label>
                             <input id="courtCount" type="number" min="1" value="2"/>
                             <button class="primary" id="generateBtn">Generer</button>
+                            <span class="generate-spinner" id="generateSpinner" aria-hidden="true"></span>
                         </div>
                     </div>
 
@@ -167,11 +168,6 @@
                 <div class="flex-row">
                     <h2 class="h-no-m">Indstillinger</h2>
                     <button class="ghost" id="closeSettingsBtn">Luk</button>
-                </div>
-
-                <div class="settings-row">
-                    <input id="iterations" type="number" min="1" step="100" value="1000"/>
-                    <label for="iterations">tilfældige kampprogrammer genereres hver gang, hvorfra bedste sammensætning vælges</label>
                 </div>
 
                 <div class="settings-row">
