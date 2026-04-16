@@ -1145,7 +1145,7 @@ function renderPlayerManagerList() {
             // Levels are hidden — show a reveal toggle button; level select starts hidden
             levelControls = `
                 <div class="player-row-inline-controls">
-                    <button class="level-reveal-btn" onclick="togglePlayerLevelReveal(this, ${index})" title="Vis/skjul niveau">•••</button>
+                    <button class="level-reveal-btn" onclick="togglePlayerLevelReveal(this, ${index})" title="Vis/skjul niveau">👁 Niveau</button>
                     <div class="level-reveal-area">
                         <select class="level-select" data-player-level-index="${index}">
                             ${getLevelOptions(player.level)}
@@ -1178,7 +1178,7 @@ function renderPlayerManagerList() {
 function togglePlayerLevelReveal(btn, index) {
     const area = btn.closest('.player-row-inline-controls').querySelector('.level-reveal-area');
     const isVisible = area.classList.toggle('level-reveal-area--open');
-    btn.textContent = isVisible ? '▲' : '•••';
+    btn.textContent = isVisible ? '▲ Skjul' : '👁 Niveau';
     btn.title = isVisible ? 'Skjul niveau' : 'Vis niveau';
 }
 

@@ -29,9 +29,9 @@
         <div class="header-menu">
             <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu">☰</button>
             <div class="menu-dropdown" id="menuDropdown">
-                <button class="ghost menu-item" id="settingsBtn">Indstillinger</button>
-                <button class="ghost menu-item" id="importExportBtn">Importér / eksportér</button>
-                <button class="danger menu-item" id="resetAllBtn">Nulstil</button>
+                <button class="ghost menu-item" id="settingsBtn">⚙ Indstillinger</button>
+                <button class="ghost menu-item" id="importExportBtn">⇅ Importér / eksportér</button>
+                <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
             </div>
         </div>
     </header>
@@ -45,7 +45,7 @@
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
                         <div class="actions">
-                            <button class="secondary" id="newPlayerBtn">Opret</button>
+                            <button class="secondary" id="newPlayerBtn">+ Opret</button>
                         </div>
                     </div>
 
@@ -78,7 +78,7 @@
                                     <select id="presetPlayerList">
                                         <option value="">Vælg liste</option>
                                     </select>
-                                    <button class="secondary" id="loadPresetPlayersBtn">Hent spillere</button>
+                                    <button class="secondary" id="loadPresetPlayersBtn">↓ Hent spillere</button>
                                 </div>
                             </div>
 
@@ -86,7 +86,7 @@
                                 <label for="newPresetListName">Gem nuværende spillere som ny liste</label>
                                 <div class="actions">
                                     <input id="newPresetListName" type="text" placeholder="Fx Torsdagsholdet"/>
-                                    <button class="secondary" id="savePresetPlayersBtn">Gem liste</button>
+                                    <button class="secondary" id="savePresetPlayersBtn">✓ Gem liste</button>
                                 </div>
                             </div>
 
@@ -96,7 +96,7 @@
                                     <select id="deletePresetPlayerList">
                                         <option value="">Vælg liste</option>
                                     </select>
-                                    <button class="danger" id="deletePresetPlayersBtn">Slet liste</button>
+                                    <button class="danger" id="deletePresetPlayersBtn">✕ Slet liste</button>
                                 </div>
                             </div>
                         </div>
@@ -111,7 +111,7 @@
                         <div class="court-count">
                             <label for="courtCount">Baner</label>
                             <input id="courtCount" type="number" min="1" value="2"/>
-                            <button class="primary" id="generateBtn">Generer</button>
+                            <button class="primary" id="generateBtn">▶ Generer</button>
                         </div>
                     </div>
 
@@ -123,7 +123,7 @@
 
                         <div class="collapsible-content">
                             <div class="prefill-actions">
-                                <button class="ghost" id="clearPrefillBtn" type="button">Nulstil</button>
+                                <button class="ghost" id="clearPrefillBtn" type="button">✕ Nulstil</button>
                             </div>
                             <div id="prefillArea" class="prefill-area"></div>
                         </div>
@@ -159,8 +159,8 @@
                     <div class="collapsible-content">
                         <div class="history-header">
 
-                            <button class="ghost" id="undoBtn">Fjern seneste</button>
-                            <button class="danger" id="resetHistoryBtn">Fjern alle</button>
+                            <button class="ghost" id="undoBtn">↩ Fjern seneste</button>
+                            <button class="danger" id="resetHistoryBtn">✕ Fjern alle</button>
                         </div>
                         <div id="historyArea" class="subtle">Ingen kampe endnu.</div>
                     </div>
@@ -171,7 +171,7 @@
             <div class="panel settings-panel standalone" id="settingsPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Indstillinger</h2>
-                    <button class="ghost" id="closeSettingsBtn">Luk</button>
+                    <button class="ghost" id="closeSettingsBtn">✕ Luk</button>
                 </div>
 
                 <div class="settings-row">
@@ -255,7 +255,7 @@
             <div class="panel import-export-panel standalone" id="importExportPanel">
                 <div class="flex-row">
                     <h2>Importér / eksportér</h2>
-                    <button class="ghost" id="closeImportExportBtn">Luk</button>
+                    <button class="ghost" id="closeImportExportBtn">✕ Luk</button>
                 </div>
 
                 <div class="settings-row">
@@ -268,15 +268,15 @@
                 </div>
 
                 <div class="actions" style="margin-top: 12px;">
-                    <button class="secondary" id="importPlayersBtn">Importér spillere</button>
-                    <button class="ghost" id="copyPlayersBtn">Kopiér nuværende spillerliste</button>
+                    <button class="secondary" id="importPlayersBtn">↑ Importér spillere</button>
+                    <button class="ghost" id="copyPlayersBtn">⎘ Kopiér nuværende spillerliste</button>
                 </div>
             </div>
 
             <div class="panel new-player-panel standalone" id="newPlayerPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Opret spiller</h2>
-                    <button class="ghost" id="closeNewPlayerBtn">Luk</button>
+                    <button class="ghost" id="closeNewPlayerBtn">✕ Luk</button>
                 </div>
 
                 <div class="player-manager-form">
@@ -300,7 +300,7 @@
                     </div>
                 </div>
                 <div>
-                    <button class="secondary" id="addPlayerBtn">Tilføj</button>
+                    <button class="secondary" id="addPlayerBtn">+ Tilføj</button>
                 </div>
             </div>
 

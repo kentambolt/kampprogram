@@ -934,15 +934,13 @@ prefill-card-header {
     }
 
 }
-}
 
-/* ── Generate spinner ───────────────────────────────────────────── */
-/* ── Retry button spacing ────────────────────────────────────────── */
+
 .retry-row {
     padding-top: 18px;
 }
 
-/* ── Full-screen generate overlay ───────────────────────────────── */
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
@@ -980,4 +978,3 @@ prefill-card-header {
     opacity: 0.85;
     letter-spacing: 0.02em;
 }
-                                                                                                                                                             
