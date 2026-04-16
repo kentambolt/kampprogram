@@ -63,6 +63,7 @@ const el = {
     historyArea: document.getElementById('historyArea'),
     menuToggleBtn: document.getElementById('menuToggleBtn'),
     menuDropdown: document.getElementById('menuDropdown'),
+    menuBackdrop: document.getElementById('menuBackdrop'),
     matchPanel: document.getElementById('matchPanel'),
     playerStatsPanel: document.getElementById('playerStatsPanel'),
     historyPanel: document.getElementById('historyPanel'),
@@ -1597,11 +1598,13 @@ function undoLastRound() {
 }
 
 function toggleMenu() {
-    el.menuDropdown.classList.toggle('open');
+    const isOpen = el.menuDropdown.classList.toggle('open');
+    el.menuBackdrop?.classList.toggle('open', isOpen);
 }
 
 function closeMenu() {
     el.menuDropdown.classList.remove('open');
+    el.menuBackdrop?.classList.remove('open');
 }
 
 function showStandAlone(panel) {
@@ -1628,6 +1631,8 @@ el.menuToggleBtn.addEventListener('click', (event) => {
     event.stopPropagation();
     toggleMenu();
 });
+
+el.menuBackdrop?.addEventListener('click', closeMenu);
 
 el.generateBtn.addEventListener('click', generateRound);
 el.resetHistoryBtn.addEventListener('click', resetHistory);
