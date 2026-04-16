@@ -46,7 +46,8 @@ const el = {
     newPlayerLevel: document.getElementById('newPlayerLevel'),
     addPlayerBtn: document.getElementById('addPlayerBtn'),
     courtCount: document.getElementById('courtCount'),
-    generateSpinner: document.getElementById('generateSpinner'),
+    generateOverlay: document.getElementById('generateOverlay'),
+    resultToggleBtn: document.getElementById('resultToggleBtn'),
     weightTeamBalance: document.getElementById('weightTeamBalance'),
     weightPartnerBalance: document.getElementById('weightPartnerBalance'),
     penaltyRepeatTeammate: document.getElementById('penaltyRepeatTeammate'),
@@ -183,6 +184,7 @@ function saveState() {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
                 fetchPlayersPanel: el.fetchPlayersPanel?.classList.contains('collapsed') ?? true,
                 prefillPanel: el.prefillPanel?.classList.contains('collapsed') ?? true,
+                resultPanel: el.resultPanel?.classList.contains('collapsed') ?? true,
                 playerStatsPanel: el.playerStatsPanel?.classList.contains('collapsed') ?? true,
                 historyPanel: el.historyPanel?.classList.contains('collapsed') ?? true,
                 playerListsPanel: el.playerListsPanel?.classList.contains('collapsed') ?? true,
@@ -248,6 +250,11 @@ function restoreState() {
             el.prefillPanel?.classList.add('collapsed');
         } else {
             el.prefillPanel?.classList.remove('collapsed');
+        }
+        if (collapsedPanels.resultPanel !== false) {
+            el.resultPanel?.classList.add('collapsed');
+        } else {
+            el.resultPanel?.classList.remove('collapsed');
         }
         if (collapsedPanels.playerStatsPanel !== false) {
             el.playerStatsPanel?.classList.add('collapsed');
@@ -340,7 +347,25 @@ function updatePanelVisibility() {
     el.playerStatsPanel.classList.toggle('hidden', !hasHistory);
     el.historyPanel.classList.toggle('hidden', !hasHistory);
     el.playerRosterArea.classList.toggle('hidden', activePlayersCount === 0);
+    // resultPanel is now a collapsible sub-section inside matchPanel; show/hide it
     el.resultPanel.classList.toggle('hidden', !hasHistory);
+}
+
+// Collapse every major panel, then expand the result section so the
+// freshly generated round is immediately visible.
+function collapseAllAndShowResult() {
+    const toCollapse = [
+        el.arrivalPanel,
+        el.fetchPlayersPanel,
+        el.prefillPanel,
+        el.playerStatsPanel,
+        el.historyPanel,
+        el.playerListsPanel,
+    ];
+    toCollapse.forEach(p => p?.classList.add('collapsed'));
+
+    // Expand the result sub-panel
+    el.resultPanel?.classList.remove('collapsed');
 }
 
 function showStatusMessage(message, duration = 2800) {
@@ -1470,9 +1495,9 @@ async function generateRound() {
     const config = getConfig();
     const prefills = getPrefillStateFromUi();
 
-    // Show spinner, disable button
+    // Show full-screen overlay, disable button
     el.generateBtn.disabled = true;
-    el.generateSpinner?.classList.add('generate-spinner--visible');
+    el.generateOverlay?.classList.add('generate-overlay--visible');
 
     try {
         const best = await findBestRoundAsync(players, courtCount, state.history, config, prefills, 1000);
@@ -1488,11 +1513,12 @@ async function generateRound() {
         renderHistory();
         renderPlayerStats();
         updatePanelVisibility();
+        collapseAllAndShowResult();
     } catch (err) {
         showStatusMessage(err.message);
     } finally {
         el.generateBtn.disabled = false;
-        el.generateSpinner?.classList.remove('generate-spinner--visible');
+        el.generateOverlay?.classList.remove('generate-overlay--visible');
     }
 
     saveState();
@@ -1747,6 +1773,10 @@ el.playerManagerListArea.addEventListener('change', (event) => {
 
 el.prefillToggleBtn?.addEventListener('click', () => {
     toggleCollapsiblePanel(el.prefillPanel);
+});
+
+el.resultToggleBtn?.addEventListener('click', () => {
+    toggleCollapsiblePanel(el.resultPanel);
 });
 
 document.addEventListener('click', (event) => {
