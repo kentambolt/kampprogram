@@ -1052,4 +1052,157 @@ prefill-card-header {
     opacity: 0.85;
     letter-spacing: 0.02em;
 }
+
+/* ----- Edit-mode for the current round ----- */
+
+.result-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.result-actions .ghost.is-active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+
+.result-slot-select {
+    width: 100%;
+}
+
+.benched-line {
+    margin-top: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.benched-edit-area {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 14px;
+    background: rgba(31, 41, 55, 0.45);
+}
+
+.benched-edit-area > strong {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-weight: bold;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.benched-edit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ----- Team mode: teams panel ----- */
+
+.team-mode-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.teams-area {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.team-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    background: rgba(31, 41, 55, 0.7);
+}
+
+.team-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.team-card-total {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.team-card-members {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.team-card-member {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 14px;
+}
+
+/* ----- Team super-player display in result ----- */
+
+.result-team-block {
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+    padding: 6px 0;
+}
+
+.result-team-block:last-child {
+    border-bottom: none;
+}
+
+.result-team-name {
+    margin-bottom: 6px;
+}
+
+.result-team-members {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+    padding-left: 4px;
+}
+
+.team-member-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--muted);
+    padding: 2px 0;
+}
+
+.team-member-line .level {
+    color: var(--text);
+}
+
+/* ----- Session transfer (export/import) ----- */
+
+.session-transfer-section {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    margin-top: 24px;
+}
+
+.session-transfer-section h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.session-transfer-section textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    word-break: break-all;
+}
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

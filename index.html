@@ -105,6 +105,20 @@
 
                 </div>
 
+                <div class="panel collapsible-panel hidden" id="teamsPanel">
+                    <button class="prefill-header collapsible-toggle" type="button" data-target="teamsPanel">
+                        <span class="h-no-m" id="teamsTitle">Hold</span>
+                        <span class="collapse-indicator">▾</span>
+                    </button>
+                    <div class="collapsible-content">
+                        <div class="team-mode-actions">
+                            <button class="secondary" id="generateTeamsBtn">↻ Generér hold</button>
+                            <button class="ghost" id="clearTeamsBtn">✕ Nulstil hold</button>
+                        </div>
+                        <div id="teamsArea" class="teams-area"></div>
+                    </div>
+                </div>
+
                 <div class="panel hidden" id="matchPanel">
                     <h2>Lav kampe</h2>
 
@@ -135,6 +149,9 @@
                             <span class="collapse-indicator">▾</span>
                         </button>
                         <div class="collapsible-content">
+                            <div class="result-actions">
+                                <button class="ghost" id="editResultBtn" type="button">✎ Rediger spillere</button>
+                            </div>
                             <div id="resultArea" class="subtle">Ingen kamp genereret endnu.</div>
                         </div>
                     </div>
@@ -250,6 +267,21 @@
                     <label for="defaultCourtCount">Standard antal baner</label>
                     <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
                 </div>
+
+                <div class="settings-row" style="border-top: 1px solid var(--border); padding-top: 24px;">
+                    <label>
+                        <input id="teamMode" type="checkbox" />
+                        Holdtilstand (faste hold spiller mod hinanden)
+                    </label>
+                    <p class="subtle small-text" style="margin: 6px 0 0 28px;">
+                        Til fx floorball: Generér hold med næsten lige stærke spillere, og lad app'en sende hele hold ind/ud i stedet for enkelte spillere.
+                    </p>
+                </div>
+
+                <div class="settings-sub-row" id="teamSizeRow">
+                    <label for="teamSize">Spillere pr. hold</label>
+                    <input id="teamSize" type="number" min="2" max="11" value="5" style="width:5rem;"/>
+                </div>
             </div>
 
             <div class="panel import-export-panel standalone" id="importExportPanel">
@@ -270,6 +302,23 @@
                 <div class="actions" style="margin-top: 12px;">
                     <button class="secondary" id="importPlayersBtn">↑ Importér spillere</button>
                     <button class="ghost" id="copyPlayersBtn">⎘ Kopiér nuværende spillerliste</button>
+                </div>
+
+                <div class="settings-row session-transfer-section">
+                    <h3>Del session</h3>
+                    <p class="subtle small-text">
+                        Eksportér aktuel session (aktive spillere, historik, hold, indstillinger) som tekst, og send til en kollega der kan importere og fortsætte.
+                    </p>
+                    <label for="sessionTransferText">Session-kode</label>
+                    <textarea
+                            id="sessionTransferText"
+                            rows="6"
+                            placeholder="Indsæt session-kode her for at importere…"
+                    ></textarea>
+                    <div class="actions" style="margin-top: 12px;">
+                        <button class="secondary" id="exportSessionBtn">⎘ Kopiér aktuel session</button>
+                        <button class="secondary" id="importSessionBtn">↑ Importér session</button>
+                    </div>
                 </div>
             </div>
 

@@ -19,7 +19,8 @@ const MAX_TEAM_SIZE = 11;
 const state = {
     roster: [],
     history: [],
-    lastResult: null
+    lastResult: null,
+    teams: [], // populated when team mode is enabled
 };
 
 const STORAGE_KEY = 'kampprogram-state-v2';
@@ -40,6 +41,7 @@ const el = {
     arrivalPanel: document.getElementById('arrivalPanel'),
     newPlayerPanel: document.getElementById('newPlayerPanel'),
     resultPanel: document.getElementById('resultPanel'),
+    editResultBtn: document.getElementById('editResultBtn'),
     newPlayerBtn: document.getElementById('newPlayerBtn'),
     closeNewPlayerBtn: document.getElementById('closeNewPlayerBtn'),
     newPlayerName: document.getElementById('newPlayerName'),
@@ -77,6 +79,9 @@ const el = {
     playerImportText: document.getElementById('playerImportText'),
     importPlayersBtn: document.getElementById('importPlayersBtn'),
     copyPlayersBtn: document.getElementById('copyPlayersBtn'),
+    sessionTransferText: document.getElementById('sessionTransferText'),
+    exportSessionBtn: document.getElementById('exportSessionBtn'),
+    importSessionBtn: document.getElementById('importSessionBtn'),
     closeSettingsBtn: document.getElementById('closeSettingsBtn'),
     prefillArea: document.getElementById('prefillArea'),
     clearPrefillBtn: document.getElementById('clearPrefillBtn'),
@@ -93,9 +98,21 @@ const el = {
     levelSettingsGroup: document.getElementById('levelSettingsGroup'),
     maximizeCourts: document.getElementById('maximizeCourts'),
     defaultCourtCount: document.getElementById('defaultCourtCount'),
+    teamMode: document.getElementById('teamMode'),
+    teamSize: document.getElementById('teamSize'),
+    teamSizeRow: document.getElementById('teamSizeRow'),
+    teamsPanel: document.getElementById('teamsPanel'),
+    teamsArea: document.getElementById('teamsArea'),
+    teamsTitle: document.getElementById('teamsTitle'),
+    generateTeamsBtn: document.getElementById('generateTeamsBtn'),
+    clearTeamsBtn: document.getElementById('clearTeamsBtn'),
+    formatSizesGroup: document.getElementById('formatSizesGroup'),
 };
 
 function getEnabledFormats() {
+    // Team mode forces 1v1 — each "player" is a whole team super-player.
+    if (isTeamMode()) return [1];
+
     const formats = [];
     for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
         if (document.getElementById(`format-${n}v${n}`)?.checked) {
@@ -103,6 +120,151 @@ function getEnabledFormats() {
         }
     }
     return formats.length > 0 ? formats : [1]; // always at least 1v1
+}
+
+function isTeamMode() {
+    return Boolean(el.teamMode?.checked);
+}
+
+function getTeamSize() {
+    const v = Number(el.teamSize?.value);
+    if (!Number.isInteger(v) || v < 2) return 5;
+    return Math.min(MAX_TEAM_SIZE, v);
+}
+
+// Returns the matchmaking pool: active teams in team mode, active players otherwise.
+function getMatchmakingPool() {
+    if (isTeamMode()) {
+        return state.teams.filter(t => t.active !== false);
+    }
+    return getActivePlayers();
+}
+
+// Update settings UI when team mode is toggled: dim format-size group,
+// disable partner/teammate-related toggles (they don't apply at 1v1).
+function updateTeamModeUi() {
+    const tm = isTeamMode();
+
+    if (el.teamSizeRow) el.teamSizeRow.classList.toggle('settings-sub-row--hidden', !tm);
+    if (el.formatSizesGroup) {
+        el.formatSizesGroup.classList.toggle('settings-group-disabled', tm);
+        el.formatSizesGroup.querySelectorAll('input').forEach(i => i.disabled = tm);
+    }
+
+    // Show/hide the teams panel
+    const hasActiveCount = getActivePlayers().length;
+    if (el.teamsPanel) {
+        el.teamsPanel.classList.toggle('hidden', !tm || hasActiveCount === 0);
+    }
+
+    // Hide prefill panel in team mode (lock-individual-slot doesn't apply)
+    if (el.prefillPanel) {
+        el.prefillPanel.classList.toggle('hidden', tm);
+    }
+
+    updatePanelVisibility();
+}
+
+// Snake-draft team generation: distribute active players (sorted by level desc)
+// across N teams in serpentine order so total team levels stay close.
+function generateTeams() {
+    const teamSize = getTeamSize();
+    const activePlayers = getActivePlayers();
+
+    if (activePlayers.length < teamSize * 2) {
+        showStatusMessage(`Mindst ${teamSize * 2} aktive spillere kræves for to hold.`);
+        return;
+    }
+
+    const numTeams = Math.max(2, Math.floor(activePlayers.length / teamSize));
+    // Tiny shuffle first so equal-level players end up on varying teams
+    const sorted = shuffle(activePlayers).slice().sort((a, b) => b.level - a.level);
+
+    const buckets = Array.from({length: numTeams}, () => []);
+    let dir = 1;
+    let idx = 0;
+    for (const player of sorted) {
+        buckets[idx].push({name: player.name, level: player.level});
+        idx += dir;
+        if (idx === numTeams) { dir = -1; idx = numTeams - 1; }
+        else if (idx === -1) { dir = 1; idx = 0; }
+    }
+
+    state.teams = buckets.map((members, i) => ({
+        id: `team-${Date.now()}-${i + 1}`,
+        name: `Hold ${i + 1}`,
+        members,
+        level: members.reduce((s, m) => s + m.level, 0),
+        active: true,
+    }));
+
+    // Generated teams invalidate the prior history (the units changed).
+    state.history = [];
+    state.lastResult = null;
+    setEditResultMode(false);
+
+    renderTeams();
+    renderRoster();
+    renderHistory();
+    renderPlayerStats();
+    updateTeamModeUi();
+    updatePanelVisibility();
+    saveState();
+
+    showStatusMessage(`${numTeams} hold er genereret.`);
+}
+
+function clearTeams() {
+    if (state.teams.length === 0) return;
+    const confirmed = window.confirm('Vil du nulstille alle hold? Historikken bliver også nulstillet.');
+    if (!confirmed) return;
+
+    state.teams = [];
+    state.history = [];
+    state.lastResult = null;
+    setEditResultMode(false);
+
+    renderTeams();
+    renderHistory();
+    renderPlayerStats();
+    updateTeamModeUi();
+    updatePanelVisibility();
+    saveState();
+    showStatusMessage('Holdene er nulstillet.');
+}
+
+function renderTeams() {
+    if (!el.teamsArea) return;
+
+    if (!state.teams || state.teams.length === 0) {
+        el.teamsArea.innerHTML = '<div class="subtle">Ingen hold endnu. Klik "Generér hold" for at lave balancerede hold ud fra dine aktive spillere.</div>';
+        if (el.teamsTitle) el.teamsTitle.textContent = 'Hold';
+        return;
+    }
+
+    if (el.teamsTitle) el.teamsTitle.textContent = `Hold (${state.teams.length})`;
+
+    el.teamsArea.innerHTML = state.teams.map((team) => {
+        const totalLevelHtml = shouldShowLevels()
+            ? `<span class="team-card-total">Total: ${team.level}</span>`
+            : '';
+        return `
+            <div class="team-card">
+                <div class="team-card-header">
+                    <strong>${escapeHtml(team.name)}</strong>
+                    ${totalLevelHtml}
+                </div>
+                <div class="team-card-members">
+                    ${team.members.map(m => `
+                        <div class="team-card-member">
+                            <span>${escapeHtml(m.name)}</span>
+                            ${shouldShowLevels() ? `<span class="level">${m.level}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function getMaxEnabledFormat() {
@@ -133,10 +295,38 @@ function createDefaultPrefills(courtCount) {
 }
 
 function normalizePlayer(player) {
+    if (player && Array.isArray(player.members)) {
+        // Team super-player: don't clamp level (sum can exceed 9), keep members.
+        return {
+            name: normalizeName(player.name),
+            level: Number(player.level) || 0,
+            active: player.active === undefined ? true : Boolean(player.active),
+            members: player.members.map(m => ({
+                name: normalizeName(m.name),
+                level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+            })),
+            id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
+        };
+    }
     return {
         name: normalizeName(player.name),
         level: Math.min(9, Math.max(1, Number(player.level) || 1)),
         active: Boolean(player.active),
+    };
+}
+
+function normalizeTeam(team) {
+    if (!team || !Array.isArray(team.members)) return null;
+    const members = team.members.map(m => ({
+        name: normalizeName(m.name),
+        level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+    }));
+    return {
+        id: team.id || `team-${Math.random().toString(36).slice(2, 8)}`,
+        name: normalizeName(team.name) || 'Hold',
+        members,
+        level: members.reduce((s, m) => s + m.level, 0),
+        active: team.active === undefined ? true : Boolean(team.active),
     };
 }
 
@@ -169,6 +359,7 @@ function saveState() {
         roster: state.roster.map(normalizePlayer),
         history: state.history,
         lastResult: state.lastResult,
+        teams: state.teams || [],
         ui: {
             courtCount: el.courtCount.value,
             weightTeamBalance: el.weightTeamBalance.checked,
@@ -178,9 +369,20 @@ function saveState() {
             penaltyBench: el.penaltyBench.checked,
             useSkillLevels: el.useSkillLevels?.checked ?? true,
             hideSkillLevels: el.hideSkillLevels?.checked ?? false,
-            enabledFormats: getEnabledFormats(),
+            // saveState reads enabled formats raw from the checkboxes — not from
+            // getEnabledFormats() which returns [1] in team mode, so we'd lose
+            // the user's earlier selection.
+            enabledFormats: (() => {
+                const formats = [];
+                for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+                    if (document.getElementById(`format-${n}v${n}`)?.checked) formats.push(n);
+                }
+                return formats.length > 0 ? formats : [1, 2];
+            })(),
             maximizeCourts: el.maximizeCourts?.checked ?? true,
             defaultCourtCount: el.defaultCourtCount?.value ?? '2',
+            teamMode: el.teamMode?.checked ?? false,
+            teamSize: el.teamSize?.value ?? '5',
             prefills: getPrefillStateFromUi(),
             collapsedPanels: {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
@@ -206,7 +408,11 @@ function restoreState() {
 
         state.roster = Array.isArray(data.roster) ? data.roster.map(normalizePlayer) : [];
         state.history = Array.isArray(data.history) ? data.history.map(normalizeRoundFromStorage) : [];
-        state.lastResult = data.lastResult ? normalizeRoundFromStorage(data.lastResult) : null;
+        // Always make lastResult point at the same object as the final history
+        // entry so edits to the current round are reflected in history (and used
+        // when scoring the next round).
+        state.lastResult = state.history[state.history.length - 1] || null;
+        state.teams = Array.isArray(data.teams) ? data.teams.map(normalizeTeam) : [];
 
         if (data.ui) {
             const defaultCourts = data.ui.defaultCourtCount ?? '2';
@@ -229,6 +435,8 @@ function restoreState() {
                 if (cb) cb.checked = savedFormats.includes(n);
             }
             if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts !== false;
+            if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
+            if (el.teamSize && data.ui.teamSize) el.teamSize.value = data.ui.teamSize;
         }
         const collapsedPanels = data.ui.collapsedPanels || {};
 
@@ -310,6 +518,18 @@ function normalizeRoundFromStorage(round) {
 }
 
 function normalizePlayerForRound(player) {
+    if (player && Array.isArray(player.members)) {
+        return {
+            name: normalizeName(player.name),
+            level: Number(player.level) || 0,
+            active: true,
+            members: player.members.map(m => ({
+                name: normalizeName(m.name),
+                level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+            })),
+            id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
+        };
+    }
     return {
         name: normalizeName(player.name),
         level: Math.min(9, Math.max(1, Number(player.level) || 1)),
@@ -348,13 +568,28 @@ function updateShuffleBtn() {
 function updatePanelVisibility() {
     const activePlayersCount = getActivePlayers().length;
     const hasHistory = state.history.length > 0;
+    const tm = isTeamMode();
+    const hasEnoughTeams = state.teams.length >= 2;
 
-    el.matchPanel.classList.toggle('hidden', activePlayersCount < 2);
+    // In team mode, the match panel needs at least 2 teams; otherwise 2 players.
+    const canMatch = tm ? hasEnoughTeams : activePlayersCount >= 2;
+    el.matchPanel.classList.toggle('hidden', !canMatch);
+
     el.playerStatsPanel.classList.toggle('hidden', !hasHistory);
     el.historyPanel.classList.toggle('hidden', !hasHistory);
     el.playerRosterArea.classList.toggle('hidden', activePlayersCount === 0);
     // resultPanel is now a collapsible sub-section inside matchPanel; show/hide it
     el.resultPanel.classList.toggle('hidden', !hasHistory);
+
+    // Teams panel: only visible in team mode and with at least one active player
+    if (el.teamsPanel) {
+        el.teamsPanel.classList.toggle('hidden', !tm || activePlayersCount === 0);
+    }
+    // Hide prefill panel in team mode
+    if (el.prefillPanel) {
+        el.prefillPanel.classList.toggle('hidden', tm);
+    }
+
     updateShuffleBtn();
 }
 
@@ -402,9 +637,11 @@ function loadDefaults() {
     }
 
     updateSkillLevelSettingsUI();
+    updateTeamModeUi();
     renderStoredPlayerLists();
     renderRoster();
     renderPlayerManagerList();
+    renderTeams();
     renderPlayerStats();
     renderHistory();
     updatePanelVisibility();
@@ -1070,6 +1307,14 @@ function findBestRoundAsync(players, courtCount, history, config, prefills, dura
     });
 }
 
+// Returns true if the round entry (player or team super-player) contains
+// the given player name. Handles both normal players and team super-players.
+function entryContainsPlayer(entry, playerName) {
+    if (!entry) return false;
+    if (entry.members) return entry.members.some(m => m.name === playerName);
+    return entry.name === playerName;
+}
+
 function getPlayerStats() {
     return state.roster.filter(player => player.active).map(player => {
         let played = 0;
@@ -1078,9 +1323,9 @@ function getPlayerStats() {
         let benchedPrev = false;
 
         state.history.forEach((round, index) => {
-            const onBench = round.benched.some(p => p.name === player.name);
+            const onBench = round.benched.some(p => entryContainsPlayer(p, player.name));
             const courtPlayed = round.courts.find(court =>
-                [...court.teamA.players, ...court.teamB.players].some(p => p.name === player.name)
+                [...court.teamA.players, ...court.teamB.players].some(p => entryContainsPlayer(p, player.name))
             );
 
             if (onBench) benched += 1;
@@ -1228,6 +1473,174 @@ function renderPlayerStats() {
     updatePanelVisibility();
 }
 
+// Edit mode for the current/last round — allows the coach to swap players
+// after generation (e.g., someone left, two players didn't want to play together).
+let editingResult = false;
+
+function isResultEditable() {
+    return Boolean(state.lastResult && state.lastResult.courts.length > 0);
+}
+
+function setEditResultMode(enabled) {
+    editingResult = Boolean(enabled) && isResultEditable();
+    if (el.editResultBtn) {
+        el.editResultBtn.textContent = editingResult ? '✓ Færdig' : '✎ Rediger spillere';
+        el.editResultBtn.classList.toggle('is-active', editingResult);
+    }
+    if (state.lastResult) renderRound(state.lastResult);
+}
+
+function toggleEditResultMode() {
+    if (!isResultEditable()) return;
+    setEditResultMode(!editingResult);
+}
+
+// Builds <select> options listing every entrant currently in the round —
+// players (or teams) on courts and on the bench. Used to swap one entrant
+// with another by re-selecting from the dropdown.
+function buildResultSlotSelectHtml(round, currentName, courtIndex, side, slotIndex) {
+    const entries = [];
+    round.courts.forEach((court) => {
+        court.teamA.players.forEach((p) => entries.push(p));
+        court.teamB.players.forEach((p) => entries.push(p));
+    });
+    round.benched.forEach((p) => entries.push(p));
+
+    // De-duplicate by name (defensive)
+    const seen = new Set();
+    const optionsHtml = entries.filter(p => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+    }).map(p => {
+        const isTeam = Boolean(p.members);
+        const label = isTeam
+            ? p.name
+            : `${p.name}${shouldShowLevels() ? ` (${p.level})` : ''}`;
+        return `<option value="${escapeHtml(p.name)}" ${p.name === currentName ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('');
+
+    return `<select class="result-slot-select" data-result-court="${courtIndex}" data-result-side="${side}" data-result-index="${slotIndex}">${optionsHtml}</select>`;
+}
+
+function findResultSlotByName(round, playerName) {
+    for (let c = 0; c < round.courts.length; c++) {
+        const court = round.courts[c];
+        for (let i = 0; i < court.teamA.players.length; i++) {
+            if (court.teamA.players[i].name === playerName) {
+                return {kind: 'court', courtIndex: c, side: 'A', slotIndex: i};
+            }
+        }
+        for (let i = 0; i < court.teamB.players.length; i++) {
+            if (court.teamB.players[i].name === playerName) {
+                return {kind: 'court', courtIndex: c, side: 'B', slotIndex: i};
+            }
+        }
+    }
+    for (let i = 0; i < round.benched.length; i++) {
+        if (round.benched[i].name === playerName) {
+            return {kind: 'bench', slotIndex: i};
+        }
+    }
+    return null;
+}
+
+function getResultSlotEntry(round, loc) {
+    if (loc.kind === 'court') {
+        const team = loc.side === 'A' ? 'teamA' : 'teamB';
+        return round.courts[loc.courtIndex][team].players[loc.slotIndex];
+    }
+    return round.benched[loc.slotIndex];
+}
+
+function setResultSlotEntry(round, loc, entry) {
+    if (loc.kind === 'court') {
+        const team = loc.side === 'A' ? 'teamA' : 'teamB';
+        round.courts[loc.courtIndex][team].players[loc.slotIndex] = entry;
+    } else {
+        round.benched[loc.slotIndex] = entry;
+    }
+}
+
+function recomputeCourtTotals(round, courtIndex) {
+    if (courtIndex < 0 || courtIndex >= round.courts.length) return;
+    const court = round.courts[courtIndex];
+    court.teamA.totalLevel = sumTeamLevel(court.teamA.players);
+    court.teamB.totalLevel = sumTeamLevel(court.teamB.players);
+}
+
+function locationsEqual(a, b) {
+    if (!a || !b) return false;
+    if (a.kind !== b.kind) return false;
+    if (a.kind === 'court') {
+        return a.courtIndex === b.courtIndex && a.side === b.side && a.slotIndex === b.slotIndex;
+    }
+    return a.slotIndex === b.slotIndex;
+}
+
+// Swap two slots' contents in the current round. The slot the new player came
+// from receives the player who used to occupy the target slot.
+function swapInResult(targetLoc, newPlayerName) {
+    if (!state.lastResult) return;
+    const round = state.lastResult;
+    const sourceLoc = findResultSlotByName(round, newPlayerName);
+    if (!sourceLoc || locationsEqual(sourceLoc, targetLoc)) return;
+
+    const targetEntry = getResultSlotEntry(round, targetLoc);
+    const sourceEntry = getResultSlotEntry(round, sourceLoc);
+
+    setResultSlotEntry(round, targetLoc, sourceEntry);
+    setResultSlotEntry(round, sourceLoc, targetEntry);
+
+    if (targetLoc.kind === 'court') recomputeCourtTotals(round, targetLoc.courtIndex);
+    if (sourceLoc.kind === 'court') recomputeCourtTotals(round, sourceLoc.courtIndex);
+
+    // Keep history's last entry in sync — future rounds use history when scoring.
+    if (state.history.length > 0) {
+        state.history[state.history.length - 1] = round;
+    }
+
+    saveState();
+    renderRound(round);
+    renderHistory();
+    renderPlayerStats();
+}
+
+// Render a single slot: a player line, or a team block (when the entry has `members`).
+function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing) {
+    const isTeam = Boolean(entry && entry.members);
+
+    if (isTeam) {
+        const memberLines = entry.members.map(m => `
+            <div class="team-member-line">
+                <span>${escapeHtml(m.name)}</span>
+                ${shouldShowLevels() ? `<span class="level">${m.level}</span>` : ''}
+            </div>
+        `).join('');
+
+        const header = editing
+            ? buildResultSlotSelectHtml(round, entry.name, courtIndex, side, slotIndex)
+            : `<div class="result-team-name"><strong>${escapeHtml(entry.name)}</strong></div>`;
+
+        return `
+            <div class="result-team-block">
+                ${header}
+                <div class="result-team-members">${memberLines}</div>
+            </div>
+        `;
+    }
+
+    if (editing) {
+        return `<div class="player-line">
+            ${buildResultSlotSelectHtml(round, entry.name, courtIndex, side, slotIndex)}
+        </div>`;
+    }
+    return `<div class="player-line">
+        <span>${escapeHtml(entry.name)}</span>
+        ${shouldShowLevels() ? `<span class="level">${entry.level}</span>` : ''}
+    </div>`;
+}
+
 function renderRound(result) {
     let html = '';
 
@@ -1236,45 +1649,58 @@ function renderRound(result) {
         return;
     }
 
+    const editing = editingResult;
+
+    if (el.editResultBtn) {
+        el.editResultBtn.style.display = isResultEditable() ? '' : 'none';
+    }
+
     result.courts.forEach((court, index) => {
         const teamSize = normalizeCourtFormat(court.format) || inferCourtFormat(court);
         const fmtLabel = formatLabel(teamSize);
+        // In team mode each court has 1 team-entry per side, so the NvN tag would
+        // be misleading; show "Hold-kamp" instead.
+        const isTeamMatchup = court.teamA.players.some(p => p && p.members);
+        const tagHtml = isTeamMatchup
+            ? '<span class="tag">Holdkamp</span>'
+            : `<span class="tag">${fmtLabel}</span>`;
+
+        const sideHtml = (sidePlayers, side) => sidePlayers
+            .map((entry, i) => renderResultSlot(result, entry, index, side, i, editing))
+            .join('');
 
         html += `
             <div class="result-card">
                 <div class="court-title">
                     <span>Bane ${index + 1}</span>
-                    <div class="court-tags">
-                        <span class="tag">${fmtLabel}</span>
-                    </div>
+                    <div class="court-tags">${tagHtml}</div>
                 </div>
                 <div class="vs-grid">
-                    <div class="team">
-                        ${court.teamA.players.map(player => `
-                            <div class="player-line">
-                                <span>${escapeHtml(player.name)}</span>
-                                ${shouldShowLevels() ? `<span class="level">${player.level}</span>` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
+                    <div class="team">${sideHtml(court.teamA.players, 'A')}</div>
                     <div class="flex-center"><strong>VS</strong></div>
-                    <div class="team">
-                        ${court.teamB.players.map(player => `
-                            <div class="player-line">
-                                <span>${escapeHtml(player.name)}</span>
-                                ${shouldShowLevels() ? `<span class="level">${player.level}</span>` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
+                    <div class="team">${sideHtml(court.teamB.players, 'B')}</div>
                 </div>
             </div>
         `;
     });
 
     if (result.benched.length > 0) {
-        html += `<div class="benched-line">Sidder over: ${result.benched.map(p => escapeHtml(p.name)).join(', ')}</div>`;
+        if (editing) {
+            const items = result.benched
+                .map((entry, i) => renderResultSlot(result, entry, -1, 'bench', i, editing))
+                .join('');
+            html += `<div class="benched-edit-area"><strong>Sidder over:</strong><div class="benched-edit-list">${items}</div></div>`;
+        } else {
+            const benchedHtml = result.benched.map(p => {
+                if (p && p.members) {
+                    const members = p.members.map(m => escapeHtml(m.name)).join(', ');
+                    return `<strong>${escapeHtml(p.name)}</strong> (${members})`;
+                }
+                return escapeHtml(p.name);
+            }).join(', ');
+            html += `<div class="benched-line">Sidder over: ${benchedHtml}</div>`;
+        }
     }
-
 
     el.resultArea.innerHTML = html;
 }
@@ -1318,6 +1744,160 @@ async function copyCurrentPlayersToClipboard() {
     } catch (error) {
         showStatusMessage('Kunne ikke kopiere til udklipsholder.');
     }
+}
+
+// Build a session-transfer payload: the volatile state (current players,
+// active players, history, last result, teams, UI settings, prefills)
+// without persisted things like saved player lists.
+function buildSessionPayload() {
+    return {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        roster: state.roster.map(normalizePlayer),
+        history: state.history,
+        lastResult: state.lastResult,
+        teams: state.teams || [],
+        ui: {
+            courtCount: el.courtCount.value,
+            weightTeamBalance: el.weightTeamBalance.checked,
+            weightPartnerBalance: el.weightPartnerBalance.checked,
+            penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
+            penaltyRepeatOpponent: el.penaltyRepeatOpponent.checked,
+            penaltyBench: el.penaltyBench.checked,
+            useSkillLevels: el.useSkillLevels?.checked ?? true,
+            hideSkillLevels: el.hideSkillLevels?.checked ?? false,
+            enabledFormats: getEnabledFormats(),
+            maximizeCourts: el.maximizeCourts?.checked ?? true,
+            defaultCourtCount: el.defaultCourtCount?.value ?? '2',
+            teamMode: el.teamMode?.checked ?? false,
+            teamSize: el.teamSize?.value ?? '5',
+            prefills: getPrefillStateFromUi(),
+        }
+    };
+}
+
+// Encode an arbitrary JS value as a UTF-8 safe base64 string.
+function encodeSessionToBase64(payload) {
+    const json = JSON.stringify(payload);
+    // Encode as UTF-8 first to support Danish characters (æ, ø, å, etc.)
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+function decodeSessionFromBase64(text) {
+    const cleaned = String(text || '').trim().replace(/\s+/g, '');
+    if (!cleaned) throw new Error('Session-koden er tom.');
+    let binary;
+    try {
+        binary = atob(cleaned);
+    } catch (e) {
+        throw new Error('Session-koden er ugyldig.');
+    }
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const json = new TextDecoder().decode(bytes);
+    let parsed;
+    try {
+        parsed = JSON.parse(json);
+    } catch (e) {
+        throw new Error('Kunne ikke læse session-koden.');
+    }
+    if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Session-koden har et ugyldigt format.');
+    }
+    return parsed;
+}
+
+async function exportSessionToClipboard() {
+    try {
+        const payload = buildSessionPayload();
+        const encoded = encodeSessionToBase64(payload);
+        if (el.sessionTransferText) {
+            el.sessionTransferText.value = encoded;
+            el.sessionTransferText.select?.();
+        }
+        try {
+            await navigator.clipboard.writeText(encoded);
+            showStatusMessage('Session er kopieret til udklipsholderen.');
+        } catch (clipErr) {
+            showStatusMessage('Session er klar — kopiér teksten manuelt.');
+        }
+    } catch (error) {
+        showStatusMessage(error.message || 'Kunne ikke eksportere session.');
+    }
+}
+
+function importSessionFromTextarea() {
+    try {
+        const text = el.sessionTransferText?.value || '';
+        const data = decodeSessionFromBase64(text);
+
+        if (state.roster.length || state.history.length) {
+            const confirmed = window.confirm(
+                'Vil du erstatte den aktuelle session? Spillere, historik og indstillinger bliver overskrevet (gemte spillerlister bevares).'
+            );
+            if (!confirmed) return;
+        }
+
+        applySessionPayload(data);
+
+        if (el.sessionTransferText) el.sessionTransferText.value = '';
+
+        showStatusMessage('Session er importeret.');
+        closeStandAlone();
+    } catch (error) {
+        showStatusMessage(error.message || 'Kunne ikke importere session.');
+    }
+}
+
+// Apply a parsed session payload to the live app state.
+// Mirrors restoreState but works from an in-memory object.
+function applySessionPayload(data) {
+    state.roster = Array.isArray(data.roster) ? data.roster.map(normalizePlayer) : [];
+    state.history = Array.isArray(data.history) ? data.history.map(normalizeRoundFromStorage) : [];
+    state.lastResult = state.history[state.history.length - 1] || null;
+    state.teams = Array.isArray(data.teams) ? data.teams.map(normalizeTeam) : [];
+
+    if (data.ui) {
+        const defaultCourts = data.ui.defaultCourtCount ?? '2';
+        if (el.defaultCourtCount) el.defaultCourtCount.value = defaultCourts;
+        el.courtCount.value = data.ui.courtCount ?? defaultCourts;
+        el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
+        el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
+        el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
+        el.penaltyRepeatOpponent.checked = Boolean(data.ui.penaltyRepeatOpponent);
+        el.penaltyBench.checked = Boolean(data.ui.penaltyBench);
+        el.useSkillLevels.checked = data.ui.useSkillLevels !== false;
+        el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
+
+        const savedFormats = Array.isArray(data.ui.enabledFormats) ? data.ui.enabledFormats : [1, 2];
+        for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+            const cb = document.getElementById(`format-${n}v${n}`);
+            if (cb) cb.checked = savedFormats.includes(n);
+        }
+        if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts !== false;
+        if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
+        if (el.teamSize && data.ui.teamSize) el.teamSize.value = data.ui.teamSize;
+
+        renderPrefillArea(data.ui.prefills || createDefaultPrefills(getCourtCount()));
+    }
+
+    updateSkillLevelSettingsUI();
+    updateTeamModeUi();
+    renderRoster();
+    renderPlayerManagerList();
+    renderTeams();
+    renderPlayerStats();
+    renderHistory();
+    updatePanelVisibility();
+    if (state.lastResult) renderRound(state.lastResult);
+    saveState();
 }
 
 function importPlayersFromTextarea() {
@@ -1460,6 +2040,7 @@ function markArrived(index) {
     renderRoster();
     renderPlayerManagerList();
     renderPlayerStats();
+    updateTeamModeUi();
     updatePanelVisibility();
 
     saveState();
@@ -1473,6 +2054,7 @@ function removePlayer(index) {
     renderRoster();
     renderPlayerManagerList();
     renderPlayerStats();
+    updateTeamModeUi();
     updatePanelVisibility();
 
     saveState();
@@ -1496,10 +2078,20 @@ window.markArrived = markArrived;
 window.removePlayer = removePlayer;
 
 async function generateRound() {
-    const players = getActivePlayers();
+    const tm = isTeamMode();
+    if (tm && (!state.teams || state.teams.length < 2)) {
+        showStatusMessage('Generér mindst 2 hold før du laver kampe.');
+        return;
+    }
+
+    const players = tm ? getMatchmakingPool() : getActivePlayers();
     const courtCount = getCourtCount();
     const config = getConfig();
-    const prefills = getPrefillStateFromUi();
+    // Prefills don't apply in team mode (locking individual slots makes no sense
+    // when each slot is a whole team).
+    const prefills = tm
+        ? createDefaultPrefills(courtCount)
+        : getPrefillStateFromUi();
 
     // Show full-screen overlay, disable buttons
     el.generateBtn.disabled = true;
@@ -1515,6 +2107,11 @@ async function generateRound() {
 
         state.lastResult = best;
         state.history.push(best);
+
+        // Reset prefill configuration for the next round (no one wants to reuse the same setup).
+        renderPrefillArea(createDefaultPrefills(getCourtCount()));
+        // Exit edit mode automatically when a fresh round arrives.
+        setEditResultMode(false);
 
         renderRound(best);
         renderHistory();
@@ -1569,11 +2166,15 @@ function resetAll() {
     state.history = [];
     state.roster = [];
     state.lastResult = null;
+    state.teams = [];
+    setEditResultMode(false);
     renderHistory();
     renderPlayerStats();
     renderRoster();
     renderPlayerManagerList();
+    renderTeams();
     renderPrefillArea(createDefaultPrefills(getCourtCount()));
+    updateTeamModeUi();
     updatePanelVisibility();
     showStatusMessage('Alt er nulstillet.');
     closeMenu();
@@ -1589,6 +2190,7 @@ function undoLastRound() {
 
     state.history.pop();
     state.lastResult = state.history[state.history.length - 1] || null;
+    setEditResultMode(false);
 
     renderHistory();
     renderPlayerStats();
@@ -1657,6 +2259,8 @@ el.deletePresetPlayersBtn?.addEventListener('click', deleteStoredPlayerList);
 
 el.importPlayersBtn.addEventListener('click', importPlayersFromTextarea);
 el.copyPlayersBtn.addEventListener('click', copyCurrentPlayersToClipboard);
+el.exportSessionBtn?.addEventListener('click', exportSessionToClipboard);
+el.importSessionBtn?.addEventListener('click', importSessionFromTextarea);
 
 
 el.newPlayerBtn.addEventListener('click', () => {
@@ -1721,12 +2325,31 @@ el.useSkillLevels.addEventListener('change', () => {
     updateSkillLevelSettingsUI();
     renderRoster();
     renderPlayerManagerList();
+    renderTeams();
     if (state.lastResult) renderRound(state.lastResult);
 });
+
+el.teamMode?.addEventListener('change', () => {
+    // When toggling team mode off, keep generated teams in state but stop using them.
+    updateTeamModeUi();
+    renderPrefillArea(getPrefillStateFromUi());
+    if (state.lastResult) renderRound(state.lastResult);
+    saveState();
+});
+
+el.teamSize?.addEventListener('change', () => {
+    const v = Math.max(2, Math.min(MAX_TEAM_SIZE, parseInt(el.teamSize.value, 10) || 2));
+    el.teamSize.value = String(v);
+    saveState();
+});
+
+el.generateTeamsBtn?.addEventListener('click', generateTeams);
+el.clearTeamsBtn?.addEventListener('click', clearTeams);
 
 el.hideSkillLevels.addEventListener('change', () => {
     renderRoster();
     renderPlayerManagerList();
+    renderTeams();
     if (state.lastResult) renderRound(state.lastResult);
 });
 
@@ -1790,6 +2413,31 @@ el.prefillToggleBtn?.addEventListener('click', () => {
 
 el.resultToggleBtn?.addEventListener('click', () => {
     toggleCollapsiblePanel(el.resultPanel);
+});
+
+el.editResultBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleEditResultMode();
+});
+
+el.resultArea?.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) return;
+    if (!target.classList.contains('result-slot-select')) return;
+
+    const courtIndex = Number(target.dataset.resultCourt);
+    const side = target.dataset.resultSide;
+    const slotIndex = Number(target.dataset.resultIndex);
+    const newName = target.value;
+
+    let targetLoc;
+    if (side === 'bench') {
+        targetLoc = {kind: 'bench', slotIndex};
+    } else {
+        targetLoc = {kind: 'court', courtIndex, side, slotIndex};
+    }
+
+    swapInResult(targetLoc, newName);
 });
 
 document.addEventListener('click', (event) => {
