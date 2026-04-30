@@ -47,6 +47,7 @@ const el = {
     addPlayerBtn: document.getElementById('addPlayerBtn'),
     courtCount: document.getElementById('courtCount'),
     generateOverlay: document.getElementById('generateOverlay'),
+    shuffleBtn: document.getElementById('shuffleBtn'),
     resultToggleBtn: document.getElementById('resultToggleBtn'),
     weightTeamBalance: document.getElementById('weightTeamBalance'),
     weightPartnerBalance: document.getElementById('weightPartnerBalance'),
@@ -340,6 +341,10 @@ function updateActivePlayersTitle() {
     el.allPlayersTitle.textContent = `Alle spillere (${totalPlayersCount})`;
 }
 
+function updateShuffleBtn() {
+    if (el.shuffleBtn) el.shuffleBtn.disabled = state.history.length === 0;
+}
+
 function updatePanelVisibility() {
     const activePlayersCount = getActivePlayers().length;
     const hasHistory = state.history.length > 0;
@@ -350,6 +355,7 @@ function updatePanelVisibility() {
     el.playerRosterArea.classList.toggle('hidden', activePlayersCount === 0);
     // resultPanel is now a collapsible sub-section inside matchPanel; show/hide it
     el.resultPanel.classList.toggle('hidden', !hasHistory);
+    updateShuffleBtn();
 }
 
 // Collapse every major panel, then expand the result section so the
@@ -1269,7 +1275,6 @@ function renderRound(result) {
         html += `<div class="benched-line">Sidder over: ${result.benched.map(p => escapeHtml(p.name)).join(', ')}</div>`;
     }
 
-    html += `<div class="retry-row"><button class="ghost retry-btn" onclick="retryRound()" title="Kassér dette resultat og generér et nyt">↺ Prøv igen</button></div>`;
 
     el.resultArea.innerHTML = html;
 }
@@ -1496,8 +1501,9 @@ async function generateRound() {
     const config = getConfig();
     const prefills = getPrefillStateFromUi();
 
-    // Show full-screen overlay, disable button
+    // Show full-screen overlay, disable buttons
     el.generateBtn.disabled = true;
+    el.shuffleBtn.disabled = true;
     el.generateOverlay?.classList.add('generate-overlay--visible');
 
     try {
@@ -1520,6 +1526,7 @@ async function generateRound() {
     } finally {
         el.generateBtn.disabled = false;
         el.generateOverlay?.classList.remove('generate-overlay--visible');
+        updateShuffleBtn();
     }
 
     saveState();
@@ -1635,6 +1642,7 @@ el.menuToggleBtn.addEventListener('click', (event) => {
 el.menuBackdrop?.addEventListener('click', closeMenu);
 
 el.generateBtn.addEventListener('click', generateRound);
+el.shuffleBtn?.addEventListener('click', retryRound);
 el.resetHistoryBtn.addEventListener('click', resetHistory);
 el.resetAllBtn.addEventListener('click', resetAll);
 el.undoBtn.addEventListener('click', undoLastRound);

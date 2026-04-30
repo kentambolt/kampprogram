@@ -39,8 +39,20 @@ body {
 
 .court-count {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
     align-items: center;
+}
+
+.court-count input[type="number"] {
+    width: 5rem;
+    flex-shrink: 0;
+}
+
+button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .app-header {
@@ -283,12 +295,6 @@ textarea {
     padding: 10px 12px;
 }
 
-.match-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 14px;
-    align-items: end;
-}
 
 .settings-row {
     margin-top: 16px;
@@ -879,7 +885,6 @@ prefill-card-header {
 @media (max-width: 980px) {
     .grid,
     .vs-grid,
-    .match-row,
     .player-row-main {
         flex-direction: column;
         align-items: stretch;
