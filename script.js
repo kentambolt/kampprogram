@@ -54,8 +54,6 @@ const el = {
     weightTeamBalance: document.getElementById('weightTeamBalance'),
     weightPartnerBalance: document.getElementById('weightPartnerBalance'),
     penaltyRepeatTeammate: document.getElementById('penaltyRepeatTeammate'),
-    penaltyRepeatOpponent: document.getElementById('penaltyRepeatOpponent'),
-    penaltyBench: document.getElementById('penaltyBench'),
     settingsBtn: document.getElementById('settingsBtn'),
     settingsPanel: document.getElementById('settingsPanel'),
     generateBtn: document.getElementById('generateBtn'),
@@ -99,14 +97,15 @@ const el = {
     maximizeCourts: document.getElementById('maximizeCourts'),
     defaultCourtCount: document.getElementById('defaultCourtCount'),
     teamMode: document.getElementById('teamMode'),
-    teamSize: document.getElementById('teamSize'),
-    teamSizeRow: document.getElementById('teamSizeRow'),
+    teamModeRow: document.getElementById('teamModeRow'),
     teamsPanel: document.getElementById('teamsPanel'),
     teamsArea: document.getElementById('teamsArea'),
     teamsTitle: document.getElementById('teamsTitle'),
     generateTeamsBtn: document.getElementById('generateTeamsBtn'),
     clearTeamsBtn: document.getElementById('clearTeamsBtn'),
     formatSizesGroup: document.getElementById('formatSizesGroup'),
+    penaltyRepeatTeammateRow: document.getElementById('penaltyRepeatTeammateRow'),
+    maximizeCourtsRow: document.getElementById('maximizeCourtsRow'),
 };
 
 function getEnabledFormats() {
@@ -126,10 +125,53 @@ function isTeamMode() {
     return Boolean(el.teamMode?.checked);
 }
 
-function getTeamSize() {
-    const v = Number(el.teamSize?.value);
-    if (!Number.isInteger(v) || v < 2) return 5;
-    return Math.min(MAX_TEAM_SIZE, v);
+// Read the user's enabled team-size formats directly from the checkboxes.
+// (getEnabledFormats() returns [1] in team mode for the matchmaker, so we can't
+// reuse it here.)
+function getRawEnabledFormats() {
+    const formats = [];
+    for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+        if (document.getElementById(`format-${n}v${n}`)?.checked) formats.push(n);
+    }
+    return formats;
+}
+
+// Pick the team size automatically from active player count, the enabled
+// "Tilladte holdstørrelser" checkboxes, and the maximizeCourts setting.
+// Mirrors comparePlanScore from the regular matchmaker:
+//   - prefer plans that put the most players on the court (least benched)
+//   - then prefer more or fewer matched courts depending on maximizeCourts
+//   - then prefer larger team size as a tiebreaker
+// Returns null if no enabled format yields at least two teams from the pool.
+function deriveTeamSize(activeCount) {
+    const enabled = getRawEnabledFormats();
+    if (enabled.length === 0) return null;
+    const maximize = el.maximizeCourts?.checked ?? true;
+
+    let bestN = null;
+    let bestKey = null;
+
+    for (const n of enabled) {
+        const numTeams = Math.floor(activeCount / n);
+        if (numTeams < 2) continue;
+        const usedPlayers = n * numTeams;
+        const numCourts = Math.floor(numTeams / 2);
+        const courtsKey = maximize ? numCourts : -numCourts;
+        // Sort key: more usedPlayers > favoured court count > more teams > larger n
+        const candidateKey = [usedPlayers, courtsKey, numTeams, n];
+        if (!bestKey || compareKeyArrays(candidateKey, bestKey) > 0) {
+            bestKey = candidateKey;
+            bestN = n;
+        }
+    }
+    return bestN;
+}
+
+function compareKeyArrays(a, b) {
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return a[i] - b[i];
+    }
+    return 0;
 }
 
 // Returns the matchmaking pool: active teams in team mode, active players otherwise.
@@ -140,16 +182,12 @@ function getMatchmakingPool() {
     return getActivePlayers();
 }
 
-// Update settings UI when team mode is toggled: dim format-size group,
-// disable partner/teammate-related toggles (they don't apply at 1v1).
+// Update settings UI when team mode is toggled. Team mode hides settings that
+// don't apply (partner-repeat penalty, max-courts toggle, prefills) and shows
+// the teams panel. The format-size checkboxes stay enabled in team mode — they
+// drive the auto-derived team size.
 function updateTeamModeUi() {
     const tm = isTeamMode();
-
-    if (el.teamSizeRow) el.teamSizeRow.classList.toggle('settings-sub-row--hidden', !tm);
-    if (el.formatSizesGroup) {
-        el.formatSizesGroup.classList.toggle('settings-group-disabled', tm);
-        el.formatSizesGroup.querySelectorAll('input').forEach(i => i.disabled = tm);
-    }
 
     // Show/hide the teams panel
     const hasActiveCount = getActivePlayers().length;
@@ -162,21 +200,38 @@ function updateTeamModeUi() {
         el.prefillPanel.classList.toggle('hidden', tm);
     }
 
+    // Task B: hide settings that don't apply in team mode.
+    // (Their underlying values are preserved so toggling team mode off restores them.)
+    if (el.penaltyRepeatTeammateRow) {
+        el.penaltyRepeatTeammateRow.classList.toggle('hidden', tm);
+    }
+    if (el.maximizeCourtsRow) {
+        el.maximizeCourtsRow.classList.toggle('hidden', tm);
+    }
+
     updatePanelVisibility();
 }
 
 // Snake-draft team generation: distribute active players (sorted by level desc)
 // across N teams in serpentine order so total team levels stay close.
+// Team size is derived automatically from the enabled "Tilladte holdstørrelser"
+// formats and the maximizeCourts setting.
 function generateTeams() {
-    const teamSize = getTeamSize();
     const activePlayers = getActivePlayers();
+    const teamSize = deriveTeamSize(activePlayers.length);
 
-    if (activePlayers.length < teamSize * 2) {
-        showStatusMessage(`Mindst ${teamSize * 2} aktive spillere kræves for to hold.`);
+    if (!teamSize) {
+        const enabled = getRawEnabledFormats();
+        if (enabled.length === 0) {
+            showStatusMessage('Vælg mindst én holdstørrelse i indstillingerne.');
+        } else {
+            const minNeeded = Math.min(...enabled) * 2;
+            showStatusMessage(`Mindst ${minNeeded} aktive spillere kræves for to hold.`);
+        }
         return;
     }
 
-    const numTeams = Math.max(2, Math.floor(activePlayers.length / teamSize));
+    const numTeams = Math.floor(activePlayers.length / teamSize);
     // Tiny shuffle first so equal-level players end up on varying teams
     const sorted = shuffle(activePlayers).slice().sort((a, b) => b.level - a.level);
 
@@ -365,8 +420,6 @@ function saveState() {
             weightTeamBalance: el.weightTeamBalance.checked,
             weightPartnerBalance: el.weightPartnerBalance.checked,
             penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
-            penaltyRepeatOpponent: el.penaltyRepeatOpponent.checked,
-            penaltyBench: el.penaltyBench.checked,
             useSkillLevels: el.useSkillLevels?.checked ?? true,
             hideSkillLevels: el.hideSkillLevels?.checked ?? false,
             // saveState reads enabled formats raw from the checkboxes — not from
@@ -382,7 +435,6 @@ function saveState() {
             maximizeCourts: el.maximizeCourts?.checked ?? true,
             defaultCourtCount: el.defaultCourtCount?.value ?? '2',
             teamMode: el.teamMode?.checked ?? false,
-            teamSize: el.teamSize?.value ?? '5',
             prefills: getPrefillStateFromUi(),
             collapsedPanels: {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
@@ -421,8 +473,6 @@ function restoreState() {
             el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
             el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
             el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
-            el.penaltyRepeatOpponent.checked = Boolean(data.ui.penaltyRepeatOpponent);
-            el.penaltyBench.checked = Boolean(data.ui.penaltyBench);
             // Default useSkillLevels to true for backward compatibility
             el.useSkillLevels.checked = data.ui.useSkillLevels !== false;
             el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
@@ -436,7 +486,6 @@ function restoreState() {
             }
             if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts !== false;
             if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
-            if (el.teamSize && data.ui.teamSize) el.teamSize.value = data.ui.teamSize;
         }
         const collapsedPanels = data.ui.collapsedPanels || {};
 
@@ -789,10 +838,12 @@ function getConfig() {
         partnerBalanceWeight: (usingLevels && el.weightPartnerBalance.checked) ? FIXED_CONFIG.partnerBalanceWeight : 0,
         teammateLastPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammateLastPenalty : 0,
         teammatePrevPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammatePrevPenalty : 0,
-        opponentLastPenalty: el.penaltyRepeatOpponent.checked ? FIXED_CONFIG.opponentLastPenalty : 0,
-        opponentPrevPenalty: el.penaltyRepeatOpponent.checked ? FIXED_CONFIG.opponentPrevPenalty : 0,
-        benchLastPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchLastPenalty : 0,
-        benchPrevPenalty: el.penaltyBench.checked ? FIXED_CONFIG.benchPrevPenalty : 0,
+        // New opponents and bench rotation are always prioritised — they're
+        // baseline behaviour, not opt-in toggles.
+        opponentLastPenalty: FIXED_CONFIG.opponentLastPenalty,
+        opponentPrevPenalty: FIXED_CONFIG.opponentPrevPenalty,
+        benchLastPenalty: FIXED_CONFIG.benchLastPenalty,
+        benchPrevPenalty: FIXED_CONFIG.benchPrevPenalty,
     };
 }
 
@@ -808,9 +859,11 @@ function updateSkillLevelSettingsUI() {
     const using = isUsingSkillLevels();
     // Show or hide the "hide levels" sub-option
     el.hideSkillLevelsRow?.classList.toggle('settings-sub-row--hidden', !using);
-    // Dim and disable the level-balance settings when levels are off
+    // Fully hide the level-balance settings when skill levels are off — they
+    // only make sense alongside levels, so hiding (rather than dimming) keeps
+    // the panel uncluttered.
     if (el.levelSettingsGroup) {
-        el.levelSettingsGroup.classList.toggle('settings-group-disabled', !using);
+        el.levelSettingsGroup.classList.toggle('hidden', !using);
         el.levelSettingsGroup.querySelectorAll('input').forEach(input => {
             input.disabled = !using;
         });
@@ -1606,8 +1659,30 @@ function swapInResult(targetLoc, newPlayerName) {
     renderPlayerStats();
 }
 
+// Returns the largest member count of any team super-player in the round
+// (covers courts + bench). Used to reserve space in edit mode so swapping
+// teams of different sizes doesn't make the layout jump.
+function getMaxTeamMemberCountInRound(round) {
+    let max = 0;
+    for (const court of round.courts) {
+        for (const entry of [...court.teamA.players, ...court.teamB.players]) {
+            if (entry && entry.members) {
+                if (entry.members.length > max) max = entry.members.length;
+            }
+        }
+    }
+    for (const entry of round.benched) {
+        if (entry && entry.members && entry.members.length > max) {
+            max = entry.members.length;
+        }
+    }
+    return max;
+}
+
 // Render a single slot: a player line, or a team block (when the entry has `members`).
-function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing) {
+// `maxTeamMembers` reserves space when in edit mode (prevents UI jumping between
+// teams of different sizes). 0 means "no padding".
+function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing, maxTeamMembers = 0) {
     const isTeam = Boolean(entry && entry.members);
 
     if (isTeam) {
@@ -1618,6 +1693,16 @@ function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing) {
             </div>
         `).join('');
 
+        // Pad with invisible placeholder rows up to maxTeamMembers (only in edit
+        // mode, where swapping teams of different sizes would otherwise jump).
+        let placeholderLines = '';
+        if (editing && maxTeamMembers > entry.members.length) {
+            const missing = maxTeamMembers - entry.members.length;
+            for (let i = 0; i < missing; i++) {
+                placeholderLines += '<div class="team-member-line team-member-line--placeholder" aria-hidden="true">&nbsp;</div>';
+            }
+        }
+
         const header = editing
             ? buildResultSlotSelectHtml(round, entry.name, courtIndex, side, slotIndex)
             : `<div class="result-team-name"><strong>${escapeHtml(entry.name)}</strong></div>`;
@@ -1625,7 +1710,7 @@ function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing) {
         return `
             <div class="result-team-block">
                 ${header}
-                <div class="result-team-members">${memberLines}</div>
+                <div class="result-team-members">${memberLines}${placeholderLines}</div>
             </div>
         `;
     }
@@ -1650,6 +1735,9 @@ function renderRound(result) {
     }
 
     const editing = editingResult;
+    // Reserve vertical space for team blocks based on the round's largest team,
+    // so swapping teams of different sizes in edit mode doesn't jump the layout.
+    const maxTeamMembers = getMaxTeamMemberCountInRound(result);
 
     if (el.editResultBtn) {
         el.editResultBtn.style.display = isResultEditable() ? '' : 'none';
@@ -1666,7 +1754,7 @@ function renderRound(result) {
             : `<span class="tag">${fmtLabel}</span>`;
 
         const sideHtml = (sidePlayers, side) => sidePlayers
-            .map((entry, i) => renderResultSlot(result, entry, index, side, i, editing))
+            .map((entry, i) => renderResultSlot(result, entry, index, side, i, editing, maxTeamMembers))
             .join('');
 
         html += `
@@ -1687,7 +1775,7 @@ function renderRound(result) {
     if (result.benched.length > 0) {
         if (editing) {
             const items = result.benched
-                .map((entry, i) => renderResultSlot(result, entry, -1, 'bench', i, editing))
+                .map((entry, i) => renderResultSlot(result, entry, -1, 'bench', i, editing, maxTeamMembers))
                 .join('');
             html += `<div class="benched-edit-area"><strong>Sidder over:</strong><div class="benched-edit-list">${items}</div></div>`;
         } else {
@@ -1762,15 +1850,12 @@ function buildSessionPayload() {
             weightTeamBalance: el.weightTeamBalance.checked,
             weightPartnerBalance: el.weightPartnerBalance.checked,
             penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
-            penaltyRepeatOpponent: el.penaltyRepeatOpponent.checked,
-            penaltyBench: el.penaltyBench.checked,
             useSkillLevels: el.useSkillLevels?.checked ?? true,
             hideSkillLevels: el.hideSkillLevels?.checked ?? false,
             enabledFormats: getEnabledFormats(),
             maximizeCourts: el.maximizeCourts?.checked ?? true,
             defaultCourtCount: el.defaultCourtCount?.value ?? '2',
             teamMode: el.teamMode?.checked ?? false,
-            teamSize: el.teamSize?.value ?? '5',
             prefills: getPrefillStateFromUi(),
         }
     };
@@ -1871,8 +1956,6 @@ function applySessionPayload(data) {
         el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
         el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
         el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
-        el.penaltyRepeatOpponent.checked = Boolean(data.ui.penaltyRepeatOpponent);
-        el.penaltyBench.checked = Boolean(data.ui.penaltyBench);
         el.useSkillLevels.checked = data.ui.useSkillLevels !== false;
         el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
 
@@ -1883,7 +1966,6 @@ function applySessionPayload(data) {
         }
         if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts !== false;
         if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
-        if (el.teamSize && data.ui.teamSize) el.teamSize.value = data.ui.teamSize;
 
         renderPrefillArea(data.ui.prefills || createDefaultPrefills(getCourtCount()));
     }
@@ -2293,8 +2375,6 @@ el.closeImportExportBtn.addEventListener('click', () => {
     el.weightTeamBalance,
     el.weightPartnerBalance,
     el.penaltyRepeatTeammate,
-    el.penaltyRepeatOpponent,
-    el.penaltyBench,
     el.useSkillLevels,
     el.hideSkillLevels,
     el.maximizeCourts,
@@ -2334,12 +2414,6 @@ el.teamMode?.addEventListener('change', () => {
     updateTeamModeUi();
     renderPrefillArea(getPrefillStateFromUi());
     if (state.lastResult) renderRound(state.lastResult);
-    saveState();
-});
-
-el.teamSize?.addEventListener('change', () => {
-    const v = Math.max(2, Math.min(MAX_TEAM_SIZE, parseInt(el.teamSize.value, 10) || 2));
-    el.teamSize.value = String(v);
     saveState();
 });
 

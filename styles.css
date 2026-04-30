@@ -269,6 +269,7 @@ label {
     align-items: center;
     gap: 10px;
     font-weight: normal;
+    margin: 0 0 24px 0;
 }
 
 .settings-panel input[type="checkbox"] {
@@ -831,7 +832,7 @@ prefill-card-header {
 .format-sizes-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 14px;
+    gap: 8px 30px;
 }
 
 .format-size-label {
@@ -1185,6 +1186,14 @@ prefill-card-header {
 
 .team-member-line .level {
     color: var(--text);
+}
+
+/* Reserves space in edit mode so swapping teams of different sizes doesn't
+   jump the layout — the placeholder occupies the same row height as a real
+   member line but stays invisible. */
+.team-member-line--placeholder {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* ----- Session transfer (export/import) ----- */

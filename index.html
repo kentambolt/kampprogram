@@ -191,6 +191,13 @@
                     <button class="ghost" id="closeSettingsBtn">✕ Luk</button>
                 </div>
 
+                <div class="settings-row" id="teamModeRow">
+                    <label>
+                        <input id="teamMode" type="checkbox" />
+                        Faste hold
+                    </label>
+                </div>
+
                 <div class="settings-row">
                     <label>
                         <input id="useSkillLevels" type="checkbox" checked />
@@ -198,44 +205,33 @@
                     </label>
                 </div>
 
-                <div class="settings-sub-row" id="hideSkillLevelsRow">
-                    <label>
-                        <input id="hideSkillLevels" type="checkbox" />
-                        Skjul niveauer i appen (privat tilstand)
-                    </label>
-                </div>
+
 
                 <div id="levelSettingsGroup">
-                    <div class="settings-row">
+                    <div class="settings-sub-row">
                         <label>
                             <input id="weightTeamBalance" type="checkbox" checked />
-                            Prioritér modstandere på samme niveau
+                            Modstandere på samme niveau
                         </label>
                     </div>
-                    <div class="settings-row">
+                    <div class="settings-sub-row">
                         <label>
                             <input id="weightPartnerBalance" type="checkbox" checked />
-                            Prioritér partnere på samme niveau
+                            Medspillere på samme niveau
+                        </label>
+                    </div>
+                    <div class="settings-sub-row" id="hideSkillLevelsRow">
+                        <label>
+                            <input id="hideSkillLevels" type="checkbox" />
+                            Skjul niveauer i appen (privat tilstand)
                         </label>
                     </div>
                 </div>
 
-                <div class="settings-row">
+                <div class="settings-row" id="penaltyRepeatTeammateRow">
                     <label>
                         <input id="penaltyRepeatTeammate" type="checkbox" checked />
-                        Prioritér nye partnere
-                    </label>
-                </div>
-                <div class="settings-row">
-                    <label>
-                        <input id="penaltyRepeatOpponent" type="checkbox" checked />
-                        Prioritér nye modstandere
-                    </label>
-                </div>
-                <div class="settings-row">
-                    <label>
-                        <input id="penaltyBench" type="checkbox" checked />
-                        Prioritér kampe til spillere, der for nyligt har været på bænken
+                        Nye medspillere
                     </label>
                 </div>
 
@@ -256,7 +252,7 @@
                     </div>
                 </div>
 
-                <div class="settings-row">
+                <div class="settings-row" id="maximizeCourtsRow">
                     <label>
                         <input id="maximizeCourts" type="checkbox" checked />
                         Brug flest mulige baner (ellers brug færreste mulige)
@@ -266,21 +262,6 @@
                 <div class="settings-row">
                     <label for="defaultCourtCount">Standard antal baner</label>
                     <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
-                </div>
-
-                <div class="settings-row" style="border-top: 1px solid var(--border); padding-top: 24px;">
-                    <label>
-                        <input id="teamMode" type="checkbox" />
-                        Holdtilstand (faste hold spiller mod hinanden)
-                    </label>
-                    <p class="subtle small-text" style="margin: 6px 0 0 28px;">
-                        Til fx floorball: Generér hold med næsten lige stærke spillere, og lad app'en sende hele hold ind/ud i stedet for enkelte spillere.
-                    </p>
-                </div>
-
-                <div class="settings-sub-row" id="teamSizeRow">
-                    <label for="teamSize">Spillere pr. hold</label>
-                    <input id="teamSize" type="number" min="2" max="11" value="5" style="width:5rem;"/>
                 </div>
             </div>
 
