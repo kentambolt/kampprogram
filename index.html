@@ -18,7 +18,7 @@
 
     <!-- Android / Chrome "Add to Home Screen" -->
     <link rel="manifest" href="site.webmanifest"/>
-    <meta name="theme-color" content="#e85d04"/>
+    <meta name="theme-color" content="#ff7a5c"/>
 
     <link rel="stylesheet" href="styles.css"/>
 </head>
@@ -30,8 +30,8 @@
             <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu">☰</button>
             <div class="menu-backdrop" id="menuBackdrop"></div>
             <div class="menu-dropdown" id="menuDropdown">
-                <button class="ghost menu-item" id="settingsBtn">⚙ Indstillinger</button>
-                <button class="ghost menu-item" id="importExportBtn">⇅ Importér / eksportér</button>
+                <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
+                <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
                 <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
             </div>
         </div>
@@ -46,7 +46,7 @@
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
                         <div class="actions">
-                            <button class="secondary" id="newPlayerBtn">+ Opret</button>
+                            <button class="primary" id="newPlayerBtn">+ Opret</button>
                         </div>
                     </div>
 
@@ -79,7 +79,7 @@
                                     <select id="presetPlayerList">
                                         <option value="">Vælg liste</option>
                                     </select>
-                                    <button class="secondary" id="loadPresetPlayersBtn">↓ Hent spillere</button>
+                                    <button class="primary" id="loadPresetPlayersBtn">↓ Hent spillere</button>
                                 </div>
                             </div>
 
@@ -87,7 +87,7 @@
                                 <label for="newPresetListName">Gem nuværende spillere som ny liste</label>
                                 <div class="actions">
                                     <input id="newPresetListName" type="text" placeholder="Fx Torsdagsholdet"/>
-                                    <button class="secondary" id="savePresetPlayersBtn">✓ Gem liste</button>
+                                    <button class="primary" id="savePresetPlayersBtn">✓ Gem liste</button>
                                 </div>
                             </div>
 
@@ -112,7 +112,7 @@
                     </button>
                     <div class="collapsible-content">
                         <div class="team-mode-actions">
-                            <button class="secondary" id="generateTeamsBtn">↻ Generér hold</button>
+                            <button class="primary" id="generateTeamsBtn">↻ Lav hold</button>
                             <button class="ghost" id="clearTeamsBtn">✕ Nulstil hold</button>
                         </div>
                         <div id="teamsArea" class="teams-area"></div>
@@ -150,7 +150,7 @@
                         </button>
                         <div class="collapsible-content">
                             <div class="result-actions">
-                                <button class="ghost" id="editResultBtn" type="button">✎ Rediger spillere</button>
+                                <button class="ghost" id="editResultBtn" type="button">✎ Rediger</button>
                             </div>
                             <div id="resultArea" class="subtle">Ingen kamp genereret endnu.</div>
                         </div>
@@ -235,6 +235,13 @@
                     </label>
                 </div>
 
+                <div class="settings-row" id="maximizeCourtsRow">
+                    <label>
+                        <input id="maximizeCourts" type="checkbox" checked />
+                        Brug flest mulige baner (ellers færreste mulige)
+                    </label>
+                </div>
+
                 <div class="settings-row">
                     <div class="settings-label">Tilladte holdstørrelser:</div>
                     <div class="format-sizes-group" id="formatSizesGroup">
@@ -252,13 +259,6 @@
                     </div>
                 </div>
 
-                <div class="settings-row" id="maximizeCourtsRow">
-                    <label>
-                        <input id="maximizeCourts" type="checkbox" checked />
-                        Brug flest mulige baner (ellers brug færreste mulige)
-                    </label>
-                </div>
-
                 <div class="settings-row">
                     <label for="defaultCourtCount">Standard antal baner</label>
                     <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
@@ -267,7 +267,7 @@
 
             <div class="panel import-export-panel standalone" id="importExportPanel">
                 <div class="flex-row">
-                    <h2>Importér / eksportér</h2>
+                    <h2>Importer / eksporter</h2>
                     <button class="ghost" id="closeImportExportBtn">✕ Luk</button>
                 </div>
 
@@ -281,14 +281,14 @@
                 </div>
 
                 <div class="actions" style="margin-top: 12px;">
-                    <button class="secondary" id="importPlayersBtn">↑ Importér spillere</button>
-                    <button class="ghost" id="copyPlayersBtn">⎘ Kopiér nuværende spillerliste</button>
+                    <button class="primary" id="importPlayersBtn">↑ Importer spillere</button>
+                    <button class="ghost" id="copyPlayersBtn">⎘ Kopier nuværende spillerliste</button>
                 </div>
 
                 <div class="settings-row session-transfer-section">
                     <h3>Del session</h3>
                     <p class="subtle small-text">
-                        Eksportér aktuel session (aktive spillere, historik, hold, indstillinger) som tekst, og send til en kollega der kan importere og fortsætte.
+                        Eksporter aktuel session (aktive spillere, historik, hold, indstillinger) som tekst, og send til en kollega der kan importere og fortsætte.
                     </p>
                     <label for="sessionTransferText">Session-kode</label>
                     <textarea
@@ -297,8 +297,8 @@
                             placeholder="Indsæt session-kode her for at importere…"
                     ></textarea>
                     <div class="actions" style="margin-top: 12px;">
-                        <button class="secondary" id="exportSessionBtn">⎘ Kopiér aktuel session</button>
-                        <button class="secondary" id="importSessionBtn">↑ Importér session</button>
+                        <button class="primary" id="exportSessionBtn">⎘ Kopiér aktuel session</button>
+                        <button class="primary" id="importSessionBtn">↑ Importér session</button>
                     </div>
                 </div>
             </div>
@@ -330,7 +330,7 @@
                     </div>
                 </div>
                 <div>
-                    <button class="secondary" id="addPlayerBtn">+ Tilføj</button>
+                    <button class="primary" id="addPlayerBtn">+ Tilføj</button>
                 </div>
             </div>
 
