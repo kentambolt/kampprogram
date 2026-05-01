@@ -10,7 +10,7 @@
     --accent: #4A5240;
     --accent-hover: #929891;   /* lighter coral */
     --accent-contrast: #ffffff;
-    --accent-2: #4ecdc4;       /* fresh mint — secondary */
+    --accent-2: #9c9c9c;       /* fresh mint — secondary */
     --accent-2-contrast: #074c48;
     --accent-3: #ffc857;       /* sunshine yellow — highlight */
     --danger: #a12731;         /* warm red */
@@ -50,15 +50,21 @@ body {
     padding: 24px;
 }
 
+.courts {
+    display: flex;
+    gap: 10px;
+}
+
 .court-count {
     display: flex;
+    justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
 }
 
 .court-count input[type="number"] {
-    width: 5rem;
+    width: 4rem;
     flex-shrink: 0;
 }
 
@@ -268,13 +274,14 @@ label {
 .settings-panel label {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 4px;
     font-weight: normal;
 }
 
 .settings-panel input[type="checkbox"] {
     width: auto;
     transform: scale(1.2);
+    margin-top: 5px;
 }
 
 input[type="checkbox"] {
@@ -305,6 +312,7 @@ textarea {
     border: 1px solid #e1e1e1;
     border-radius: 10px;
     padding: 10px 12px;
+    text-align: center;
 }
 
 input[type="number"]:focus,
@@ -369,7 +377,7 @@ button:active {
 }
 
 .secondary:hover {
-    background: #62d6ce;
+    background: #cfcfcf;
 }
 
 .danger {
@@ -396,6 +404,17 @@ button:active {
     padding: 16px;
     background: #00000000;
     margin-bottom: 14px;
+    border-bottom: 1px solid #00000012;
+    border-radius: 0;
+}
+
+select {
+    text-align: center;
+    text-align-last: center;
+}
+
+select option {
+    text-align: left;
 }
 
 .court-title {
@@ -407,11 +426,6 @@ button:active {
     font-weight: bold;
 }
 
-.court-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
 
 .vs-grid {
     display: grid;
@@ -437,15 +451,11 @@ button:active {
 
 .player-line {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     gap: 12px;
     padding: 6px 0;
-    border-bottom: 1px dashed var(--border);
 }
 
-.player-line:last-child {
-    border-bottom: none;
-}
 
 .tag {
     display: inline-block;
@@ -491,6 +501,7 @@ button:active {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    flex-direction: row !important;
 }
 
 .player-chip {
@@ -697,17 +708,19 @@ textarea {
 
 .prefill-area {
     display: grid;
-    gap: 24px;
 }
 
 .prefill-card {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px;
+    border: none;
+    border-radius: 0;
+    padding: 20px 20px;
+    padding-bottom: 20px;
     display: flex;
     gap: 14px;
-    background: var(--panel-2);
+    background: none;
     flex-direction: column;
+    margin: 0 -18px;
+    border-bottom: 1px solid #00000012;
 }
 
 prefill-card-header {
@@ -869,7 +882,6 @@ prefill-card-header {
 
 .prefill-actions {
     display: flex;
-    margin-bottom: 24px;
 }
 
 /* Label for settings sections that aren't checkboxes */
@@ -1049,17 +1061,6 @@ prefill-card-header {
         margin: 0 auto 20px;
     }
 
-    .prefill-card {
-        border: none;
-        border-radius: 0;
-        padding: 18px;
-        display: flex;
-        gap: 14px;
-        background: var(--panel-2);
-        flex-direction: column;
-        margin: 0 -18px;
-    }
-
 }
 
 
@@ -1110,7 +1111,7 @@ prefill-card-header {
 
 .result-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-bottom: 12px;
 }
 
@@ -1130,11 +1131,8 @@ prefill-card-header {
 }
 
 .benched-edit-area {
-    border: 1px dashed var(--border-strong);
-    border-radius: 12px;
     padding: 12px;
     margin-top: 14px;
-    background: var(--panel-2);
 }
 
 .benched-edit-area > strong {

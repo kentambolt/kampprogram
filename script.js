@@ -1722,9 +1722,6 @@ function renderRound(result) {
         // In team mode each court has 1 team-entry per side, so the NvN tag would
         // be misleading; show "Hold-kamp" instead.
         const isTeamMatchup = court.teamA.players.some(p => p && p.members);
-        const tagHtml = isTeamMatchup
-            ? ''
-            : `<span class="tag">${fmtLabel}</span>`;
 
         const sideHtml = (sidePlayers, side) => sidePlayers
             .map((entry, i) => renderResultSlot(result, entry, index, side, i, editing, maxTeamMembers))
@@ -1734,7 +1731,6 @@ function renderRound(result) {
             <div class="result-card">
                 <div class="court-title">
                     <span>Bane ${index + 1}</span>
-                    <div class="court-tags">${tagHtml}</div>
                 </div>
                 <div class="vs-grid">
                     <div class="team">${sideHtml(court.teamA.players, 'A')}</div>
@@ -1776,7 +1772,7 @@ function renderHistory() {
     updatePanelVisibility();
 
     if (state.history.length === 0) {
-        el.historyArea.innerHTML = '<div class="subtle">Ingen kampe endnu.</div>';
+        el.historyArea.innerHTML = '<div class="subtle">Ingen kamprunde endnu.</div>';
         return;
     }
 
@@ -1786,7 +1782,7 @@ function renderHistory() {
         return `
             <div class="result-card">
                 <div class="court-title">
-                    <span>Kamp ${roundNo}</span>
+                    <span>Kamprunde ${roundNo}</span>
                 </div>
                 <ul class="history-list">
                     ${round.courts.map((court, i) => `<li>${describeCourtForHistory(court, i)}</li>`).join('')}
@@ -2405,7 +2401,7 @@ function resetAll() {
 function undoLastRound() {
     if (state.history.length === 0) return;
 
-    const confirmed = window.confirm('Er du sikker på, at du vil fjerne seneste kamp fra historikken?');
+    const confirmed = window.confirm('Er du sikker på, at du vil fjerne seneste kamprunde fra historikken?');
     if (!confirmed) return;
 
     state.history.pop();
@@ -2419,10 +2415,10 @@ function undoLastRound() {
     if (state.lastResult) {
         renderRound(state.lastResult);
     } else {
-        el.resultArea.innerHTML = 'Ingen kamp genereret endnu.';
+        el.resultArea.innerHTML = 'Ingen kamprunde genereret endnu.';
     }
 
-    showStatusMessage('Seneste kamp er fjernet fra historikken.');
+    showStatusMessage('Seneste kamprunde er fjernet fra historikken.');
     saveState();
 }
 

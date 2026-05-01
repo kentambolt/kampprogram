@@ -123,10 +123,11 @@
                     <h2>Lav kampe</h2>
 
                     <div class="court-count">
-                        <label for="courtCount">Baner</label>
-                        <input id="courtCount" type="number" min="1" value="2"/>
-                        <button class="primary" id="generateBtn">▶ Næste kamprunde</button>
-                        <button class="ghost" id="shuffleBtn" disabled>↺ Shuffle</button>
+                        <div class="courts">
+                            <label for="courtCount">Baner</label>
+                            <input id="courtCount" type="number" min="1" value="2"/>
+                        </div>
+                        <button class="primary" id="generateBtn">▶ Lav næste kamprunde</button>
                     </div>
 
                     <div class="prefill-panel collapsible-panel collapsed" id="prefillPanel">
@@ -145,14 +146,15 @@
 
                     <div class="prefill-panel collapsible-panel collapsed" id="resultPanel">
                         <button class="prefill-header collapsible-toggle" id="resultToggleBtn" type="button">
-                            <h3 class="h-no-m">Seneste kamp</h3>
+                            <h3 class="h-no-m">Seneste kamprunde</h3>
                             <span class="collapse-indicator">▾</span>
                         </button>
                         <div class="collapsible-content">
                             <div class="result-actions">
                                 <button class="ghost" id="editResultBtn" type="button">✎ Rediger</button>
+                                <button class="ghost" id="shuffleBtn" disabled>↺ Shuffle</button>
                             </div>
-                            <div id="resultArea" class="subtle">Ingen kamp genereret endnu.</div>
+                            <div id="resultArea" class="subtle">Ingen kamprunde genereret endnu.</div>
                         </div>
                     </div>
                 </div>
@@ -179,7 +181,7 @@
                             <button class="ghost" id="undoBtn">↩ Fjern seneste</button>
                             <button class="danger" id="resetHistoryBtn">✕ Fjern alle</button>
                         </div>
-                        <div id="historyArea" class="subtle">Ingen kampe endnu.</div>
+                        <div id="historyArea" class="subtle">Ingen kamprunder endnu.</div>
                     </div>
                 </div>
 
@@ -338,9 +340,9 @@
     </div>
 </div>
 <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
-<div id="generateOverlay" class="generate-overlay" role="status" aria-label="Genererer kampe…">
+<div id="generateOverlay" class="generate-overlay" role="status" aria-label="Genererer kamprunde…">
     <div class="generate-overlay__spinner"></div>
-    <div class="generate-overlay__text">Genererer kampe…</div>
+    <div class="generate-overlay__text">Genererer kamprunde…</div>
 </div>
 <script src="script.js" lang="javascript"></script>
 </body>
