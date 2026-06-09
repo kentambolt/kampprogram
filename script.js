@@ -106,6 +106,8 @@ const el = {
     formatSizesGroup: document.getElementById('formatSizesGroup'),
     penaltyRepeatTeammateRow: document.getElementById('penaltyRepeatTeammateRow'),
     maximizeCourtsRow: document.getElementById('maximizeCourtsRow'),
+    wizardPanel: document.getElementById('wizardPanel'),
+    setupWizardBtn: document.getElementById('setupWizardBtn'),
 };
 
 function getEnabledFormats() {
@@ -2495,6 +2497,446 @@ el.closeSettingsBtn.addEventListener('click', () => {
     closeStandAlone();
 });
 
+/* ============================================================
+ *  Setup Wizard
+ * ============================================================
+ *
+ *  A friendly multi-step guide that asks plain-language questions
+ *  and writes the answers into the existing settings checkboxes.
+ *  The legacy settings panel still exists for power users.
+ *
+ *  Steps follow a dynamic flow based on earlier answers:
+ *    welcome → teamMode → (format → formatOther?) → useLevels →
+ *      (balance → hideLevels) → (rotateTeammates) → courtCount → done
+ *  Steps in parentheses are conditional.
+ *
+ *  All changes are kept in a working `wizardChoices` object and only
+ *  committed to the real settings on Finish, so closing mid-wizard
+ *  leaves the existing settings untouched.
+ * ============================================================ */
+
+const WIZARD_FLAG_KEY = 'kampprogram-wizard-completed-v1';
+
+const wizard = {
+    choices: {},
+    history: [],
+    current: null,
+};
+
+function getWizardSteps() {
+    return Array.from(document.querySelectorAll('[data-wizard-step]'));
+}
+
+function getWizardStepEl(name) {
+    return document.querySelector(`[data-wizard-step="${name}"]`);
+}
+
+function isTeamModeChoice() {
+    return wizard.choices.teamMode === 'true';
+}
+
+function isUsingLevelsChoice() {
+    const v = wizard.choices.useLevels;
+    // Accept the legacy 'true' so saved-in-progress states keep working.
+    return v === 'visible' || v === 'hidden' || v === 'true';
+}
+
+// Decide which step comes after the given one, based on the choices
+// made so far. Returns null when the wizard is finished.
+function getNextWizardStep(from) {
+    switch (from) {
+        case 'welcome':
+            return 'teamMode';
+        case 'teamMode':
+            return 'useLevels';
+        case 'useLevels':
+            return isUsingLevelsChoice() ? 'balance' : 'courts';
+        case 'balance':
+            return 'courts';
+        case 'courts':
+            return 'done';
+        default:
+            return null;
+    }
+}
+
+// Approximate progress: count how many of the *typical* steps remain.
+// We hide the dot for "welcome" and "done" to keep the bar feeling
+// progress-like rather than wandering.
+function getApproxProgress() {
+    const plannedSteps = ['teamMode', 'useLevels'];
+    if (isUsingLevelsChoice()) plannedSteps.push('balance');
+    plannedSteps.push('courts');
+
+    const idx = plannedSteps.indexOf(wizard.current);
+    return { total: plannedSteps.length, currentIndex: idx, plannedSteps };
+}
+
+function renderWizardProgress() {
+    const wrap = document.getElementById('wizardProgress');
+    if (!wrap) return;
+    if (wizard.current === 'welcome' || wizard.current === 'done') {
+        wrap.innerHTML = '';
+        return;
+    }
+    const { total, currentIndex } = getApproxProgress();
+    if (total <= 0) {
+        wrap.innerHTML = '';
+        return;
+    }
+    const dots = [];
+    for (let i = 0; i < total; i++) {
+        let cls = 'wizard-progress-dot';
+        if (i < currentIndex) cls += ' done';
+        else if (i === currentIndex) cls += ' current';
+        dots.push(`<div class="${cls}"></div>`);
+    }
+    wrap.innerHTML = dots.join('');
+}
+
+function showWizardStep(name) {
+    const steps = getWizardSteps();
+    steps.forEach(step => {
+        step.classList.toggle('hidden', step.dataset.wizardStep !== name);
+    });
+    wizard.current = name;
+    renderWizardProgress();
+
+    if (name === 'done') renderWizardSummary();
+    if (name === 'courts') renderWizardCourts();
+
+    // Re-apply selection highlight on the step we're entering so users
+    // can see what they picked last time when navigating back.
+    const stepEl = getWizardStepEl(name);
+    if (stepEl) {
+        stepEl.querySelectorAll('.wizard-option').forEach(opt => {
+            const choice = opt.dataset.wizardChoice;
+            const val = opt.dataset.value;
+            opt.classList.toggle('selected', !!choice && wizard.choices[choice] === val);
+        });
+    }
+
+    // Focus the first interactive element for keyboard users, but
+    // avoid number inputs so we don't pop the mobile keyboard up.
+    setTimeout(() => {
+        const firstBtn = stepEl?.querySelector('.wizard-option, .wizard-primary-btn');
+        firstBtn?.focus({ preventScroll: true });
+    }, 60);
+}
+
+function startWizard(forceFresh = false) {
+    if (forceFresh) {
+        wizard.choices = {};
+    } else {
+        // Seed choices with current settings so summary makes sense if
+        // the user is just adjusting things via the wizard.
+        wizard.choices = inferChoicesFromCurrentSettings();
+    }
+    wizard.history = [];
+    showStandAlone(el.wizardPanel);
+    showWizardStep('welcome');
+}
+
+function closeWizardWithoutSaving() {
+    closeStandAlone();
+}
+
+function inferChoicesFromCurrentSettings() {
+    const choices = {};
+    choices.teamMode = el.teamMode?.checked ? 'true' : 'false';
+
+    // Build courts array: one row per court, sized from the currently
+    // enabled formats. If there are fewer enabled formats than courts,
+    // pad with the first enabled size so the rest is unambiguous.
+    const enabledSizes = [];
+    for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+        if (document.getElementById(`format-${n}v${n}`)?.checked) enabledSizes.push(n);
+    }
+    const cc = Math.max(1, parseInt(el.defaultCourtCount?.value, 10) || 2);
+    const primary = enabledSizes[0] || 2;
+    choices.courts = [];
+    for (let i = 0; i < cc; i++) {
+        choices.courts.push(enabledSizes[i] !== undefined ? enabledSizes[i] : primary);
+    }
+    choices.lastCourtSize = choices.courts[choices.courts.length - 1] || primary;
+
+    // useLevels: combine useSkillLevels + hideSkillLevels into one tri-value.
+    const using = !!el.useSkillLevels?.checked;
+    const hiding = !!el.hideSkillLevels?.checked;
+    if (using && hiding) choices.useLevels = 'hidden';
+    else if (using) choices.useLevels = 'visible';
+    else choices.useLevels = 'false';
+
+    const tb = el.weightTeamBalance?.checked;
+    const pb = el.weightPartnerBalance?.checked;
+    if (tb && pb) choices.balance = 'both';
+    else if (tb) choices.balance = 'teamBalance';
+    else if (pb) choices.balance = 'partnerBalance';
+    else choices.balance = 'none';
+
+    return choices;
+}
+
+function goToNextWizardStep() {
+    const next = getNextWizardStep(wizard.current);
+    if (!next) return;
+    wizard.history.push(wizard.current);
+    showWizardStep(next);
+}
+
+function goBackWizardStep() {
+    if (wizard.history.length === 0) return;
+    const prev = wizard.history.pop();
+    showWizardStep(prev);
+}
+
+function pickWizardChoice(stepName, value) {
+    wizard.choices[stepName] = value;
+
+    // Highlight the chosen card briefly so it's clear what was picked,
+    // then advance after a tick so the user sees confirmation.
+    const stepEl = getWizardStepEl(stepName);
+    if (stepEl) {
+        stepEl.querySelectorAll('.wizard-option').forEach(opt => {
+            opt.classList.toggle('selected', opt.dataset.value === value);
+        });
+    }
+
+    // Auto-advance after a brief pause so the selection is visible.
+    setTimeout(() => {
+        if (wizard.current === stepName) goToNextWizardStep();
+    }, 180);
+}
+
+// Look up the human-readable label for a wizard option directly from the
+// markup so each phrase only lives in one place. Prefers the optional
+// data-summary attribute (for shorter, summary-friendly wording), then
+// falls back to the visible button title.
+function wizardOptionLabel(stepName, value) {
+    if (value === undefined || value === null || value === '') return '';
+    const btn = document.querySelector(
+        `[data-wizard-choice="${stepName}"][data-value="${value}"]`
+    );
+    if (!btn) return '';
+    if (btn.dataset.summary) return btn.dataset.summary;
+    const titleEl = btn.querySelector('.wizard-option-title');
+    return titleEl ? titleEl.textContent.trim() : '';
+}
+
+function renderWizardSummary() {
+    const lines = [];
+    const c = wizard.choices;
+
+    lines.push(['Spillemåde', wizardOptionLabel('teamMode', c.teamMode === 'true' ? 'true' : 'false')]);
+
+    // Courts summary: group identical sizes ("4 × 7v7, 1 × 11v11").
+    const courts = Array.isArray(c.courts) && c.courts.length ? c.courts : [2];
+    const counts = {};
+    courts.forEach(n => { counts[n] = (counts[n] || 0) + 1; });
+    const courtParts = Object.keys(counts)
+        .sort((a, b) => Number(a) - Number(b))
+        .map(n => `${counts[n]} × ${n}v${n}`);
+    lines.push(['Baner', courtParts.join(', ')]);
+
+    if (c.useLevels === 'visible' || c.useLevels === 'hidden') {
+        const balance = wizardOptionLabel('balance', c.balance) || wizardOptionLabel('balance', 'both');
+        lines.push(['Niveau-balance', balance]);
+        lines.push(['Niveauer', wizardOptionLabel('useLevels', c.useLevels)]);
+    } else {
+        lines.push(['Niveauer', wizardOptionLabel('useLevels', 'false')]);
+    }
+
+    const html = lines.map(([label, val]) => `
+        <div class="wizard-summary-item">
+            <span class="wizard-summary-label">${escapeHtml(label)}</span>
+            <span class="wizard-summary-value">${escapeHtml(String(val))}</span>
+        </div>
+    `).join('');
+    const target = document.getElementById('wizardSummary');
+    if (target) target.innerHTML = html;
+}
+
+function applyWizardChoices() {
+    const c = wizard.choices;
+
+    // Team mode
+    if (el.teamMode) el.teamMode.checked = c.teamMode === 'true';
+
+    // Courts → enabled formats = unique set of sizes the user added.
+    // The underlying engine picks one allowed format per court each round,
+    // so the union of court sizes is what matters here.
+    const courts = Array.isArray(c.courts) && c.courts.length ? c.courts : [2];
+    const enabledSizes = new Set(
+        courts.map(n => Number(n)).filter(n => n >= 1 && n <= MAX_TEAM_SIZE)
+    );
+    if (enabledSizes.size === 0) enabledSizes.add(2);
+    for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+        const cb = document.getElementById(`format-${n}v${n}`);
+        if (cb) cb.checked = enabledSizes.has(n);
+    }
+
+    // useLevels (tri-value): visible / hidden / false
+    const usingLevels = c.useLevels === 'visible' || c.useLevels === 'hidden';
+    if (el.useSkillLevels) el.useSkillLevels.checked = usingLevels;
+    if (el.hideSkillLevels) el.hideSkillLevels.checked = c.useLevels === 'hidden';
+
+    // Balance — when levels are off we treat it as "none" so the
+    // underlying weight checkboxes are explicitly cleared too.
+    const effectiveBalance = usingLevels ? (c.balance || 'both') : 'none';
+    if (el.weightTeamBalance) el.weightTeamBalance.checked = (effectiveBalance === 'both' || effectiveBalance === 'teamBalance');
+    if (el.weightPartnerBalance) el.weightPartnerBalance.checked = (effectiveBalance === 'both' || effectiveBalance === 'partnerBalance');
+
+    // Teammate rotation: in casual mode we want fresh partners every round;
+    // in team mode the setting is moot (pairs are fixed by team).
+    if (el.penaltyRepeatTeammate) {
+        el.penaltyRepeatTeammate.checked = c.teamMode !== 'true';
+    }
+
+    // Court count = number of courts added in the wizard.
+    const cc = Math.max(1, courts.length);
+    if (el.defaultCourtCount) el.defaultCourtCount.value = String(cc);
+    if (el.courtCount) el.courtCount.value = String(cc);
+
+    // Apply UI ripple effects so the rest of the app picks up changes.
+    updateSkillLevelSettingsUI();
+    updateTeamModeUi();
+    renderRoster();
+    renderPlayerManagerList();
+    renderTeams();
+    renderPrefillArea(getPrefillStateFromUi());
+    if (state.lastResult) renderRound(state.lastResult);
+    updatePanelVisibility();
+
+    saveState();
+    try { localStorage.setItem(WIZARD_FLAG_KEY, '1'); } catch (e) { /* ignore */ }
+}
+
+function finishWizard() {
+    applyWizardChoices();
+    closeStandAlone();
+    showStatusMessage('Indstillinger gemt. Du kan altid ændre dem i menuen.');
+}
+
+// Wire wizard events. Use event delegation so the markup can grow
+// without re-binding.
+document.addEventListener('click', (event) => {
+    const choiceBtn = event.target.closest('[data-wizard-choice]');
+    if (choiceBtn) {
+        pickWizardChoice(choiceBtn.dataset.wizardChoice, choiceBtn.dataset.value);
+        return;
+    }
+    if (event.target.closest('[data-wizard-next]')) {
+        // If the wizard markup is visible but the state machine hasn't
+        // been kicked off yet (e.g. the panel was orphaned by a layout
+        // glitch on first paint), initialise it from welcome so the
+        // button still does the right thing.
+        if (!wizard.current) {
+            startWizard(true);
+            return;
+        }
+        goToNextWizardStep();
+        return;
+    }
+    if (event.target.closest('[data-wizard-back]')) {
+        goBackWizardStep();
+        return;
+    }
+    if (event.target.closest('[data-wizard-skip]')) {
+        try { localStorage.setItem(WIZARD_FLAG_KEY, '1'); } catch (e) { /* ignore */ }
+        closeStandAlone();
+        return;
+    }
+    if (event.target.closest('[data-wizard-finish]')) {
+        finishWizard();
+        return;
+    }
+});
+
+document.getElementById('closeWizardBtn')?.addEventListener('click', () => {
+    closeStandAlone();
+});
+
+document.getElementById('setupWizardBtn')?.addEventListener('click', () => {
+    closeMenu();
+    startWizard(false);
+});
+
+// Courts step: render the editable list of courts (size per court).
+function renderWizardCourts() {
+    const container = document.getElementById('wizardCourtsList');
+    if (!container) return;
+    const courts = Array.isArray(wizard.choices.courts) && wizard.choices.courts.length
+        ? wizard.choices.courts
+        : [2];
+    wizard.choices.courts = courts;
+    const canRemove = courts.length > 1;
+    const rows = courts.map((size, i) => {
+        const options = [];
+        for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+            options.push(`<option value="${n}"${n === Number(size) ? ' selected' : ''}>${n}v${n}</option>`);
+        }
+        return `
+            <div class="wizard-court-row" data-court-index="${i}">
+                <span class="wizard-court-label">Bane ${i + 1}</span>
+                <select class="wizard-court-size" data-court-index="${i}" aria-label="Størrelse for bane ${i + 1}">
+                    ${options.join('')}
+                </select>
+                <button class="ghost wizard-court-remove" type="button" data-court-remove="${i}" aria-label="Fjern bane ${i + 1}"${canRemove ? '' : ' disabled'}>✕</button>
+            </div>
+        `;
+    }).join('');
+    container.innerHTML = rows;
+}
+
+document.addEventListener('change', (event) => {
+    const sel = event.target.closest('.wizard-court-size');
+    if (!sel) return;
+    const idx = Number(sel.dataset.courtIndex);
+    const size = Math.max(1, Math.min(MAX_TEAM_SIZE, parseInt(sel.value, 10) || 2));
+    if (!Array.isArray(wizard.choices.courts)) wizard.choices.courts = [];
+    wizard.choices.courts[idx] = size;
+    wizard.choices.lastCourtSize = size;
+});
+
+document.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('[data-court-remove]');
+    if (removeBtn && !removeBtn.disabled) {
+        const idx = Number(removeBtn.dataset.courtRemove);
+        if (Array.isArray(wizard.choices.courts) && wizard.choices.courts.length > 1) {
+            wizard.choices.courts.splice(idx, 1);
+            renderWizardCourts();
+        }
+        return;
+    }
+    if (event.target.closest('#wizardAddCourt')) {
+        if (!Array.isArray(wizard.choices.courts)) wizard.choices.courts = [];
+        const last = wizard.choices.lastCourtSize
+            || wizard.choices.courts[wizard.choices.courts.length - 1]
+            || 2;
+        wizard.choices.courts.push(Number(last));
+        renderWizardCourts();
+    }
+});
+
+// Auto-launch on first visit (no saved state AND wizard has never been completed/skipped).
+function maybeAutoLaunchWizard() {
+    try {
+        const completed = localStorage.getItem(WIZARD_FLAG_KEY) === '1';
+        if (completed) return;
+        const hasSavedState = !!localStorage.getItem(STORAGE_KEY);
+        const hasPlayers = state.roster.length > 0;
+        const hasHistory = state.history.length > 0;
+        // If they already have data, they don't need an onboarding nudge.
+        if (hasSavedState && (hasPlayers || hasHistory)) {
+            localStorage.setItem(WIZARD_FLAG_KEY, '1');
+            return;
+        }
+        startWizard(true);
+    } catch (e) {
+        // Storage unavailable: best-effort skip.
+    }
+}
+
 el.importExportBtn.addEventListener('click', () => {
     el.playerImportText.value = playersToText(state.roster);
     showStandAlone(el.importExportPanel);
@@ -2674,3 +3116,4 @@ document.addEventListener('click', (event) => {
 });
 
 loadDefaults();
+maybeAutoLaunchWizard();

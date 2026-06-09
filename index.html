@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Kampprogram</title>
 
-    <!-- Favicon -->
+    <!-- Favicon — SVG is preferred where supported, with PNG/ICO fallbacks. -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
     <link rel="icon" type="image/x-icon" href="favicon.ico"/>
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
@@ -18,7 +19,7 @@
 
     <!-- Android / Chrome "Add to Home Screen" -->
     <link rel="manifest" href="site.webmanifest"/>
-    <meta name="theme-color" content="#ff7a5c"/>
+    <meta name="theme-color" content="#1B2238"/>
 
     <link rel="stylesheet" href="styles.css"/>
 </head>
@@ -30,6 +31,7 @@
             <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu">☰</button>
             <div class="menu-backdrop" id="menuBackdrop"></div>
             <div class="menu-dropdown" id="menuDropdown">
+                <button class="menu-item" id="setupWizardBtn">★ Opsætningsguide</button>
                 <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
                 <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
                 <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
@@ -264,6 +266,107 @@
                 <div class="settings-row">
                     <label for="defaultCourtCount">Standard antal baner</label>
                     <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
+                </div>
+            </div>
+
+            <div class="panel wizard-panel standalone" id="wizardPanel">
+                <div class="wizard-header">
+                    <div class="wizard-progress" id="wizardProgress" aria-hidden="true"></div>
+                    <button class="ghost wizard-close-btn" id="closeWizardBtn" aria-label="Luk guide">✕</button>
+                </div>
+
+                <div class="wizard-step" data-wizard-step="welcome">
+                    <h2 class="wizard-step-title">Velkommen til Kampprogram</h2>
+                    <p class="wizard-step-desc">Lad os hurtigt sætte appen op til præcis det, du har brug for. Du kan altid ændre indstillingerne senere.</p>
+                    <div class="wizard-actions">
+                        <button class="primary wizard-primary-btn" data-wizard-next>Kom i gang →</button>
+                        <button class="ghost wizard-skip-btn" data-wizard-skip>Spring guiden over</button>
+                    </div>
+                </div>
+
+                <div class="wizard-step hidden" data-wizard-step="teamMode">
+                    <h2 class="wizard-step-title">Hvordan spiller I?</h2>
+                    <p class="wizard-step-desc"></p>
+                    <div class="wizard-options">
+                        <button class="wizard-option" data-wizard-choice="teamMode" data-value="false">
+                            <span class="wizard-option-title">Blandet spil</span>
+                            <span class="wizard-option-desc">Spillere får nye makkere og modstandere hver runde</span>
+                        </button>
+                        <button class="wizard-option" data-wizard-choice="teamMode" data-value="true">
+                            <span class="wizard-option-title">Faste hold / makkere</span>
+                            <span class="wizard-option-desc">Holdene forbliver de samme, men man spiller mod nye modstandere hver runde</span>
+                        </button>
+                    </div>
+                    <div class="wizard-actions wizard-nav-only">
+                        <button class="ghost wizard-back-btn" data-wizard-back>← Tilbage</button>
+                    </div>
+                </div>
+
+                <div class="wizard-step hidden" data-wizard-step="useLevels">
+                    <h2 class="wizard-step-title">Skal niveauer bruges?</h2>
+                    <p class="wizard-step-desc">Hver spiller kan have et niveau fra 1 til 9. Niveauerne kan bruges til at lave mere lige kampe.</p>
+                    <div class="wizard-options">
+                        <button class="wizard-option" data-wizard-choice="useLevels" data-value="visible" data-summary="Bruges – niveauer vises">
+                            <span class="wizard-option-title">Ja – brug niveauerne, og vis dem</span>
+                            <span class="wizard-option-desc">Alle kan se hver spillers niveau, og kampene balanceres efter dem</span>
+                        </button>
+                        <button class="wizard-option" data-wizard-choice="useLevels" data-value="hidden" data-summary="Bruges – niveauer skjult">
+                            <span class="wizard-option-title">Ja – brug niveauerne, men skjul dem</span>
+                            <span class="wizard-option-desc">Niveauerne bruges i baggrunden, men er skjult i appen</span>
+                        </button>
+                        <button class="wizard-option" data-wizard-choice="useLevels" data-value="false" data-summary="Bruges ikke">
+                            <span class="wizard-option-title">Nej – spil uden niveauer</span>
+                            <span class="wizard-option-desc">Hold sammensættes uden hensyn til niveau</span>
+                        </button>
+                    </div>
+                    <div class="wizard-actions wizard-nav-only">
+                        <button class="ghost wizard-back-btn" data-wizard-back>← Tilbage</button>
+                    </div>
+                </div>
+
+                <div class="wizard-step hidden" data-wizard-step="balance">
+                    <h2 class="wizard-step-title">Hvordan skal spillerne matches?</h2>
+                    <p class="wizard-step-desc">Vælg den balance, der passer bedst til, hvordan I gerne vil spille.</p>
+                    <div class="wizard-options">
+                        <button class="wizard-option" data-wizard-choice="balance" data-value="both">
+                            <span class="wizard-option-title">Lige kampe + makkere på samme niveau</span>
+                            <span class="wizard-option-desc">Alt er meget lige, men kan give mindre variation mellem kamprunderne.</span>
+                        </button>
+                        <button class="wizard-option" data-wizard-choice="balance" data-value="teamBalance">
+                            <span class="wizard-option-title">Lige kampe</span>
+                            <span class="wizard-option-desc">Lige kampe uden at tage hensyn til makkeres niveau. Fx stærk+svag mod stærk+svag.</span>
+                        </button>
+                        <button class="wizard-option" data-wizard-choice="balance" data-value="none">
+                            <span class="wizard-option-title">Ingen niveau-balance</span>
+                            <span class="wizard-option-desc">Kampe dannes uden at tage hensyn til spilleres niveau.</span>
+                        </button>
+                    </div>
+                    <div class="wizard-actions wizard-nav-only">
+                        <button class="ghost wizard-back-btn" data-wizard-back>← Tilbage</button>
+                    </div>
+                </div>
+
+                <div class="wizard-step hidden" data-wizard-step="courts">
+                    <h2 class="wizard-step-title">Hvor mange baner – og hvor mange spiller på hver?</h2>
+                    <p class="wizard-step-desc">Tilføj en linje for hver bane og vælg hvor mange der spiller på hver side. Du kan altid ændre det før en runde.</p>
+                    <div class="wizard-courts-list" id="wizardCourtsList"></div>
+                    <div class="wizard-courts-actions">
+                        <button class="ghost wizard-add-court-btn" id="wizardAddCourt" type="button">+ Tilføj bane</button>
+                    </div>
+                    <div class="wizard-actions">
+                        <button class="ghost wizard-back-btn" data-wizard-back>← Tilbage</button>
+                        <button class="primary wizard-primary-btn" data-wizard-next>Næste →</button>
+                    </div>
+                </div>
+
+                <div class="wizard-step hidden" data-wizard-step="done">
+                    <h2 class="wizard-step-title">Klar til kampe! 🎉</h2>
+                    <p class="wizard-step-desc">Dine indstillinger er gemt. Du kan altid ændre dem under <strong>⚙ Indstillinger</strong> eller starte guiden igen i menuen.</p>
+                    <div class="wizard-summary" id="wizardSummary"></div>
+                    <div class="wizard-actions">
+                        <button class="ghost wizard-back-btn" data-wizard-back>← Tilbage</button>
+                        <button class="primary wizard-primary-btn" data-wizard-finish>Færdig – gå til appen</button>
+                    </div>
                 </div>
             </div>
 

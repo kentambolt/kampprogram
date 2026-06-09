@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="kp" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFB37A"/>
+      <stop offset="100%" stop-color="#F26B5E"/>
+    </linearGradient>
+  </defs>
+  <!-- Navy background fills the full canvas so any circular crop (Android
+       home screen, tab favicon) still shows the brand colour around the
+       glyph. Subtle corner rounding for browser-tab favicon (non-masked). -->
+  <rect width="32" height="32" rx="6" fill="#1B2238"/>
+  <!-- Two opposing triangles (matchup mark). Outer corners sit on a circle
+       of radius ~10.6 from centre, well inside the maskable safe zone
+       (~12.8 radius). Stroke rounds the corners. Small flat tips so the
+       silhouette doesn't pinch to a single point. -->
+  <g fill="url(#kp)"
+     stroke="url(#kp)"
+     stroke-width="1.25"
+     stroke-linejoin="round"
+     stroke-linecap="round">
+    <path d="M 9 8 L 9 24 L 15.5 17 L 15.5 15 Z"/>
+    <path d="M 23 8 L 23 24 L 16.5 17 L 16.5 15 Z"/>
+  </g>
+</svg>
