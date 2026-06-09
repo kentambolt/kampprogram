@@ -1,19 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <defs>
-    <linearGradient id="kp" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FFB37A"/>
-      <stop offset="100%" stop-color="#F26B5E"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" fill="#1B2238"/>
-  <!-- Same triangles, scaled to 75% and centred for extra mask safety. -->
-  <g transform="translate(16 16) scale(0.78) translate(-16 -16)"
-     fill="url(#kp)"
-     stroke="url(#kp)"
-     stroke-width="1.25"
-     stroke-linejoin="round"
-     stroke-linecap="round">
-    <path d="M 9 8 L 9 24 L 15.5 17 L 15.5 15 Z"/>
-    <path d="M 23 8 L 23 24 L 16.5 17 L 16.5 15 Z"/>
+  <rect width="32" height="32" fill="#ffffff"/>
+  <g transform="translate(16 16) scale(0.82) translate(-16 -16)">
+    <line x1="16" y1="5" x2="16" y2="27"
+          stroke="#000000" stroke-width="2"
+          stroke-linecap="round"/>
+    <g fill="#000000">
+      <circle cx="10" cy="11" r="3.5"/>
+      <circle cx="10" cy="21" r="3.5"/>
+      <circle cx="22" cy="11" r="3.5"/>
+      <circle cx="22" cy="21" r="3.5"/>
+    </g>
   </g>
 </svg>
