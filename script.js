@@ -25,8 +25,6 @@ const state = {
     history: [],
     lastResult: null,
     teams: [], // populated when team mode is enabled
-    // Per-player level reveal (volatile; cleared each load by design).
-    revealedLevels: new Set(),
     // Whether the global "show all levels" toggle is on.
     showAllLevels: true,
     // Sort mode for player lists ('name' | 'level-asc' | 'level-desc').
@@ -121,7 +119,7 @@ const el = {
     disallowExactRepeat: document.getElementById('disallowExactRepeat'),
     rulesSection: document.getElementById('rulesSection'),
     // Player-list view controls
-    showAllLevelsBtn: document.getElementById('showAllLevelsBtn'),
+    toggleLevelsBtn: document.getElementById('toggleLevelsBtn'),
     playerSortSelect: document.getElementById('playerSortSelect'),
 };
 
@@ -538,7 +536,7 @@ function restoreState() {
             state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
             state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
             if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
-            syncShowAllLevelsButton();
+            syncLevelsMenuItem();
             updateSkillLevelSettingsUI();
             updateRulesUI();
 
@@ -917,11 +915,9 @@ function shouldShowLevels() {
     return isUsingSkillLevels() && state.showAllLevels;
 }
 
-// Per-player visibility: visible if globally on or the user revealed this one.
-function isLevelVisibleForPlayer(playerName) {
-    if (!isUsingSkillLevels()) return false;
-    if (state.showAllLevels) return true;
-    return state.revealedLevels.has(playerName);
+// Per-player visibility: levels are either all shown or all hidden (no per-player override).
+function isLevelVisibleForPlayer(_playerName) {
+    return shouldShowLevels();
 }
 
 // Sort a player list according to the user's chosen sort mode. Falls back
@@ -936,20 +932,22 @@ function sortPlayersForDisplay(players) {
 
 function updateSkillLevelSettingsUI() {
     const using = isUsingSkillLevels();
-    // Hide the sort-by-level dropdown and global eye toggle when levels are off
-    // — they wouldn't do anything.
+    // Hide the sort-by-level dropdown when levels are off — sorting by a
+    // hidden value would be confusing. The menu-level toggle hides itself
+    // via syncLevelsMenuItem() for the same reason.
     el.playerSortSelect?.classList.toggle('hidden', !using);
-    el.showAllLevelsBtn?.classList.toggle('hidden', !using);
+    syncLevelsMenuItem();
 }
 
-// Reflect state.showAllLevels onto the global eye button's pressed state.
-function syncShowAllLevelsButton() {
-    if (!el.showAllLevelsBtn) return;
-    el.showAllLevelsBtn.setAttribute('aria-pressed', String(state.showAllLevels));
-    el.showAllLevelsBtn.classList.toggle('level-show-all-toggle--off', !state.showAllLevels);
-    el.showAllLevelsBtn.title = state.showAllLevels
-        ? 'Skjul alle niveauer'
-        : 'Vis alle niveauer';
+// Reflect state.showAllLevels onto the menu item's label so the user can
+// see at a glance what clicking will do next.
+function syncLevelsMenuItem() {
+    if (!el.toggleLevelsBtn) return;
+    // Hide entirely when skill levels aren't in use — there's nothing to toggle.
+    el.toggleLevelsBtn.classList.toggle('hidden', !isUsingSkillLevels());
+    el.toggleLevelsBtn.textContent = state.showAllLevels
+        ? '👁 Skjul niveauer'
+        : '👁 Vis niveauer';
 }
 
 // Reflect el.teamMode.checked onto the segmented toggle visual.
@@ -1637,16 +1635,7 @@ function renderRoster() {
     el.playerRosterArea.innerHTML = sortPlayersForDisplay(activePlayers)
         .map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
-            let levelHtml = '';
-            if (isUsingSkillLevels()) {
-                if (isLevelVisibleForPlayer(player.name)) {
-                    levelHtml = `<span class="lowered">${player.level}</span>`;
-                } else {
-                    levelHtml = `<span class="level-eye" role="button" tabindex="0"
-                                  data-action="reveal-level" data-player-name="${escapeHtml(player.name)}"
-                                  title="Vis niveau" aria-label="Vis niveau">👁</span>`;
-                }
-            }
+            const levelHtml = shouldShowLevels() ? `<span class="lowered">${player.level}</span>` : '';
             return `
             <button class="player-chip" type="button" data-action="remove-player" data-player-index="${index}" title="Klik for at sætte spilleren som inaktiv">
                 ${escapeHtml(player.name)}
@@ -1669,25 +1658,13 @@ function renderPlayerManagerList() {
     el.playerManagerListArea.innerHTML = players.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
 
-        let levelControls;
-        if (!isUsingSkillLevels()) {
-            // Skill levels feature is off entirely — no level UI at all
-            levelControls = '';
-        } else if (!isLevelVisibleForPlayer(player.name)) {
-            // Hidden for this player — show an eye button (state-backed reveal).
-            levelControls = `
-                <div class="player-row-inline-controls">
-                    <button class="level-reveal-btn" type="button" data-action="reveal-level" data-player-name="${escapeHtml(player.name)}" title="Vis niveau" aria-label="Vis niveau">👁 Niveau</button>
-                </div>`;
-        } else {
-            // Visible — show the select directly
-            levelControls = `
-                <div class="player-row-inline-controls">
-                    <select class="level-select" data-player-level-index="${index}">
-                        ${getLevelOptions(player.level)}
-                    </select>
-                </div>`;
-        }
+        // Level controls: shown only when levels are enabled AND globally visible.
+        const levelControls = (isUsingSkillLevels() && shouldShowLevels()) ? `
+            <div class="player-row-inline-controls">
+                <select class="level-select" data-player-level-index="${index}">
+                    ${getLevelOptions(player.level)}
+                </select>
+            </div>` : '';
 
         return `
             <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}">
@@ -1696,6 +1673,9 @@ function renderPlayerManagerList() {
                         <strong>${escapeHtml(player.name)}</strong>
                     </button>
                     ${levelControls}
+                    <button class="player-row-delete" type="button"
+                            data-action="delete-player" data-player-index="${index}"
+                            title="Slet spiller" aria-label="Slet spiller">✕</button>
                 </div>
             </div>
         `;
@@ -2376,7 +2356,7 @@ function applySessionPayload(data) {
         state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
         state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
         if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
-        syncShowAllLevelsButton();
+        syncLevelsMenuItem();
         updateRulesUI();
 
         const savedFormats = Array.isArray(data.ui.enabledFormats) ? data.ui.enabledFormats : [1, 2];
@@ -2563,6 +2543,40 @@ function removePlayer(index) {
     updatePanelVisibility();
 
     saveState();
+}
+
+// Permanently delete a player from the roster (and any team membership). Past
+// rounds in history are left untouched so old stats remain valid.
+function deletePlayer(index) {
+    const player = state.roster[index];
+    if (!player) return;
+    const confirmed = window.confirm(
+        `Slet spilleren "${player.name}"?\n\n` +
+        `Spilleren fjernes fra spillerlisten og fra eventuelle hold. ` +
+        `Tidligere kampe i historikken påvirkes ikke.`
+    );
+    if (!confirmed) return;
+
+    state.roster.splice(index, 1);
+
+    if (Array.isArray(state.teams)) {
+        state.teams.forEach(team => {
+            if (Array.isArray(team.members)) {
+                team.members = team.members.filter(m => m.name !== player.name);
+                team.level = team.members.reduce((s, m) => s + (m.level || 0), 0);
+            }
+        });
+        state.teams = state.teams.filter(t => Array.isArray(t.members) && t.members.length > 0);
+    }
+
+    renderRoster();
+    renderPlayerManagerList();
+    renderPlayerStats();
+    renderTeams();
+    updateTeamModeUi();
+    updatePanelVisibility();
+    saveState();
+    showStatusMessage(`Slettede "${player.name}".`);
 }
 
 function updatePlayerLevel(index, level) {
@@ -3083,8 +3097,7 @@ function applyWizardChoices() {
 
     // Show-all-levels: hidden iff the wizard explicitly chose "hidden".
     state.showAllLevels = !(c.useLevels === 'hidden');
-    if (state.revealedLevels) state.revealedLevels.clear();
-    syncShowAllLevelsButton();
+    syncLevelsMenuItem();
 
     // New-partner rotation: in casual mode prefer fresh partners; in team
     // mode it's moot (teams are fixed by definition).
@@ -3411,19 +3424,16 @@ document.addEventListener('click', (event) => {
 
 // ── Per-player level reveal (event delegation on the player containers) ──
 function handlePlayerAreaClick(event) {
-    const eye = event.target.closest('[data-action="reveal-level"]');
-    if (eye) {
+    // Delete-player button (in the player-manager list).
+    const delBtn = event.target.closest('[data-action="delete-player"]');
+    if (delBtn) {
         event.stopPropagation();
         event.preventDefault();
-        const name = eye.dataset.playerName;
-        if (name) {
-            state.revealedLevels.add(name);
-            renderRoster();
-            renderPlayerManagerList();
-            saveState();
-        }
+        const idx = Number(delBtn.dataset.playerIndex);
+        if (Number.isInteger(idx)) deletePlayer(idx);
         return;
     }
+    // Roster-chip click → toggle player active.
     const chip = event.target.closest('[data-action="remove-player"]');
     if (chip) {
         const idx = Number(chip.dataset.playerIndex);
@@ -3432,20 +3442,11 @@ function handlePlayerAreaClick(event) {
 }
 el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
 el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
-el.playerRosterArea?.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    const eye = event.target.closest('[data-action="reveal-level"]');
-    if (!eye) return;
-    event.preventDefault();
-    eye.click();
-});
-
-// ── Global "show all levels" toggle ──
-el.showAllLevelsBtn?.addEventListener('click', () => {
+// ── Global "vis/skjul niveauer" menu item ──
+el.toggleLevelsBtn?.addEventListener('click', () => {
     state.showAllLevels = !state.showAllLevels;
-    if (state.showAllLevels) state.revealedLevels.clear();
-    syncShowAllLevelsButton();
-    updateSkillLevelSettingsUI();
+    syncLevelsMenuItem();
+    closeMenu();
     renderRoster();
     renderPlayerManagerList();
     renderTeams();

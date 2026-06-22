@@ -1643,18 +1643,34 @@ prefill-card-header {
 }
 .rule-select {
     flex: 1 1 230px;
-    height: 40px;
-    padding: 0 10px;
+    box-sizing: border-box;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    line-height: 1.2;
+    padding: 0 30px 0 10px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--panel, #ffffff);
     color: var(--text);
     font-size: 15px;
+    text-align: left;
+    text-align-last: left;
     cursor: pointer;
 }
 .rule-select:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+}
+/* Same treatment for the sort dropdown in the Spillere header. */
+.sort-select {
+    box-sizing: border-box;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    line-height: 1.2;
+    text-align: left;
+    text-align-last: left;
 }
 .rule-toggle-label {
     display: flex;
@@ -1715,47 +1731,7 @@ prefill-card-header {
 
 /* Global "show all levels" toggle (eye). aria-pressed=true means levels
    are visible; aria-pressed=false (i.e. --off class) means hidden. */
-.level-show-all-toggle.level-show-all-toggle--off {
-    opacity: 0.5;
-}
-.level-show-all-toggle.level-show-all-toggle--off::after {
-    content: "";
-    /* Crossed-out look — diagonal red line over the eye. */
-    position: absolute;
-    width: 24px;
-    height: 2px;
-    background: currentColor;
-    transform: rotate(45deg);
-    pointer-events: none;
-}
-.level-show-all-toggle {
-    position: relative;
-    overflow: hidden;
-}
-
 /* Eye inside the player chip (when a player's level is hidden). */
-.level-eye {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    margin-left: 4px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.06);
-    cursor: pointer;
-    font-size: 13px;
-    user-select: none;
-    transition: background 0.12s ease;
-}
-.level-eye:hover {
-    background: rgba(0, 0, 0, 0.12);
-}
-.level-eye:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
 /* Mobile layout: stack rule rows so the dropdown sits below the label. */
 @media (max-width: 640px) {
     .settings-rule-row {
@@ -1771,4 +1747,36 @@ prefill-card-header {
     .player-actions {
         gap: 6px;
     }
+}
+
+
+/* Delete-player button in the player-manager list row. */
+.player-row-delete {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border, #e1e1e1);
+    background: transparent;
+    color: var(--muted, #777);
+    font-size: 14px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    margin-left: 6px;
+}
+.player-row-delete:hover {
+    border-color: #b91c1c;
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.06);
+}
+.player-row-delete:focus-visible {
+    outline: 2px solid #b91c1c;
+    outline-offset: 2px;
 }
