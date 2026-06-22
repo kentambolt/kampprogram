@@ -7,7 +7,11 @@ const FIXED_CONFIG = {
     opponentPrevPenalty: 2.5,
     benchLastPenalty: 500,
     benchPrevPenalty: 120,
+    // Used to flag rounds that violate a hard-constraint rule. Any score
+    // below HARD_REJECT_THRESHOLD signals "no feasible round" to the caller.
+    hardRejectScore: -1e9,
 };
+const HARD_REJECT_THRESHOLD = -1e8;
 
 
 // Format is an integer N meaning "NvN" (N players per team).
@@ -21,9 +25,16 @@ const state = {
     history: [],
     lastResult: null,
     teams: [], // populated when team mode is enabled
+    // Per-player level reveal (volatile; cleared each load by design).
+    revealedLevels: new Set(),
+    // Whether the global "show all levels" toggle is on.
+    showAllLevels: true,
+    // Sort mode for player lists ('name' | 'level-asc' | 'level-desc').
+    sortPlayersBy: 'name',
 };
 
-const STORAGE_KEY = 'kampprogram-state-v2';
+const STORAGE_KEY = 'kampprogram-state-v3';
+const STORAGE_KEY_V2 = 'kampprogram-state-v2';
 
 const PRESET_LISTS_STORAGE_KEY = 'kampprogram-playerlists-v1';
 
@@ -51,9 +62,6 @@ const el = {
     generateOverlay: document.getElementById('generateOverlay'),
     shuffleBtn: document.getElementById('shuffleBtn'),
     resultToggleBtn: document.getElementById('resultToggleBtn'),
-    weightTeamBalance: document.getElementById('weightTeamBalance'),
-    weightPartnerBalance: document.getElementById('weightPartnerBalance'),
-    penaltyRepeatTeammate: document.getElementById('penaltyRepeatTeammate'),
     settingsBtn: document.getElementById('settingsBtn'),
     settingsPanel: document.getElementById('settingsPanel'),
     generateBtn: document.getElementById('generateBtn'),
@@ -90,10 +98,6 @@ const el = {
     savePresetPlayersBtn: document.getElementById('savePresetPlayersBtn'),
     deletePresetPlayerList: document.getElementById('deletePresetPlayerList'),
     deletePresetPlayersBtn: document.getElementById('deletePresetPlayersBtn'),
-    useSkillLevels: document.getElementById('useSkillLevels'),
-    hideSkillLevels: document.getElementById('hideSkillLevels'),
-    hideSkillLevelsRow: document.getElementById('hideSkillLevelsRow'),
-    levelSettingsGroup: document.getElementById('levelSettingsGroup'),
     maximizeCourts: document.getElementById('maximizeCourts'),
     defaultCourtCount: document.getElementById('defaultCourtCount'),
     teamMode: document.getElementById('teamMode'),
@@ -104,10 +108,21 @@ const el = {
     generateTeamsBtn: document.getElementById('generateTeamsBtn'),
     clearTeamsBtn: document.getElementById('clearTeamsBtn'),
     formatSizesGroup: document.getElementById('formatSizesGroup'),
-    penaltyRepeatTeammateRow: document.getElementById('penaltyRepeatTeammateRow'),
     maximizeCourtsRow: document.getElementById('maximizeCourtsRow'),
     wizardPanel: document.getElementById('wizardPanel'),
     setupWizardBtn: document.getElementById('setupWizardBtn'),
+    // New rule-based settings
+    partnerLevelRule: document.getElementById('partnerLevelRule'),
+    opponentLevelRule: document.getElementById('opponentLevelRule'),
+    newPartnerRule: document.getElementById('newPartnerRule'),
+    newOpponentRule: document.getElementById('newOpponentRule'),
+    newPartnerRuleRow: document.getElementById('newPartnerRuleRow'),
+    newPartnerRuleHint: document.getElementById('newPartnerRuleHint'),
+    disallowExactRepeat: document.getElementById('disallowExactRepeat'),
+    rulesSection: document.getElementById('rulesSection'),
+    // Player-list view controls
+    showAllLevelsBtn: document.getElementById('showAllLevelsBtn'),
+    playerSortSelect: document.getElementById('playerSortSelect'),
 };
 
 function getEnabledFormats() {
@@ -204,8 +219,8 @@ function updateTeamModeUi() {
 
     // Task B: hide settings that don't apply in team mode.
     // (Their underlying values are preserved so toggling team mode off restores them.)
-    if (el.penaltyRepeatTeammateRow) {
-        el.penaltyRepeatTeammateRow.classList.toggle('hidden', tm);
+    if (el.newPartnerRuleRow) {
+        el.newPartnerRuleRow.classList.toggle('hidden', tm);
     }
     if (el.maximizeCourtsRow) {
         el.maximizeCourtsRow.classList.toggle('hidden', tm);
@@ -419,11 +434,13 @@ function saveState() {
         teams: state.teams || [],
         ui: {
             courtCount: el.courtCount.value,
-            weightTeamBalance: el.weightTeamBalance.checked,
-            weightPartnerBalance: el.weightPartnerBalance.checked,
-            penaltyRepeatTeammate: el.penaltyRepeatTeammate.checked,
-            useSkillLevels: el.useSkillLevels?.checked ?? true,
-            hideSkillLevels: el.hideSkillLevels?.checked ?? false,
+            partnerLevelRule: el.partnerLevelRule?.value ?? 'prefer',
+            opponentLevelRule: el.opponentLevelRule?.value ?? 'prefer',
+            newPartnerRule: el.newPartnerRule?.value ?? 'prefer',
+            newOpponentRule: el.newOpponentRule?.value ?? 'prefer',
+            disallowExactRepeat: el.disallowExactRepeat?.checked ?? false,
+            showAllLevels: state.showAllLevels,
+            sortPlayersBy: state.sortPlayersBy,
             // saveState reads enabled formats raw from the checkboxes — not from
             // getEnabledFormats() which returns [1] in team mode, so we'd lose
             // the user's earlier selection.
@@ -453,9 +470,46 @@ function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+// Convert v2 ui blob into v3-shaped ui object. v2 had separate
+// useSkillLevels/hideSkillLevels/weightTeamBalance/weightPartnerBalance/
+// penaltyRepeatTeammate flags; v3 collapses them into rule dropdowns.
+function migrateV2ToV3(oldUi) {
+    if (!oldUi || typeof oldUi !== 'object') return oldUi;
+    const u = { ...oldUi };
+    const usingLevels = u.useSkillLevels !== undefined ? Boolean(u.useSkillLevels) : true;
+    u.partnerLevelRule = (usingLevels && Boolean(u.weightPartnerBalance)) ? 'prefer' : 'none';
+    u.opponentLevelRule = (usingLevels && Boolean(u.weightTeamBalance)) ? 'prefer' : 'none';
+    u.newPartnerRule = Boolean(u.penaltyRepeatTeammate) ? 'prefer' : 'none';
+    // v2 always penalised repeating opponents (no UI). Keep that behaviour.
+    u.newOpponentRule = u.newOpponentRule || 'prefer';
+    u.disallowExactRepeat = Boolean(u.disallowExactRepeat);
+    u.showAllLevels = u.showAllLevels !== undefined ? Boolean(u.showAllLevels) : !Boolean(u.hideSkillLevels);
+    u.sortPlayersBy = u.sortPlayersBy || 'name';
+    // Drop obsolete keys so they don't shadow new ones if a future read
+    // accidentally falls back to defaults.
+    delete u.useSkillLevels;
+    delete u.hideSkillLevels;
+    delete u.weightTeamBalance;
+    delete u.weightPartnerBalance;
+    delete u.penaltyRepeatTeammate;
+    return u;
+}
+
 function restoreState() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        // Prefer v3, fall back to v2 with migration so existing users don't
+        // lose their settings on the upgrade.
+        let raw = localStorage.getItem(STORAGE_KEY);
+        let migratedFromV2 = false;
+        if (!raw) {
+            const rawV2 = localStorage.getItem(STORAGE_KEY_V2);
+            if (rawV2) {
+                const parsedV2 = JSON.parse(rawV2);
+                if (parsedV2 && parsedV2.ui) parsedV2.ui = migrateV2ToV3(parsedV2.ui);
+                raw = JSON.stringify(parsedV2);
+                migratedFromV2 = true;
+            }
+        }
         if (!raw) return false;
 
         const data = JSON.parse(raw);
@@ -472,12 +526,21 @@ function restoreState() {
             const defaultCourts = data.ui.defaultCourtCount ?? '2';
             if (el.defaultCourtCount) el.defaultCourtCount.value = defaultCourts;
             el.courtCount.value = defaultCourts;
-            el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
-            el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
-            el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
-            el.useSkillLevels.checked = data.ui.useSkillLevels ?? true;
-            el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
+
+            // Rule selects — fall back to v3 defaults if missing.
+            if (el.partnerLevelRule) el.partnerLevelRule.value = data.ui.partnerLevelRule ?? 'prefer';
+            if (el.opponentLevelRule) el.opponentLevelRule.value = data.ui.opponentLevelRule ?? 'prefer';
+            if (el.newPartnerRule) el.newPartnerRule.value = data.ui.newPartnerRule ?? 'prefer';
+            if (el.newOpponentRule) el.newOpponentRule.value = data.ui.newOpponentRule ?? 'prefer';
+            if (el.disallowExactRepeat) el.disallowExactRepeat.checked = Boolean(data.ui.disallowExactRepeat);
+
+            // Visibility/sort live in state (not on DOM elements).
+            state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
+            state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
+            if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
+            syncShowAllLevelsButton();
             updateSkillLevelSettingsUI();
+            updateRulesUI();
 
             // Restore enabled formats (default: 1v1 and 2v2)
             const savedFormats = Array.isArray(data.ui.enabledFormats) ? data.ui.enabledFormats : [1, 2];
@@ -486,7 +549,13 @@ function restoreState() {
                 if (cb) cb.checked = savedFormats.includes(n);
             }
             if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? true;
-            if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
+            if (el.teamMode) {
+                el.teamMode.checked = Boolean(data.ui.teamMode);
+                syncTeamModeToggle();
+            }
+
+            // Persist the v3-shape immediately so the v2 key isn't needed again.
+            if (migratedFromV2) saveState();
         }
         // Panels default to collapsed when no saved value exists.
         const collapsedPanels = data.ui?.collapsedPanels || {};
@@ -809,42 +878,108 @@ function deleteStoredPlayerList() {
 }
 
 function getConfig() {
-    const usingLevels = isUsingSkillLevels();
+    const partnerLevelRule = el.partnerLevelRule?.value || 'none';
+    const opponentLevelRule = el.opponentLevelRule?.value || 'none';
+    const newPartnerRule = el.newPartnerRule?.value || 'none';
+    const newOpponentRule = el.newOpponentRule?.value || 'none';
+    const disallowExactRepeat = !!el.disallowExactRepeat?.checked;
+
     return {
-        teamBalanceWeight: (usingLevels && el.weightTeamBalance.checked) ? FIXED_CONFIG.teamBalanceWeight : 0,
-        partnerBalanceWeight: (usingLevels && el.weightPartnerBalance.checked) ? FIXED_CONFIG.partnerBalanceWeight : 0,
-        teammateLastPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammateLastPenalty : 0,
-        teammatePrevPenalty: el.penaltyRepeatTeammate.checked ? FIXED_CONFIG.teammatePrevPenalty : 0,
-        // New opponents and bench rotation are always prioritised — they're
-        // baseline behaviour, not opt-in toggles.
-        opponentLastPenalty: FIXED_CONFIG.opponentLastPenalty,
-        opponentPrevPenalty: FIXED_CONFIG.opponentPrevPenalty,
+        // Soft scoring weights — active for both 'prefer' and 'require' (the
+        // 'require' variants additionally hard-reject in scoreRound).
+        teamBalanceWeight:    (opponentLevelRule !== 'none') ? FIXED_CONFIG.teamBalanceWeight    : 0,
+        partnerBalanceWeight: (partnerLevelRule  !== 'none') ? FIXED_CONFIG.partnerBalanceWeight : 0,
+        teammateLastPenalty:  (newPartnerRule    !== 'none') ? FIXED_CONFIG.teammateLastPenalty  : 0,
+        teammatePrevPenalty:  (newPartnerRule    !== 'none') ? FIXED_CONFIG.teammatePrevPenalty  : 0,
+        opponentLastPenalty:  (newOpponentRule   !== 'none') ? FIXED_CONFIG.opponentLastPenalty  : 0,
+        opponentPrevPenalty:  (newOpponentRule   !== 'none') ? FIXED_CONFIG.opponentPrevPenalty  : 0,
+        // Bench rotation is unconditional baseline behaviour.
         benchLastPenalty: FIXED_CONFIG.benchLastPenalty,
         benchPrevPenalty: FIXED_CONFIG.benchPrevPenalty,
+        // Hard-constraint rules (consumed by scoreRound pre-check).
+        partnerLevelRule, opponentLevelRule, newPartnerRule, newOpponentRule, disallowExactRepeat,
+        partnerLevelRequireMaxSpread: 1,   // teams may differ by at most this within a court
+        opponentLevelRequireMaxDiff: 2,    // opposing team totals may differ by at most this
     };
 }
 
 function isUsingSkillLevels() {
-    return el.useSkillLevels?.checked ?? true;
+    // Skill levels are "in use" if any niveau-based rule is active.
+    const p = el.partnerLevelRule?.value || 'none';
+    const o = el.opponentLevelRule?.value || 'none';
+    return p !== 'none' || o !== 'none';
 }
 
+// Global "all levels visible" predicate, used for places where we have no
+// specific player (team totals, dropdown labels). For per-row decisions
+// use isLevelVisibleForPlayer().
 function shouldShowLevels() {
-    return isUsingSkillLevels() && !(el.hideSkillLevels?.checked ?? false);
+    return isUsingSkillLevels() && state.showAllLevels;
+}
+
+// Per-player visibility: visible if globally on or the user revealed this one.
+function isLevelVisibleForPlayer(playerName) {
+    if (!isUsingSkillLevels()) return false;
+    if (state.showAllLevels) return true;
+    return state.revealedLevels.has(playerName);
+}
+
+// Sort a player list according to the user's chosen sort mode. Falls back
+// to alphabetical when levels aren't in use (sorting by hidden values is silly).
+function sortPlayersForDisplay(players) {
+    const mode = isUsingSkillLevels() ? (state.sortPlayersBy || 'name') : 'name';
+    const byName = (a, b) => a.name.localeCompare(b.name, 'da');
+    if (mode === 'level-asc')  return [...players].sort((a, b) => (a.level - b.level) || byName(a, b));
+    if (mode === 'level-desc') return [...players].sort((a, b) => (b.level - a.level) || byName(a, b));
+    return [...players].sort(byName);
 }
 
 function updateSkillLevelSettingsUI() {
     const using = isUsingSkillLevels();
-    // Show or hide the "hide levels" sub-option
-    el.hideSkillLevelsRow?.classList.toggle('settings-sub-row--hidden', !using);
-    // Fully hide the level-balance settings when skill levels are off — they
-    // only make sense alongside levels, so hiding (rather than dimming) keeps
-    // the panel uncluttered.
-    if (el.levelSettingsGroup) {
-        el.levelSettingsGroup.classList.toggle('hidden', !using);
-        el.levelSettingsGroup.querySelectorAll('input').forEach(input => {
-            input.disabled = !using;
-        });
-    }
+    // Hide the sort-by-level dropdown and global eye toggle when levels are off
+    // — they wouldn't do anything.
+    el.playerSortSelect?.classList.toggle('hidden', !using);
+    el.showAllLevelsBtn?.classList.toggle('hidden', !using);
+}
+
+// Reflect state.showAllLevels onto the global eye button's pressed state.
+function syncShowAllLevelsButton() {
+    if (!el.showAllLevelsBtn) return;
+    el.showAllLevelsBtn.setAttribute('aria-pressed', String(state.showAllLevels));
+    el.showAllLevelsBtn.classList.toggle('level-show-all-toggle--off', !state.showAllLevels);
+    el.showAllLevelsBtn.title = state.showAllLevels
+        ? 'Skjul alle niveauer'
+        : 'Vis alle niveauer';
+}
+
+// Reflect el.teamMode.checked onto the segmented toggle visual.
+function syncTeamModeToggle() {
+    const on = !!el.teamMode?.checked;
+    const opts = el.teamModeRow?.querySelectorAll('[data-team-mode]');
+    opts?.forEach(opt => {
+        const isThis = (opt.dataset.teamMode === 'true') === on;
+        opt.classList.toggle('mode-toggle__option--active', isThis);
+        opt.setAttribute('aria-checked', String(isThis));
+    });
+}
+
+// Show/hide the 1v1 hint on newPartnerRule + any other dependent UI bits.
+function updateRulesUI() {
+    if (!el.newPartnerRuleHint) return;
+    const rule = el.newPartnerRule?.value || 'none';
+    // The "new partners" rule has no meaning when every match is effectively 1v1
+    // (either explicitly via formats, or implicitly because team-mode runs each
+    // round as a 1v1 super-player match).
+    const formats = (() => {
+        const f = [];
+        for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
+            if (document.getElementById(`format-${n}v${n}`)?.checked) f.push(n);
+        }
+        return f;
+    })();
+    const only1v1 = !!el.teamMode?.checked || (formats.length === 1 && formats[0] === 1);
+    const ruleAppliesToPartners = rule !== 'none';
+    el.newPartnerRuleHint.classList.toggle('hidden', !(only1v1 && ruleAppliesToPartners));
 }
 
 function getCourtCount() {
@@ -1251,6 +1386,53 @@ function scoreBenchRotation(round, history, config) {
 }
 
 
+// Canonical fingerprint of a round (insensitive to A/B swaps and court order).
+function roundFingerprint(round) {
+    if (!round || !Array.isArray(round.courts)) return '';
+    const courtKeys = round.courts.map(court => {
+        const a = (court.teamA?.players || []).map(p => p.name).slice().sort().join(',');
+        const b = (court.teamB?.players || []).map(p => p.name).slice().sort().join(',');
+        return [a, b].sort().join('|');
+    }).slice().sort();
+    const bench = (round.benched || []).map(p => p.name).slice().sort().join(',');
+    return courtKeys.join(';') + '#' + bench;
+}
+
+// Build a per-player teammate Set<name>. Includes only players who actually
+// played (had teammates with whom they shared a court).
+function buildTeammateSets(round) {
+    const out = new Map();
+    for (const court of round.courts || []) {
+        for (const team of [court.teamA?.players || [], court.teamB?.players || []]) {
+            for (const p of team) {
+                if (!out.has(p.name)) out.set(p.name, new Set());
+                for (const q of team) {
+                    if (q.name !== p.name) out.get(p.name).add(q.name);
+                }
+            }
+        }
+    }
+    return out;
+}
+
+// Build a per-player opponent Set<name>.
+function buildOpponentSets(round) {
+    const out = new Map();
+    for (const court of round.courts || []) {
+        const A = court.teamA?.players || [];
+        const B = court.teamB?.players || [];
+        for (const p of A) {
+            if (!out.has(p.name)) out.set(p.name, new Set());
+            for (const q of B) out.get(p.name).add(q.name);
+        }
+        for (const p of B) {
+            if (!out.has(p.name)) out.set(p.name, new Set());
+            for (const q of A) out.get(p.name).add(q.name);
+        }
+    }
+    return out;
+}
+
 function scoreRound(round, history, config) {
     let score = 0;
 
@@ -1258,6 +1440,75 @@ function scoreRound(round, history, config) {
     const prevRound = history[history.length - 2] || null;
     const lastMaps = lastRound ? buildRelationMaps(lastRound) : null;
     const prevMaps = prevRound ? buildRelationMaps(prevRound) : null;
+
+    // ── Hard-constraint pre-checks. Any violation returns a very negative
+    //    score so this round is effectively rejected by the search. ──
+    if (config.disallowExactRepeat && lastRound) {
+        if (roundFingerprint(round) === roundFingerprint(lastRound)) {
+            return FIXED_CONFIG.hardRejectScore;
+        }
+    }
+
+    if (config.partnerLevelRule === 'require' || config.opponentLevelRule === 'require') {
+        for (const court of round.courts) {
+            if (config.partnerLevelRule === 'require') {
+                for (const team of [court.teamA.players, court.teamB.players]) {
+                    if (team.length > 1) {
+                        const levels = team.map(p => p.level);
+                        const spread = Math.max(...levels) - Math.min(...levels);
+                        if (spread > config.partnerLevelRequireMaxSpread) {
+                            return FIXED_CONFIG.hardRejectScore;
+                        }
+                    }
+                }
+            }
+            if (config.opponentLevelRule === 'require') {
+                const diff = Math.abs(court.teamA.totalLevel - court.teamB.totalLevel);
+                if (diff > config.opponentLevelRequireMaxDiff) {
+                    return FIXED_CONFIG.hardRejectScore;
+                }
+            }
+        }
+    }
+
+    // "new partner" hard rules (oneNew / allNew). 1v1 has no teammates so
+    // those players are exempt automatically (their teammate sets are empty).
+    if (lastRound && (config.newPartnerRule === 'oneNew' || config.newPartnerRule === 'allNew')) {
+        const thisMates = buildTeammateSets(round);
+        const lastMates = buildTeammateSets(lastRound);
+        for (const [name, mates] of thisMates) {
+            if (mates.size === 0) continue;
+            const wasMates = lastMates.get(name);
+            if (!wasMates || wasMates.size === 0) continue;
+            if (config.newPartnerRule === 'allNew') {
+                for (const m of mates) {
+                    if (wasMates.has(m)) return FIXED_CONFIG.hardRejectScore;
+                }
+            } else {
+                const hasNew = [...mates].some(m => !wasMates.has(m));
+                if (!hasNew) return FIXED_CONFIG.hardRejectScore;
+            }
+        }
+    }
+
+    // "new opponent" hard rules.
+    if (lastRound && (config.newOpponentRule === 'oneNew' || config.newOpponentRule === 'allNew')) {
+        const thisOpp = buildOpponentSets(round);
+        const lastOpp = buildOpponentSets(lastRound);
+        for (const [name, opps] of thisOpp) {
+            if (opps.size === 0) continue;
+            const wasOpp = lastOpp.get(name);
+            if (!wasOpp || wasOpp.size === 0) continue;
+            if (config.newOpponentRule === 'allNew') {
+                for (const o of opps) {
+                    if (wasOpp.has(o)) return FIXED_CONFIG.hardRejectScore;
+                }
+            } else {
+                const hasNew = [...opps].some(o => !wasOpp.has(o));
+                if (!hasNew) return FIXED_CONFIG.hardRejectScore;
+            }
+        }
+    }
 
     for (const court of round.courts) {
         const teamAPlayers = court.teamA.players;
@@ -1383,16 +1634,23 @@ function renderRoster() {
         return;
     }
 
-    el.playerRosterArea.innerHTML = activePlayers
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, 'da'))
+    el.playerRosterArea.innerHTML = sortPlayersForDisplay(activePlayers)
         .map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
-
+            let levelHtml = '';
+            if (isUsingSkillLevels()) {
+                if (isLevelVisibleForPlayer(player.name)) {
+                    levelHtml = `<span class="lowered">${player.level}</span>`;
+                } else {
+                    levelHtml = `<span class="level-eye" role="button" tabindex="0"
+                                  data-action="reveal-level" data-player-name="${escapeHtml(player.name)}"
+                                  title="Vis niveau" aria-label="Vis niveau">👁</span>`;
+                }
+            }
             return `
-            <button class="player-chip" type="button" onclick="removePlayer(${index})" title="Klik for at sætte spilleren som inaktiv">
+            <button class="player-chip" type="button" data-action="remove-player" data-player-index="${index}" title="Klik for at sætte spilleren som inaktiv">
                 ${escapeHtml(player.name)}
-                ${shouldShowLevels() ? `<span class="lowered">${player.level}</span>` : ''}
+                ${levelHtml}
             </button>
         `;
         }).join('');
@@ -1401,18 +1659,12 @@ function renderRoster() {
 }
 
 function renderPlayerManagerList() {
-    const players = state.roster
-        .slice()
-        .sort((a, b) => {
-            return a.name.localeCompare(b.name, 'da');
-        });
+    const players = sortPlayersForDisplay(state.roster);
 
     if (players.length === 0) {
         el.playerManagerListArea.innerHTML = '<div class="subtle">Ingen spillere endnu.</div>';
         return;
     }
-
-    const hiding = isUsingSkillLevels() && !shouldShowLevels();
 
     el.playerManagerListArea.innerHTML = players.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
@@ -1421,19 +1673,14 @@ function renderPlayerManagerList() {
         if (!isUsingSkillLevels()) {
             // Skill levels feature is off entirely — no level UI at all
             levelControls = '';
-        } else if (hiding) {
-            // Levels are hidden — show a reveal toggle button; level select starts hidden
+        } else if (!isLevelVisibleForPlayer(player.name)) {
+            // Hidden for this player — show an eye button (state-backed reveal).
             levelControls = `
                 <div class="player-row-inline-controls">
-                    <button class="level-reveal-btn" onclick="togglePlayerLevelReveal(this, ${index})" title="Vis/skjul niveau">👁 Niveau</button>
-                    <div class="level-reveal-area">
-                        <select class="level-select" data-player-level-index="${index}">
-                            ${getLevelOptions(player.level)}
-                        </select>
-                    </div>
+                    <button class="level-reveal-btn" type="button" data-action="reveal-level" data-player-name="${escapeHtml(player.name)}" title="Vis niveau" aria-label="Vis niveau">👁 Niveau</button>
                 </div>`;
         } else {
-            // Levels visible — show select directly
+            // Visible — show the select directly
             levelControls = `
                 <div class="player-row-inline-controls">
                     <select class="level-select" data-player-level-index="${index}">
@@ -1453,13 +1700,6 @@ function renderPlayerManagerList() {
             </div>
         `;
     }).join('');
-}
-
-function togglePlayerLevelReveal(btn, index) {
-    const area = btn.closest('.player-row-inline-controls').querySelector('.level-reveal-area');
-    const isVisible = area.classList.toggle('level-reveal-area--open');
-    btn.textContent = isVisible ? '▲ Skjul' : '👁 Niveau';
-    btn.title = isVisible ? 'Skjul niveau' : 'Vis niveau';
 }
 
 function renderPlayerStats() {
@@ -1854,17 +2094,25 @@ function buildSessionPayload() {
     }
 
     // UI: positional, fixed order. Decoder relies on this order.
+    // Rule encoding: 'none'|'prefer'|'require'        -> 0|1|2
+    //                'none'|'prefer'|'oneNew'|'allNew' -> 0|1|2|3
+    const encLevelRule = (v) => ({none:0, prefer:1, require:2})[v] ?? 1;
+    const encNewRule   = (v) => ({none:0, prefer:1, oneNew:2, allNew:3})[v] ?? 1;
+    const encSort      = (v) => ({name:0, 'level-asc':1, 'level-desc':2})[v] ?? 0;
+
     const u = [
         Number(el.courtCount.value) || 2,
-        el.weightTeamBalance?.checked ? 1 : 0,
-        el.weightPartnerBalance?.checked ? 1 : 0,
-        el.penaltyRepeatTeammate?.checked ? 1 : 0,
-        (el.useSkillLevels?.checked ?? true) ? 1 : 0,
-        el.hideSkillLevels?.checked ? 1 : 0,
+        encLevelRule(el.partnerLevelRule?.value),
+        encLevelRule(el.opponentLevelRule?.value),
+        encNewRule(el.newPartnerRule?.value),
+        encNewRule(el.newOpponentRule?.value),
+        el.disallowExactRepeat?.checked ? 1 : 0,
         formatsMask,
         (el.maximizeCourts?.checked ?? true) ? 1 : 0,
         Number(el.defaultCourtCount?.value) || 2,
         el.teamMode?.checked ? 1 : 0,
+        state.showAllLevels ? 1 : 0,
+        encSort(state.sortPlayersBy),
     ];
 
     const p = getPrefillStateFromUi().map(prefill => {
@@ -1875,15 +2123,16 @@ function buildSessionPayload() {
         return [fmt, slots];
     });
 
-    return {v: 2, n: names, r, t, h, u, p};
+    return {v: 3, n: names, r, t, h, u, p};
 }
 
 // Expand a compact (v:2) payload back into the verbose shape that
 // applySessionPayload expects.
 function expandSessionPayload(data) {
-    if (!data || typeof data !== 'object' || data.v !== 2) {
+    if (!data || typeof data !== 'object' || (data.v !== 2 && data.v !== 3)) {
         throw new Error('Session-koden har et ugyldigt format.');
     }
+    const isV3 = data.v === 3;
 
     const names = Array.isArray(data.n) ? data.n : [];
     const lookupName = (idx) => (Number.isInteger(idx) && idx >= 0 && idx < names.length) ? names[idx] : '';
@@ -1973,13 +2222,31 @@ function expandSessionPayload(data) {
         };
     });
 
-    return {
-        version: 2,
-        roster,
-        teams,
-        history,
-        lastResult: history[history.length - 1] || null,
-        ui: {
+    // Decoders for v3-shape values
+    const decLevelRule = (n) => ['none','prefer','require'][Number(n) || 0] || 'none';
+    const decNewRule   = (n) => ['none','prefer','oneNew','allNew'][Number(n) || 0] || 'none';
+    const decSort      = (n) => ['name','level-asc','level-desc'][Number(n) || 0] || 'name';
+
+    let ui;
+    if (isV3) {
+        ui = {
+            courtCount: String(u[0] ?? 2),
+            partnerLevelRule: decLevelRule(u[1]),
+            opponentLevelRule: decLevelRule(u[2]),
+            newPartnerRule: decNewRule(u[3]),
+            newOpponentRule: decNewRule(u[4]),
+            disallowExactRepeat: Boolean(u[5]),
+            enabledFormats,
+            maximizeCourts: Boolean(u[7]),
+            defaultCourtCount: String(u[8] ?? 2),
+            teamMode: Boolean(u[9]),
+            showAllLevels: u[10] !== undefined ? Boolean(u[10]) : true,
+            sortPlayersBy: decSort(u[11]),
+            prefills,
+        };
+    } else {
+        // v:2 layout — map through migrateV2ToV3 so we end up with the new shape.
+        const v2ui = {
             courtCount: String(u[0] ?? 2),
             weightTeamBalance: Boolean(u[1]),
             weightPartnerBalance: Boolean(u[2]),
@@ -1991,7 +2258,17 @@ function expandSessionPayload(data) {
             defaultCourtCount: String(u[8] ?? 2),
             teamMode: Boolean(u[9]),
             prefills,
-        },
+        };
+        ui = migrateV2ToV3(v2ui);
+    }
+
+    return {
+        version: 3,
+        roster,
+        teams,
+        history,
+        lastResult: history[history.length - 1] || null,
+        ui,
     };
 }
 
@@ -2089,11 +2366,18 @@ function applySessionPayload(data) {
         const defaultCourts = data.ui.defaultCourtCount ?? '2';
         if (el.defaultCourtCount) el.defaultCourtCount.value = defaultCourts;
         el.courtCount.value = data.ui.courtCount ?? defaultCourts;
-        el.weightTeamBalance.checked = Boolean(data.ui.weightTeamBalance);
-        el.weightPartnerBalance.checked = Boolean(data.ui.weightPartnerBalance);
-        el.penaltyRepeatTeammate.checked = Boolean(data.ui.penaltyRepeatTeammate);
-        el.useSkillLevels.checked = data.ui.useSkillLevels ?? true;
-        el.hideSkillLevels.checked = Boolean(data.ui.hideSkillLevels);
+
+        if (el.partnerLevelRule)    el.partnerLevelRule.value    = data.ui.partnerLevelRule    ?? 'prefer';
+        if (el.opponentLevelRule)   el.opponentLevelRule.value   = data.ui.opponentLevelRule   ?? 'prefer';
+        if (el.newPartnerRule)      el.newPartnerRule.value      = data.ui.newPartnerRule      ?? 'prefer';
+        if (el.newOpponentRule)     el.newOpponentRule.value     = data.ui.newOpponentRule     ?? 'prefer';
+        if (el.disallowExactRepeat) el.disallowExactRepeat.checked = Boolean(data.ui.disallowExactRepeat);
+
+        state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
+        state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
+        if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
+        syncShowAllLevelsButton();
+        updateRulesUI();
 
         const savedFormats = Array.isArray(data.ui.enabledFormats) ? data.ui.enabledFormats : [1, 2];
         for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
@@ -2101,7 +2385,10 @@ function applySessionPayload(data) {
             if (cb) cb.checked = savedFormats.includes(n);
         }
         if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? true;
-        if (el.teamMode) el.teamMode.checked = Boolean(data.ui.teamMode);
+        if (el.teamMode) {
+            el.teamMode.checked = Boolean(data.ui.teamMode);
+            syncTeamModeToggle();
+        }
 
         renderPrefillArea(data.ui.prefills || createDefaultPrefills(getCourtCount()));
     }
@@ -2321,6 +2608,9 @@ async function generateRound() {
 
         if (!best || best.courts.length === 0) {
             throw new Error('Kunne ikke finde en gyldig opstilling.');
+        }
+        if (best.score !== undefined && best.score <= HARD_REJECT_THRESHOLD) {
+            throw new Error('Kunne ikke finde en runde der opfylder alle "Kræv"-regler. Prøv at lempe en regel under Indstillinger → Regler.');
         }
 
         state.lastResult = best;
@@ -2660,15 +2950,18 @@ function inferChoicesFromCurrentSettings() {
     }
     choices.lastCourtSize = choices.courts[choices.courts.length - 1] || primary;
 
-    // useLevels: combine useSkillLevels + hideSkillLevels into one tri-value.
-    const using = !!el.useSkillLevels?.checked;
-    const hiding = !!el.hideSkillLevels?.checked;
+    // useLevels: derived from current rules + global show-all toggle.
+    const p = el.partnerLevelRule?.value || 'none';
+    const o = el.opponentLevelRule?.value || 'none';
+    const using = (p !== 'none') || (o !== 'none');
+    const hiding = !state.showAllLevels;
     if (using && hiding) choices.useLevels = 'hidden';
     else if (using) choices.useLevels = 'visible';
     else choices.useLevels = 'false';
 
-    const tb = el.weightTeamBalance?.checked;
-    const pb = el.weightPartnerBalance?.checked;
+    // Wizard's balance step values map to combinations of partner/opponent rules.
+    const tb = o !== 'none';
+    const pb = p !== 'none';
     if (tb && pb) choices.balance = 'both';
     else if (tb) choices.balance = 'teamBalance';
     else if (pb) choices.balance = 'partnerBalance';
@@ -2775,22 +3068,32 @@ function applyWizardChoices() {
         if (cb) cb.checked = enabledSizes.has(n);
     }
 
-    // useLevels (tri-value): visible / hidden / false
+    // useLevels (tri-value: visible / hidden / false) becomes a combination of:
+    //  - level rule dropdowns (none vs prefer)
+    //  - the global show-all-levels toggle
     const usingLevels = c.useLevels === 'visible' || c.useLevels === 'hidden';
-    if (el.useSkillLevels) el.useSkillLevels.checked = usingLevels;
-    if (el.hideSkillLevels) el.hideSkillLevels.checked = c.useLevels === 'hidden';
 
-    // Balance — when levels are off we treat it as "none" so the
-    // underlying weight checkboxes are explicitly cleared too.
+    // Balance — when levels are off we treat it as "none" so the rule selects
+    // are explicitly cleared too.
     const effectiveBalance = usingLevels ? (c.balance || 'both') : 'none';
-    if (el.weightTeamBalance) el.weightTeamBalance.checked = (effectiveBalance === 'both' || effectiveBalance === 'teamBalance');
-    if (el.weightPartnerBalance) el.weightPartnerBalance.checked = (effectiveBalance === 'both' || effectiveBalance === 'partnerBalance');
+    const partnerRule = (effectiveBalance === 'both' || effectiveBalance === 'partnerBalance') ? 'prefer' : 'none';
+    const opponentRule = (effectiveBalance === 'both' || effectiveBalance === 'teamBalance') ? 'prefer' : 'none';
+    if (el.partnerLevelRule)  el.partnerLevelRule.value  = partnerRule;
+    if (el.opponentLevelRule) el.opponentLevelRule.value = opponentRule;
 
-    // Teammate rotation: in casual mode we want fresh partners every round;
-    // in team mode the setting is moot (pairs are fixed by team).
-    if (el.penaltyRepeatTeammate) {
-        el.penaltyRepeatTeammate.checked = c.teamMode !== 'true';
+    // Show-all-levels: hidden iff the wizard explicitly chose "hidden".
+    state.showAllLevels = !(c.useLevels === 'hidden');
+    if (state.revealedLevels) state.revealedLevels.clear();
+    syncShowAllLevelsButton();
+
+    // New-partner rotation: in casual mode prefer fresh partners; in team
+    // mode it's moot (teams are fixed by definition).
+    if (el.newPartnerRule) {
+        el.newPartnerRule.value = (c.teamMode === 'true') ? 'none' : 'prefer';
     }
+    // New-opponent rotation: keep v2 behaviour ("always on").
+    if (el.newOpponentRule) el.newOpponentRule.value = 'prefer';
+    if (el.disallowExactRepeat) el.disallowExactRepeat.checked = false;
 
     // Court count = number of courts added in the wizard.
     const cc = Math.max(1, courts.length);
@@ -2948,15 +3251,20 @@ el.closeImportExportBtn.addEventListener('click', () => {
 
 [
     el.courtCount,
-    el.weightTeamBalance,
-    el.weightPartnerBalance,
-    el.penaltyRepeatTeammate,
-    el.useSkillLevels,
-    el.hideSkillLevels,
+    el.partnerLevelRule,
+    el.opponentLevelRule,
+    el.newPartnerRule,
+    el.newOpponentRule,
+    el.disallowExactRepeat,
     el.maximizeCourts,
 ].forEach(input => {
-    input.addEventListener('change', () => {
+    input?.addEventListener('change', () => {
         renderPrefillArea(getPrefillStateFromUi());
+        updateRulesUI();
+        updateSkillLevelSettingsUI();
+        renderRoster();
+        renderPlayerManagerList();
+        if (state.lastResult) renderRound(state.lastResult);
         saveState();
     });
 });
@@ -2965,6 +3273,7 @@ el.closeImportExportBtn.addEventListener('click', () => {
 for (let n = 1; n <= MAX_TEAM_SIZE; n++) {
     document.getElementById(`format-${n}v${n}`)?.addEventListener('change', () => {
         renderPrefillArea(getPrefillStateFromUi());
+        updateRulesUI();
         saveState();
     });
 }
@@ -2977,14 +3286,6 @@ el.defaultCourtCount?.addEventListener('change', () => {
     saveState();
 });
 
-el.useSkillLevels.addEventListener('change', () => {
-    updateSkillLevelSettingsUI();
-    renderRoster();
-    renderPlayerManagerList();
-    renderTeams();
-    if (state.lastResult) renderRound(state.lastResult);
-});
-
 el.teamMode?.addEventListener('change', () => {
     // When toggling team mode off, keep generated teams in state but stop using them.
     updateTeamModeUi();
@@ -2995,13 +3296,6 @@ el.teamMode?.addEventListener('change', () => {
 
 el.generateTeamsBtn?.addEventListener('click', generateTeams);
 el.clearTeamsBtn?.addEventListener('click', clearTeams);
-
-el.hideSkillLevels.addEventListener('change', () => {
-    renderRoster();
-    renderPlayerManagerList();
-    renderTeams();
-    if (state.lastResult) renderRound(state.lastResult);
-});
 
 el.prefillArea.addEventListener('change', (event) => {
 
@@ -3113,6 +3407,69 @@ document.addEventListener('click', (event) => {
     if (!clickedInsideMenu) {
         closeMenu();
     }
+});
+
+// ── Per-player level reveal (event delegation on the player containers) ──
+function handlePlayerAreaClick(event) {
+    const eye = event.target.closest('[data-action="reveal-level"]');
+    if (eye) {
+        event.stopPropagation();
+        event.preventDefault();
+        const name = eye.dataset.playerName;
+        if (name) {
+            state.revealedLevels.add(name);
+            renderRoster();
+            renderPlayerManagerList();
+            saveState();
+        }
+        return;
+    }
+    const chip = event.target.closest('[data-action="remove-player"]');
+    if (chip) {
+        const idx = Number(chip.dataset.playerIndex);
+        if (Number.isInteger(idx)) removePlayer(idx);
+    }
+}
+el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
+el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
+el.playerRosterArea?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const eye = event.target.closest('[data-action="reveal-level"]');
+    if (!eye) return;
+    event.preventDefault();
+    eye.click();
+});
+
+// ── Global "show all levels" toggle ──
+el.showAllLevelsBtn?.addEventListener('click', () => {
+    state.showAllLevels = !state.showAllLevels;
+    if (state.showAllLevels) state.revealedLevels.clear();
+    syncShowAllLevelsButton();
+    updateSkillLevelSettingsUI();
+    renderRoster();
+    renderPlayerManagerList();
+    renderTeams();
+    if (state.lastResult) renderRound(state.lastResult);
+    saveState();
+});
+
+// ── Sort dropdown ──
+el.playerSortSelect?.addEventListener('change', () => {
+    state.sortPlayersBy = el.playerSortSelect.value || 'name';
+    renderRoster();
+    renderPlayerManagerList();
+    saveState();
+});
+
+// ── Segmented team-mode toggle ──
+el.teamModeRow?.addEventListener('click', (event) => {
+    const opt = event.target.closest('[data-team-mode]');
+    if (!opt) return;
+    const newValue = opt.dataset.teamMode === 'true';
+    if (!!el.teamMode.checked === newValue) return;
+    el.teamMode.checked = newValue;
+    syncTeamModeToggle();
+    el.teamMode.dispatchEvent(new Event('change', { bubbles: true }));
 });
 
 loadDefaults();

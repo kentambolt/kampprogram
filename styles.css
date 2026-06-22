@@ -1561,3 +1561,214 @@ prefill-card-header {
         flex: 1;
     }
 }
+
+
+/* ============================================================
+   Settings v3: mode toggle + rule dropdowns + player view controls
+   ============================================================ */
+
+/* Visually hide an input while keeping it accessible. Used for the
+   real <input id="teamMode"> behind the segmented buttons. */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Segmented "Skiftende makkere / Faste hold" toggle at the top of settings. */
+.settings-row--mode-toggle {
+    margin-bottom: 18px;
+}
+.mode-toggle {
+    display: inline-flex;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3px;
+    background: var(--panel-2, #f7f8f5);
+    gap: 0;
+}
+.mode-toggle__option {
+    flex: 1 1 0;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+.mode-toggle__option:hover:not(.mode-toggle__option--active) {
+    background: rgba(0, 0, 0, 0.04);
+}
+.mode-toggle__option--active {
+    background: var(--accent, #4A5240);
+    color: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* "Regler" section. */
+.settings-section {
+    border-top: 1px solid var(--border);
+    margin-top: 18px;
+    padding-top: 14px;
+}
+.settings-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    color: var(--text);
+    letter-spacing: 0.01em;
+}
+
+/* Each rule row: label on the left, select on the right. */
+.settings-rule-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.settings-rule-row > label {
+    flex: 1 1 200px;
+    font-weight: 500;
+}
+.rule-select {
+    flex: 1 1 230px;
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel, #ffffff);
+    color: var(--text);
+    font-size: 15px;
+    cursor: pointer;
+}
+.rule-select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+.rule-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.rule-toggle-label input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 18px;
+    height: 18px;
+}
+.rule-hint {
+    flex: 1 1 100%;
+    font-size: 13px;
+    color: var(--muted, #666);
+    background: var(--panel-2, #f7f8f5);
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-top: 2px;
+}
+
+/* "Spillere" header actions row: sort select + global eye + add player. */
+.player-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.sort-select {
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel, #ffffff);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+}
+.sort-select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Generic small square icon-only button. */
+.icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* Global "show all levels" toggle (eye). aria-pressed=true means levels
+   are visible; aria-pressed=false (i.e. --off class) means hidden. */
+.level-show-all-toggle.level-show-all-toggle--off {
+    opacity: 0.5;
+}
+.level-show-all-toggle.level-show-all-toggle--off::after {
+    content: "";
+    /* Crossed-out look — diagonal red line over the eye. */
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: currentColor;
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+.level-show-all-toggle {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Eye inside the player chip (when a player's level is hidden). */
+.level-eye {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+    transition: background 0.12s ease;
+}
+.level-eye:hover {
+    background: rgba(0, 0, 0, 0.12);
+}
+.level-eye:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Mobile layout: stack rule rows so the dropdown sits below the label. */
+@media (max-width: 640px) {
+    .settings-rule-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .settings-rule-row > label {
+        flex: 0 0 auto;
+    }
+    .rule-select, .sort-select {
+        width: 100%;
+    }
+    .player-actions {
+        gap: 6px;
+    }
+}

@@ -47,7 +47,14 @@
                 <div class="panel" id="playersPanel">
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
-                        <div class="actions">
+                        <div class="actions player-actions">
+                            <select id="playerSortSelect" class="sort-select" aria-label="Sortér spillere">
+                                <option value="name">Sortér: Navn</option>
+                                <option value="level-desc">Sortér: Niveau (høj → lav)</option>
+                                <option value="level-asc">Sortér: Niveau (lav → høj)</option>
+                            </select>
+                            <button class="ghost icon-btn level-show-all-toggle" id="showAllLevelsBtn" type="button"
+                                    title="Vis/skjul alle niveauer" aria-pressed="true">👁</button>
                             <button class="primary" id="newPlayerBtn">+ Opret</button>
                         </div>
                     </div>
@@ -195,48 +202,65 @@
                     <button class="ghost" id="closeSettingsBtn">✕ Luk</button>
                 </div>
 
-                <div class="settings-row" id="teamModeRow">
-                    <label>
-                        <input id="teamMode" type="checkbox" />
-                        Faste hold
-                    </label>
+                <div class="settings-row settings-row--mode-toggle" id="teamModeRow">
+                    <div class="mode-toggle" role="radiogroup" aria-label="Spilletilstand">
+                        <button type="button" class="mode-toggle__option mode-toggle__option--active" data-team-mode="false" role="radio" aria-checked="true">Skiftende makkere</button>
+                        <button type="button" class="mode-toggle__option" data-team-mode="true" role="radio" aria-checked="false">Faste hold</button>
+                    </div>
+                    <!-- Hidden checkbox preserves the existing el.teamMode contract so we don't rewrite every isTeamMode() callsite. -->
+                    <input id="teamMode" type="checkbox" class="visually-hidden" />
                 </div>
 
-                <div class="settings-row">
-                    <label>
-                        <input id="useSkillLevels" type="checkbox" checked />
-                        Brug færdighedsniveauer
-                    </label>
-                </div>
+                <div class="settings-section" id="rulesSection">
+                    <h3 class="settings-section-title">Regler</h3>
 
+                    <div class="settings-row settings-rule-row">
+                        <label for="partnerLevelRule">Medspilleres niveau</label>
+                        <select id="partnerLevelRule" class="rule-select">
+                            <option value="none">Ingen regel</option>
+                            <option value="prefer" selected>Foretræk samme niveau</option>
+                            <option value="require">Kræv samme niveau</option>
+                        </select>
+                    </div>
 
+                    <div class="settings-row settings-rule-row">
+                        <label for="opponentLevelRule">Modstanderes niveau</label>
+                        <select id="opponentLevelRule" class="rule-select">
+                            <option value="none">Ingen regel</option>
+                            <option value="prefer" selected>Foretræk jævnbyrdige kampe</option>
+                            <option value="require">Kræv jævnbyrdige kampe</option>
+                        </select>
+                    </div>
 
-                <div id="levelSettingsGroup">
-                    <div class="settings-sub-row">
-                        <label>
-                            <input id="weightTeamBalance" type="checkbox" checked />
-                            Modstandere på samme niveau
+                    <div class="settings-row settings-rule-row" id="newPartnerRuleRow">
+                        <label for="newPartnerRule">Nye medspillere</label>
+                        <select id="newPartnerRule" class="rule-select">
+                            <option value="none">Ingen regel</option>
+                            <option value="prefer" selected>Foretræk nye medspillere</option>
+                            <option value="oneNew">Mindst én ny medspiller til alle</option>
+                            <option value="allNew">Helt nye medspillere til alle</option>
+                        </select>
+                        <div class="rule-hint hidden" id="newPartnerRuleHint">
+                            Ignoreres for 1v1-kampe (de har ingen medspillere).
+                        </div>
+                    </div>
+
+                    <div class="settings-row settings-rule-row">
+                        <label for="newOpponentRule">Nye modstandere</label>
+                        <select id="newOpponentRule" class="rule-select">
+                            <option value="none">Ingen regel</option>
+                            <option value="prefer" selected>Foretræk nye modstandere</option>
+                            <option value="oneNew">Mindst én ny modstander til alle</option>
+                            <option value="allNew">Helt nye modstandere til alle</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-row settings-rule-row">
+                        <label class="rule-toggle-label">
+                            <input id="disallowExactRepeat" type="checkbox" />
+                            Forbyd nøjagtigt samme opstilling som forrige runde
                         </label>
                     </div>
-                    <div class="settings-sub-row">
-                        <label>
-                            <input id="weightPartnerBalance" type="checkbox" checked />
-                            Medspillere på samme niveau
-                        </label>
-                    </div>
-                    <div class="settings-sub-row" id="hideSkillLevelsRow">
-                        <label>
-                            <input id="hideSkillLevels" type="checkbox" />
-                            Skjul niveauer i appen (privat tilstand)
-                        </label>
-                    </div>
-                </div>
-
-                <div class="settings-row" id="penaltyRepeatTeammateRow">
-                    <label>
-                        <input id="penaltyRepeatTeammate" type="checkbox" checked />
-                        Nye medspillere
-                    </label>
                 </div>
 
                 <div class="settings-row" id="maximizeCourtsRow">
