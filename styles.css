@@ -959,10 +959,6 @@ prefill-card-header {
 
 
 
-    .app-header {
-        align-items: stretch;
-    }
-
     /* Bottom sheet on mobile */
     .menu-dropdown {
         position: fixed;
@@ -1004,19 +1000,6 @@ prefill-card-header {
     .app-header {
         border: none;
         border-radius: 0;
-    }
-
-    .menu-toggle {
-        position: absolute;
-        right: 12px;
-        top: 12px;
-    }
-
-    .header-menu {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
     }
 
     /* --- ændret del --- */
@@ -1649,9 +1632,21 @@ prefill-card-header {
 }
 
 /* Hint text under a settings checkbox. */
-.setting-hint {
-    margin: 4px 0 0 26px;       /* indent past the checkbox + a small gap */
+/* Checkbox label that has a small inline italic hint underneath the main text. */
+.checkbox-with-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.checkbox-with-hint__text {
+    display: block;
+    line-height: 1.35;
+}
+.setting-inline-hint {
+    display: block;
+    margin-top: 2px;
+    font-style: italic;
     font-size: 13px;
     color: var(--muted, #777);
-    line-height: 1.4;
+    font-weight: 400;
 }
