@@ -1451,38 +1451,6 @@ prefill-card-header {
 }
 
 
-/* Delete-player button in the player-manager list row. */
-.player-row-delete {
-    flex: 0 0 auto;
-    box-sizing: border-box;
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid var(--border, #e1e1e1);
-    background: transparent;
-    color: var(--muted, #777);
-    font-size: 14px;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-    margin-left: 6px;
-}
-.player-row-delete:hover {
-    border-color: #b91c1c;
-    color: #b91c1c;
-    background: rgba(185, 28, 28, 0.06);
-}
-.player-row-delete:focus-visible {
-    outline: 2px solid #b91c1c;
-    outline-offset: 2px;
-}
-
-
 /* Bigger menu for the gear menu, to fit the sort sub-items + delete. */
 .actions-dropdown {
     min-width: 270px;

@@ -1693,9 +1693,6 @@ function renderPlayerManagerList() {
                         <strong>${escapeHtml(player.name)}</strong>
                     </button>
                     ${levelControls}
-                    <button class="player-row-delete" type="button"
-                            data-action="delete-player" data-player-index="${index}"
-                            title="Slet spiller" aria-label="Slet spiller">✕</button>
                 </div>
             </div>
         `;
@@ -3091,15 +3088,6 @@ function confirmBulkDelete() {
 
 // ── Per-player level reveal (event delegation on the player containers) ──
 function handlePlayerAreaClick(event) {
-    // Delete-player button (in the player-manager list).
-    const delBtn = event.target.closest('[data-action="delete-player"]');
-    if (delBtn) {
-        event.stopPropagation();
-        event.preventDefault();
-        const idx = Number(delBtn.dataset.playerIndex);
-        if (Number.isInteger(idx)) deletePlayer(idx);
-        return;
-    }
     // Roster-chip click → toggle player active.
     const chip = event.target.closest('[data-action="remove-player"]');
     if (chip) {
