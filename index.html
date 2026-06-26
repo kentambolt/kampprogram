@@ -27,16 +27,42 @@
 <div class="container">
     <header class="app-header">
         <div class="app-title">Kampprogram</div>
-        <div class="header-menu">
-            <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu">☰</button>
-            <div class="menu-backdrop" id="menuBackdrop"></div>
-            <div class="menu-dropdown" id="menuDropdown">
-                <button class="menu-item" id="setupWizardBtn">★ Opsætningsguide</button>
-                <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
-                <button class="menu-item" id="toggleLevelsBtn">👁 Skjul niveauer</button>
-                <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
-                <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
+        <div class="header-controls">
+            <div class="header-menu">
+                <button class="ghost menu-toggle" id="actionsToggleBtn" aria-label="Handlinger" title="Handlinger">⚙</button>
+                <div class="menu-dropdown actions-dropdown" id="actionsDropdown">
+                    <button class="menu-item" id="toggleLevelsBtn" type="button">
+                        <span class="eye-icon">👀</span>
+                        <span class="menu-item-label">Skjul niveauer</span>
+                    </button>
+                    <div class="menu-section">
+                        <div class="menu-section-label">Sortér spillere</div>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="name" aria-checked="true">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Efter navn</span>
+                        </button>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="level-desc" aria-checked="false">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Efter niveau (høj → lav)</span>
+                        </button>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="level-asc" aria-checked="false">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Efter niveau (lav → høj)</span>
+                        </button>
+                    </div>
+                    <button class="danger menu-item" id="bulkDeleteBtn" type="button">✕ Slet spillere…</button>
+                </div>
             </div>
+            <div class="header-menu">
+                <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu" title="Menu">☰</button>
+                <div class="menu-dropdown" id="menuDropdown">
+                    <button class="menu-item" id="setupWizardBtn">★ Opsætningsguide</button>
+                    <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
+                    <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
+                    <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
+                </div>
+            </div>
+            <div class="menu-backdrop" id="menuBackdrop"></div>
         </div>
     </header>
 
@@ -49,11 +75,6 @@
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
                         <div class="actions player-actions">
-                            <select id="playerSortSelect" class="sort-select" aria-label="Sortér spillere">
-                                <option value="name">Sortér: Navn</option>
-                                <option value="level-desc">Sortér: Niveau (høj → lav)</option>
-                                <option value="level-asc">Sortér: Niveau (lav → høj)</option>
-                            </select>
                             <button class="primary" id="newPlayerBtn">+ Opret</button>
                         </div>
                     </div>
@@ -289,6 +310,23 @@
                 <div class="settings-row">
                     <label for="defaultCourtCount">Standard antal baner</label>
                     <input id="defaultCourtCount" type="number" min="1" value="2" style="width:5rem;"/>
+                </div>
+            </div>
+
+
+            <div class="panel bulk-delete-panel standalone" id="bulkDeletePanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Slet spillere</h2>
+                    <button class="ghost" id="closeBulkDeleteBtn">✕ Luk</button>
+                </div>
+                <p class="muted bulk-delete-intro">Vælg de spillere du vil slette permanent. Tidligere kampe i historikken påvirkes ikke.</p>
+                <div class="bulk-delete-toolbar">
+                    <button class="ghost" id="bulkDeleteSelectAllBtn" type="button">Vælg alle</button>
+                    <button class="ghost" id="bulkDeleteClearBtn" type="button">Ryd valg</button>
+                </div>
+                <div class="bulk-delete-list" id="bulkDeleteList"></div>
+                <div class="bulk-delete-actions">
+                    <button class="danger" id="bulkDeleteConfirmBtn" type="button" disabled>Slet valgte (0)</button>
                 </div>
             </div>
 

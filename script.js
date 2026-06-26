@@ -120,7 +120,15 @@ const el = {
     rulesSection: document.getElementById('rulesSection'),
     // Player-list view controls
     toggleLevelsBtn: document.getElementById('toggleLevelsBtn'),
-    playerSortSelect: document.getElementById('playerSortSelect'),
+    actionsToggleBtn: document.getElementById('actionsToggleBtn'),
+    actionsDropdown: document.getElementById('actionsDropdown'),
+    bulkDeleteBtn: document.getElementById('bulkDeleteBtn'),
+    bulkDeletePanel: document.getElementById('bulkDeletePanel'),
+    bulkDeleteList: document.getElementById('bulkDeleteList'),
+    bulkDeleteConfirmBtn: document.getElementById('bulkDeleteConfirmBtn'),
+    bulkDeleteSelectAllBtn: document.getElementById('bulkDeleteSelectAllBtn'),
+    bulkDeleteClearBtn: document.getElementById('bulkDeleteClearBtn'),
+    closeBulkDeleteBtn: document.getElementById('closeBulkDeleteBtn'),
 };
 
 function getEnabledFormats() {
@@ -535,7 +543,7 @@ function restoreState() {
             // Visibility/sort live in state (not on DOM elements).
             state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
             state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
-            if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
+            syncSortMenuItems();
             syncLevelsMenuItem();
             updateSkillLevelSettingsUI();
             updateRulesUI();
@@ -932,11 +940,22 @@ function sortPlayersForDisplay(players) {
 
 function updateSkillLevelSettingsUI() {
     const using = isUsingSkillLevels();
-    // Hide the sort-by-level dropdown when levels are off — sorting by a
-    // hidden value would be confusing. The menu-level toggle hides itself
-    // via syncLevelsMenuItem() for the same reason.
-    el.playerSortSelect?.classList.toggle('hidden', !using);
+    // Sort-by-level submenu items hide themselves when levels aren't in use.
+    document.querySelectorAll('.actions-dropdown [data-sort-value^="level"]').forEach(item => {
+        item.classList.toggle('hidden', !using);
+    });
     syncLevelsMenuItem();
+    syncSortMenuItems();
+}
+
+// Reflect state.sortPlayersBy onto the radio sub-items in the actions menu.
+function syncSortMenuItems() {
+    const items = document.querySelectorAll('.actions-dropdown [data-sort-value]');
+    items.forEach(it => {
+        const isActive = it.dataset.sortValue === state.sortPlayersBy;
+        it.setAttribute('aria-checked', String(isActive));
+        it.classList.toggle('menu-radio--active', isActive);
+    });
 }
 
 // Reflect state.showAllLevels onto the menu item's label so the user can
@@ -945,9 +964,12 @@ function syncLevelsMenuItem() {
     if (!el.toggleLevelsBtn) return;
     // Hide entirely when skill levels aren't in use — there's nothing to toggle.
     el.toggleLevelsBtn.classList.toggle('hidden', !isUsingSkillLevels());
-    el.toggleLevelsBtn.textContent = state.showAllLevels
-        ? '👁 Skjul niveauer'
-        : '👁 Vis niveauer';
+    const eye = el.toggleLevelsBtn.querySelector('.eye-icon');
+    const label = el.toggleLevelsBtn.querySelector('.menu-item-label');
+    // When levels are visible, clicking will HIDE → show eyes-with-slash and "Skjul" label.
+    // When levels are hidden,  clicking will SHOW → show plain eyes and "Vis" label.
+    if (eye) eye.classList.toggle('eye-icon--off', !state.showAllLevels);
+    if (label) label.textContent = state.showAllLevels ? 'Skjul niveauer' : 'Vis niveauer';
 }
 
 // Reflect el.teamMode.checked onto the segmented toggle visual.
@@ -2355,7 +2377,7 @@ function applySessionPayload(data) {
 
         state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
         state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
-        if (el.playerSortSelect) el.playerSortSelect.value = state.sortPlayersBy;
+        syncSortMenuItems();
         syncLevelsMenuItem();
         updateRulesUI();
 
@@ -2729,12 +2751,20 @@ function undoLastRound() {
 }
 
 function toggleMenu() {
+    el.actionsDropdown?.classList.remove('open');
     const isOpen = el.menuDropdown.classList.toggle('open');
     el.menuBackdrop?.classList.toggle('open', isOpen);
 }
 
+function toggleActionsMenu() {
+    el.menuDropdown?.classList.remove('open');
+    const isOpen = el.actionsDropdown?.classList.toggle('open');
+    el.menuBackdrop?.classList.toggle('open', !!isOpen);
+}
+
 function closeMenu() {
     el.menuDropdown.classList.remove('open');
+    el.actionsDropdown?.classList.remove('open');
     el.menuBackdrop?.classList.remove('open');
 }
 
@@ -3422,6 +3452,97 @@ document.addEventListener('click', (event) => {
     }
 });
 
+
+// ═══ Bulk delete panel ═══
+
+function openBulkDeletePanel() {
+    if (!el.bulkDeletePanel) return;
+    renderBulkDeleteList();
+    showStandAlone(el.bulkDeletePanel);
+}
+
+function renderBulkDeleteList() {
+    if (!el.bulkDeleteList) return;
+    const players = sortPlayersForDisplay(state.roster);
+    if (players.length === 0) {
+        el.bulkDeleteList.innerHTML = '<div class="subtle">Ingen spillere at slette.</div>';
+        updateBulkDeleteCount();
+        return;
+    }
+    const showLevels = shouldShowLevels();
+    el.bulkDeleteList.innerHTML = players.map(p => {
+        const safeName = escapeHtml(p.name);
+        const level = showLevels ? `<span class="bulk-delete-level">niveau ${p.level}</span>` : '';
+        return `
+            <label class="bulk-delete-row">
+                <input type="checkbox" data-bulk-name="${safeName}"/>
+                <span class="bulk-delete-name">${safeName}</span>
+                ${level}
+            </label>
+        `;
+    }).join('');
+    updateBulkDeleteCount();
+}
+
+function setBulkDeleteSelection(checked) {
+    if (!el.bulkDeleteList) return;
+    el.bulkDeleteList.querySelectorAll('input[type="checkbox"][data-bulk-name]')
+        .forEach(cb => { cb.checked = checked; });
+    updateBulkDeleteCount();
+}
+
+function getBulkDeleteSelected() {
+    if (!el.bulkDeleteList) return [];
+    return Array.from(el.bulkDeleteList.querySelectorAll('input[type="checkbox"][data-bulk-name]:checked'))
+        .map(cb => cb.dataset.bulkName)
+        .filter(Boolean);
+}
+
+function updateBulkDeleteCount() {
+    if (!el.bulkDeleteConfirmBtn) return;
+    const n = getBulkDeleteSelected().length;
+    el.bulkDeleteConfirmBtn.disabled = n === 0;
+    el.bulkDeleteConfirmBtn.textContent = `Slet valgte (${n})`;
+}
+
+function confirmBulkDelete() {
+    const names = getBulkDeleteSelected();
+    if (names.length === 0) return;
+    const confirmed = window.confirm(
+        names.length === 1
+            ? `Slet 1 spiller (${names[0]})?`
+            : `Slet ${names.length} spillere?\n\n` +
+              `Spillerne fjernes fra spillerlisten og fra eventuelle hold. ` +
+              `Tidligere kampe i historikken påvirkes ikke.`
+    );
+    if (!confirmed) return;
+
+    const namesSet = new Set(names);
+    // Remove from roster
+    state.roster = state.roster.filter(p => !namesSet.has(p.name));
+    // Remove from teams
+    if (Array.isArray(state.teams)) {
+        state.teams.forEach(team => {
+            if (Array.isArray(team.members)) {
+                team.members = team.members.filter(m => !namesSet.has(m.name));
+                team.level = team.members.reduce((s, m) => s + (m.level || 0), 0);
+            }
+        });
+        state.teams = state.teams.filter(t => Array.isArray(t.members) && t.members.length > 0);
+    }
+
+    renderRoster();
+    renderPlayerManagerList();
+    renderPlayerStats();
+    renderTeams();
+    updateTeamModeUi();
+    updatePanelVisibility();
+    saveState();
+    showStatusMessage(`Slettede ${names.length} spiller${names.length === 1 ? '' : 'e'}.`);
+    // Refresh the bulk-delete view in case the user wants to delete more.
+    renderBulkDeleteList();
+}
+
 // ── Per-player level reveal (event delegation on the player containers) ──
 function handlePlayerAreaClick(event) {
     // Delete-player button (in the player-manager list).
@@ -3454,13 +3575,38 @@ el.toggleLevelsBtn?.addEventListener('click', () => {
     saveState();
 });
 
-// ── Sort dropdown ──
-el.playerSortSelect?.addEventListener('change', () => {
-    state.sortPlayersBy = el.playerSortSelect.value || 'name';
+// ── Sort radio sub-items inside the actions menu ──
+el.actionsDropdown?.addEventListener('click', (event) => {
+    const sortBtn = event.target.closest('[data-sort-value]');
+    if (!sortBtn) return;
+    state.sortPlayersBy = sortBtn.dataset.sortValue || 'name';
+    syncSortMenuItems();
     renderRoster();
     renderPlayerManagerList();
     saveState();
+    closeMenu();
 });
+
+// ── Gear button opens/closes the actions menu ──
+el.actionsToggleBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleActionsMenu();
+});
+
+// ── "Slet spillere…" opens the bulk-delete standalone panel ──
+el.bulkDeleteBtn?.addEventListener('click', () => {
+    closeMenu();
+    openBulkDeletePanel();
+});
+el.closeBulkDeleteBtn?.addEventListener('click', () => closeStandAlone());
+el.bulkDeleteSelectAllBtn?.addEventListener('click', () => setBulkDeleteSelection(true));
+el.bulkDeleteClearBtn?.addEventListener('click', () => setBulkDeleteSelection(false));
+el.bulkDeleteList?.addEventListener('change', (event) => {
+    if (event.target.matches('input[type="checkbox"][data-bulk-name]')) {
+        updateBulkDeleteCount();
+    }
+});
+el.bulkDeleteConfirmBtn?.addEventListener('click', () => confirmBulkDelete());
 
 // ── Segmented team-mode toggle ──
 el.teamModeRow?.addEventListener('click', (event) => {
