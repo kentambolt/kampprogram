@@ -75,16 +75,15 @@ button:disabled {
 }
 
 .app-header {
-    display: flex;
-    flex-wrap: nowrap;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto;   /* title takes remaining, controls take what they need */
     align-items: center;
     gap: 12px;
     margin-bottom: 20px;
     padding: 12px 18px;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-top: none;            /* flush with viewport when sticky */
+    border-top: none;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
     border-bottom-left-radius: 18px;
@@ -1294,6 +1293,9 @@ prefill-card-header {
 }
 .mode-toggle__option {
     flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;     /* center the label horizontally */
     background: transparent;
     border: none;
     border-radius: 10px;
@@ -1303,6 +1305,7 @@ prefill-card-header {
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
     white-space: nowrap;
+    text-align: center;
 }
 .mode-toggle__option:hover:not(.mode-toggle__option--active) {
     background: rgba(0, 0, 0, 0.04);
@@ -1480,14 +1483,6 @@ prefill-card-header {
 }
 
 
-/* Container for the two header menus (⚙ actions + ☰ hamburger). */
-.header-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    position: relative;
-}
-
 /* Bigger menu for the gear menu, to fit the sort sub-items + delete. */
 .actions-dropdown {
     min-width: 270px;
@@ -1608,27 +1603,36 @@ prefill-card-header {
    other standalones (it's added in HTML alongside them). */
 
 
-/* Force the two header menus to stay side-by-side regardless of viewport width. */
+/* Bulletproof header layout: the title and the controls block are two
+   independent grid columns (title fills remaining space, controls take only
+   what they need). Inside .header-controls, grid-auto-flow:column gives each
+   header-menu its own column so they can never overlap. */
 .header-controls {
-    display: flex !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
     align-items: center;
     gap: 6px;
-    flex: 0 0 auto;
     position: relative;
+    z-index: 51;          /* above the sticky header's drop-shadow */
+}
+.header-controls > .header-menu {
+    display: block;
+    position: relative;
+    /* Guarantee no transforms / absolute pinning can put this on top of its
+       sibling — these are grid items, the parent controls their position. */
+    inset: auto !important;
+}
+.header-controls .menu-toggle {
+    min-width: 44px;
+    padding: 8px 12px;
+    font-size: 20px;
 }
 .app-title {
-    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-.header-controls .menu-toggle {
-    flex: 0 0 auto;
-    min-width: 44px;
-    padding: 8px 12px;
-    font-size: 20px;
 }
 
 /* Hint text under a settings checkbox. */
