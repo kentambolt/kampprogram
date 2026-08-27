@@ -1,0 +1,6 @@
+# Rigtige database-credentials må ALDRIG committes — repoet publiceres
+# offentligt via GitHub Pages. Brug api/config.example.php som skabelon.
+api/config.php
+
+# IDE
+.idea/

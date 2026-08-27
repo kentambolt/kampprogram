@@ -56,8 +56,11 @@
             <div class="header-menu">
                 <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu" title="Menu">☰</button>
                 <div class="menu-dropdown" id="menuDropdown">
-                        <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
+                    <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
                     <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
+                    <button class="menu-item account-menu-item" id="accountBtn">👤 Log ind</button>
+                    <button class="menu-item hidden" id="usersBtn">👥 Brugere</button>
+                    <button class="menu-item hidden" id="adminBtn">🛠 Admin</button>
                     <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
                 </div>
             </div>
@@ -101,6 +104,36 @@
                         </button>
 
                         <div class="collapsible-content">
+                            <div id="cloudListsSection" class="cloud-lists-section hidden">
+                                <h4 class="lists-section-title">☁ Klubbens spillerlister</h4>
+                                <div class="settings-row" style="margin-top: 0;">
+                                    <label for="cloudPlayerList">Hent klub-liste</label>
+                                    <div class="actions">
+                                        <select id="cloudPlayerList">
+                                            <option value="">Vælg liste</option>
+                                        </select>
+                                        <button class="primary" id="loadCloudListBtn">↓ Hent</button>
+                                    </div>
+                                </div>
+                                <div class="settings-row cloud-editor-only">
+                                    <label for="newCloudListName">Gem nuværende spillere som ny klub-liste</label>
+                                    <div class="actions">
+                                        <input id="newCloudListName" type="text" placeholder="Fx Torsdagsholdet"/>
+                                        <button class="primary" id="saveCloudListBtn">✓ Gem</button>
+                                    </div>
+                                </div>
+                                <div class="settings-row cloud-editor-only">
+                                    <label for="deleteCloudList">Slet klub-liste</label>
+                                    <div class="actions">
+                                        <select id="deleteCloudList">
+                                            <option value="">Vælg liste</option>
+                                        </select>
+                                        <button class="danger" id="deleteCloudListBtn">✕ Slet</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 class="lists-section-title">📱 Lokale spillerlister</h4>
                             <div class="settings-row" style="margin-top: 0;">
                                 <label for="presetPlayerList">Hent gemt spillerliste</label>
                                 <div class="actions">
@@ -315,6 +348,151 @@
                 </div>
             </div>
 
+
+
+
+            <div class="panel admin-panel standalone" id="adminPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Admin</h2>
+                    <button class="ghost" id="closeAdminBtn">✕ Luk</button>
+                </div>
+
+                <div class="admin-stats" id="adminStats"></div>
+
+                <h3 class="mt24">Klubber</h3>
+                <div class="admin-clubs" id="adminClubsList"></div>
+                <div class="settings-row">
+                    <label for="newClubName">Opret ny klub</label>
+                    <div class="actions">
+                        <input id="newClubName" type="text" placeholder="Klubnavn"/>
+                        <button class="primary" id="createClubBtn" type="button">+ Opret klub</button>
+                    </div>
+                </div>
+
+                <h3 class="mt24">Alle brugere</h3>
+                <div class="user-create-form">
+                    <h3>Opret bruger</h3>
+                    <div class="settings-row">
+                        <label for="adminNewUserClub">Klub</label>
+                        <select id="adminNewUserClub"></select>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminNewUserName">Navn</label>
+                        <input id="adminNewUserName" type="text"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminNewUserEmail">E-mail</label>
+                        <input id="adminNewUserEmail" type="email"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminNewUserPassword">Adgangskode</label>
+                        <input id="adminNewUserPassword" type="text" placeholder="Mindst 6 tegn"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminNewUserRole">Rolle</label>
+                        <select id="adminNewUserRole">
+                            <option value="viewer">viewer</option>
+                            <option value="editor" selected>editor</option>
+                            <option value="owner">owner</option>
+                        </select>
+                    </div>
+                    <div class="login-actions">
+                        <button class="primary" id="adminCreateUserBtn" type="button">Opret bruger</button>
+                    </div>
+                    <div class="login-error hidden" id="adminNewUserError"></div>
+                </div>
+                <div class="users-list" id="adminUsersList"></div>
+
+                <h3 class="mt24">Seneste aktivitet</h3>
+                <div class="admin-activity" id="adminActivityList"></div>
+            </div>
+
+            <div class="panel login-panel standalone" id="loginPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Log ind</h2>
+                    <button class="ghost" id="closeLoginBtn">✕ Luk</button>
+                </div>
+                <p class="muted">Log ind for at gemme og hente spillerlister fra din klub.</p>
+                <form id="loginForm" autocomplete="on" novalidate>
+                    <div class="settings-row">
+                        <label for="loginEmail">E-mail</label>
+                        <input id="loginEmail" type="email" name="email" required autocomplete="email"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="loginPassword">Adgangskode</label>
+                        <input id="loginPassword" type="password" name="password" required autocomplete="current-password"/>
+                    </div>
+                    <div class="login-actions">
+                        <button class="primary" type="submit" id="loginSubmitBtn">Log ind</button>
+                    </div>
+                    <div class="login-error hidden" id="loginError"></div>
+                </form>
+                <div id="loggedInView" class="hidden">
+                    <p>Du er logget ind som <strong id="loggedInName"></strong> (<span id="loggedInRole"></span>) i klubben <strong id="loggedInClub"></strong>.</p>
+                    <div class="login-actions">
+                        <button class="ghost" type="button" id="changePasswordBtn">Skift adgangskode</button>
+                        <button class="danger" type="button" id="logoutBtn">Log ud</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel users-panel standalone" id="usersPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Brugere</h2>
+                    <button class="ghost" id="closeUsersBtn">✕ Luk</button>
+                </div>
+                <p class="muted">Owner-rollen kan oprette og redigere brugere i klubben. Send selv login-oplysninger til den enkelte bruger.</p>
+                <div class="user-create-form">
+                    <h3>Opret bruger</h3>
+                    <div class="settings-row">
+                        <label for="newUserName">Navn</label>
+                        <input id="newUserName" type="text"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="newUserEmail">E-mail</label>
+                        <input id="newUserEmail" type="email"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="newUserPassword">Adgangskode</label>
+                        <input id="newUserPassword" type="text" placeholder="Mindst 6 tegn"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="newUserRole">Rolle</label>
+                        <select id="newUserRole">
+                            <option value="viewer">viewer — kun læse</option>
+                            <option value="editor" selected>editor — gemme/redigere lister</option>
+                            <option value="owner">owner — fuld adgang</option>
+                        </select>
+                    </div>
+                    <div class="login-actions">
+                        <button class="primary" type="button" id="createUserBtn">Opret bruger</button>
+                    </div>
+                    <div class="login-error hidden" id="newUserError"></div>
+                </div>
+                <h3 class="mt24">Eksisterende brugere</h3>
+                <div class="users-list" id="usersList"></div>
+            </div>
+
+            <div class="panel change-password-panel standalone" id="changePasswordPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Skift adgangskode</h2>
+                    <button class="ghost" id="closeChangePasswordBtn">✕ Luk</button>
+                </div>
+                <form id="changePasswordForm" novalidate>
+                    <div class="settings-row">
+                        <label for="currentPassword">Nuværende adgangskode</label>
+                        <input id="currentPassword" type="password" required autocomplete="current-password"/>
+                    </div>
+                    <div class="settings-row">
+                        <label for="newPassword">Ny adgangskode</label>
+                        <input id="newPassword" type="password" required autocomplete="new-password" minlength="6"/>
+                    </div>
+                    <div class="login-actions">
+                        <button class="primary" type="submit">Skift adgangskode</button>
+                    </div>
+                    <div class="login-error hidden" id="changePasswordError"></div>
+                </form>
+            </div>
 
             <div class="panel bulk-delete-panel standalone" id="bulkDeletePanel">
                 <div class="flex-row">

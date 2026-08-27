@@ -29,6 +29,9 @@ const state = {
     showAllLevels: true,
     // Sort mode for player lists ('name' | 'level-asc' | 'level-desc').
     sortPlayersBy: 'name',
+    // Server-auth state. user = null when not logged in.
+    user: null,
+    cloudLists: [],
 };
 
 const STORAGE_KEY = 'kampprogram-state-v3';
@@ -127,6 +130,60 @@ const el = {
     bulkDeleteSelectAllBtn: document.getElementById('bulkDeleteSelectAllBtn'),
     bulkDeleteClearBtn: document.getElementById('bulkDeleteClearBtn'),
     closeBulkDeleteBtn: document.getElementById('closeBulkDeleteBtn'),
+    // Auth + cloud
+    accountBtn: document.getElementById('accountBtn'),
+    usersBtn: document.getElementById('usersBtn'),
+    adminBtn: document.getElementById('adminBtn'),
+    adminPanel: document.getElementById('adminPanel'),
+    closeAdminBtn: document.getElementById('closeAdminBtn'),
+    adminStats: document.getElementById('adminStats'),
+    adminClubsList: document.getElementById('adminClubsList'),
+    newClubName: document.getElementById('newClubName'),
+    createClubBtn: document.getElementById('createClubBtn'),
+    adminNewUserClub: document.getElementById('adminNewUserClub'),
+    adminNewUserName: document.getElementById('adminNewUserName'),
+    adminNewUserEmail: document.getElementById('adminNewUserEmail'),
+    adminNewUserPassword: document.getElementById('adminNewUserPassword'),
+    adminNewUserRole: document.getElementById('adminNewUserRole'),
+    adminCreateUserBtn: document.getElementById('adminCreateUserBtn'),
+    adminNewUserError: document.getElementById('adminNewUserError'),
+    adminUsersList: document.getElementById('adminUsersList'),
+    adminActivityList: document.getElementById('adminActivityList'),
+    loginPanel: document.getElementById('loginPanel'),
+    closeLoginBtn: document.getElementById('closeLoginBtn'),
+    loginForm: document.getElementById('loginForm'),
+    loginEmail: document.getElementById('loginEmail'),
+    loginPassword: document.getElementById('loginPassword'),
+    loginSubmitBtn: document.getElementById('loginSubmitBtn'),
+    loginError: document.getElementById('loginError'),
+    loggedInView: document.getElementById('loggedInView'),
+    loggedInName: document.getElementById('loggedInName'),
+    loggedInRole: document.getElementById('loggedInRole'),
+    loggedInClub: document.getElementById('loggedInClub'),
+    logoutBtn: document.getElementById('logoutBtn'),
+    changePasswordBtn: document.getElementById('changePasswordBtn'),
+    changePasswordPanel: document.getElementById('changePasswordPanel'),
+    closeChangePasswordBtn: document.getElementById('closeChangePasswordBtn'),
+    changePasswordForm: document.getElementById('changePasswordForm'),
+    currentPassword: document.getElementById('currentPassword'),
+    newPassword: document.getElementById('newPassword'),
+    changePasswordError: document.getElementById('changePasswordError'),
+    usersPanel: document.getElementById('usersPanel'),
+    closeUsersBtn: document.getElementById('closeUsersBtn'),
+    usersList: document.getElementById('usersList'),
+    newUserName: document.getElementById('newUserName'),
+    newUserEmail: document.getElementById('newUserEmail'),
+    newUserPassword: document.getElementById('newUserPassword'),
+    newUserRole: document.getElementById('newUserRole'),
+    createUserBtn: document.getElementById('createUserBtn'),
+    newUserError: document.getElementById('newUserError'),
+    cloudListsSection: document.getElementById('cloudListsSection'),
+    cloudPlayerList: document.getElementById('cloudPlayerList'),
+    loadCloudListBtn: document.getElementById('loadCloudListBtn'),
+    newCloudListName: document.getElementById('newCloudListName'),
+    saveCloudListBtn: document.getElementById('saveCloudListBtn'),
+    deleteCloudList: document.getElementById('deleteCloudList'),
+    deleteCloudListBtn: document.getElementById('deleteCloudListBtn'),
 };
 
 function getEnabledFormats() {
@@ -3152,5 +3209,611 @@ el.teamModeRow?.addEventListener('click', (event) => {
     syncTeamModeToggle();
     el.teamMode.dispatchEvent(new Event('change', { bubbles: true }));
 });
+
+// ═══════════════════════════════════════════════════════════
+//  Backend API (multi-tenant: clubs, users, cloud player lists)
+// ═══════════════════════════════════════════════════════════
+
+const API_BASE = 'api';
+
+async function api(method, path, body) {
+    const opts = {
+        method,
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+    };
+    if (body !== undefined) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+    }
+    let response;
+    try {
+        response = await fetch(`${API_BASE}/${path.replace(/^\//, '')}`, opts);
+    } catch (e) {
+        throw new Error('Kunne ikke kontakte serveren.');
+    }
+    let data = null;
+    try { data = await response.json(); } catch (_) { /* ignore */ }
+    if (!response.ok) {
+        const msg = (data && data.error) || `Serverfejl (HTTP ${response.status}).`;
+        const err = new Error(msg);
+        err.status = response.status;
+        throw err;
+    }
+    return data;
+}
+
+// Probes /api/me at startup. If the API isn't reachable (e.g. running as
+// pure static), we silently degrade and keep the UI in "guest mode".
+async function bootstrapAuth() {
+    try {
+        const res = await api('GET', 'me');
+        applyAuthState(res.user || null);
+    } catch (e) {
+        applyAuthState(null);
+    }
+}
+
+function applyAuthState(user) {
+    state.user = user;
+    syncAccountUI();
+    if (user) {
+        refreshCloudLists();
+    } else {
+        state.cloudLists = [];
+        renderCloudLists();
+    }
+}
+
+function syncAccountUI() {
+    const u = state.user;
+    if (el.accountBtn) {
+        el.accountBtn.textContent = u ? `👤 ${u.name} — Log ud` : '👤 Log ind';
+    }
+    if (el.usersBtn) {
+        el.usersBtn.classList.toggle('hidden', !(u && u.role === 'owner'));
+    }
+    if (el.adminBtn) {
+        el.adminBtn.classList.toggle('hidden', !(u && u.isAdmin));
+    }
+    if (el.cloudListsSection) {
+        el.cloudListsSection.classList.toggle('hidden', !u);
+    }
+    // Hide "save" + "delete" rows in cloud section if user is viewer-only.
+    const isEditor = !!(u && (u.role === 'owner' || u.role === 'editor'));
+    document.querySelectorAll('.cloud-editor-only').forEach(node => {
+        node.classList.toggle('hidden', !isEditor);
+    });
+    if (el.loggedInView)  el.loggedInView.classList.toggle('hidden', !u);
+    if (el.loginForm)     el.loginForm.classList.toggle('hidden', !!u);
+    if (u) {
+        if (el.loggedInName) el.loggedInName.textContent = u.name;
+        if (el.loggedInRole) el.loggedInRole.textContent = u.role;
+        if (el.loggedInClub) el.loggedInClub.textContent = u.club ? u.club.name : '';
+    }
+}
+
+// ── Cloud player lists ──────────────────────────────────────
+
+async function refreshCloudLists() {
+    try {
+        const res = await api('GET', 'player-lists');
+        state.cloudLists = res.lists || [];
+        renderCloudLists();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke hente klub-lister: ${e.message}`);
+    }
+}
+
+function renderCloudLists() {
+    const fill = (selectEl) => {
+        if (!selectEl) return;
+        const placeholder = '<option value="">Vælg liste</option>';
+        const opts = state.cloudLists
+            .map(l => `<option value="${l.id}">${escapeHtml(l.name)} (${l.players.length})</option>`)
+            .join('');
+        selectEl.innerHTML = placeholder + opts;
+    };
+    fill(el.cloudPlayerList);
+    fill(el.deleteCloudList);
+}
+
+async function loadCloudList() {
+    const id = el.cloudPlayerList?.value;
+    if (!id) { showStatusMessage('Vælg først en klub-liste.'); return; }
+    const list = state.cloudLists.find(l => String(l.id) === String(id));
+    if (!list) { showStatusMessage('Listen kunne ikke findes.'); return; }
+    // Replace the roster with the cloud list's players (all inactive on load).
+    replaceRoster(list.players.map(p => ({ name: p.name, level: p.level, active: false })));
+    showStatusMessage(`Hentede "${list.name}" fra klubben.`);
+}
+
+async function saveCloudList() {
+    if (!state.user) { showStatusMessage('Du skal være logget ind.'); return; }
+    const name = (el.newCloudListName?.value || '').trim();
+    if (!name) { showStatusMessage('Skriv et navn til klub-listen.'); return; }
+    if (state.roster.length === 0) { showStatusMessage('Der er ingen spillere at gemme.'); return; }
+
+    // Strip transient state — only persist name + level.
+    const players = state.roster.map(p => ({ name: p.name, level: p.level }));
+
+    // If a list with this name exists, overwrite (PUT); otherwise POST.
+    const existing = state.cloudLists.find(l => l.name.toLowerCase() === name.toLowerCase());
+    try {
+        if (existing) {
+            const ok = window.confirm(`Klub-listen "${existing.name}" findes allerede. Vil du overskrive den?`);
+            if (!ok) return;
+            await api('PUT', `player-lists/${existing.id}`, { name, players });
+        } else {
+            await api('POST', 'player-lists', { name, players });
+        }
+        if (el.newCloudListName) el.newCloudListName.value = '';
+        await refreshCloudLists();
+        showStatusMessage(`Klub-listen "${name}" er gemt.`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke gemme: ${e.message}`);
+    }
+}
+
+async function deleteCloudList() {
+    const id = el.deleteCloudList?.value;
+    if (!id) { showStatusMessage('Vælg først en klub-liste.'); return; }
+    const list = state.cloudLists.find(l => String(l.id) === String(id));
+    if (!list) return;
+    const ok = window.confirm(`Slet klub-listen "${list.name}"? Dette kan ikke fortrydes.`);
+    if (!ok) return;
+    try {
+        await api('DELETE', `player-lists/${list.id}`);
+        await refreshCloudLists();
+        showStatusMessage(`Klub-listen "${list.name}" er slettet.`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke slette: ${e.message}`);
+    }
+}
+
+// ── Login / logout flow ─────────────────────────────────────
+
+function openAccountPanel() {
+    closeMenu();
+    showStandAlone(el.loginPanel);
+    syncAccountUI();
+    if (el.loginError) el.loginError.classList.add('hidden');
+}
+
+async function submitLogin(event) {
+    event.preventDefault();
+    const email = el.loginEmail?.value.trim();
+    const password = el.loginPassword?.value;
+    if (!email || !password) return;
+    if (el.loginError) el.loginError.classList.add('hidden');
+    if (el.loginSubmitBtn) el.loginSubmitBtn.disabled = true;
+    try {
+        const res = await api('POST', 'auth/login', { email, password });
+        applyAuthState(res.user);
+        if (el.loginPassword) el.loginPassword.value = '';
+        showStatusMessage(`Velkommen, ${res.user.name}.`);
+        closeStandAlone();
+    } catch (e) {
+        if (el.loginError) {
+            el.loginError.textContent = e.message;
+            el.loginError.classList.remove('hidden');
+        }
+    } finally {
+        if (el.loginSubmitBtn) el.loginSubmitBtn.disabled = false;
+    }
+}
+
+async function doLogout() {
+    try {
+        await api('POST', 'auth/logout');
+    } catch (e) { /* ignore */ }
+    applyAuthState(null);
+    closeStandAlone();
+    showStatusMessage('Du er logget ud.');
+}
+
+async function submitChangePassword(event) {
+    event.preventDefault();
+    const cur = el.currentPassword?.value;
+    const next = el.newPassword?.value;
+    if (!cur || !next) return;
+    if (el.changePasswordError) el.changePasswordError.classList.add('hidden');
+    try {
+        await api('POST', 'auth/change-password', { currentPassword: cur, newPassword: next });
+        if (el.currentPassword) el.currentPassword.value = '';
+        if (el.newPassword) el.newPassword.value = '';
+        showStatusMessage('Adgangskoden er ændret.');
+        closeStandAlone();
+    } catch (e) {
+        if (el.changePasswordError) {
+            el.changePasswordError.textContent = e.message;
+            el.changePasswordError.classList.remove('hidden');
+        }
+    }
+}
+
+// ── User management (owner only) ────────────────────────────
+
+async function openUsersPanel() {
+    if (!state.user || state.user.role !== 'owner') return;
+    closeMenu();
+    showStandAlone(el.usersPanel);
+    await refreshUsersList();
+}
+
+async function refreshUsersList() {
+    if (!el.usersList) return;
+    try {
+        const res = await api('GET', 'users');
+        renderUsersList(res.users || []);
+    } catch (e) {
+        el.usersList.innerHTML = `<div class="login-error">${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function renderUsersList(users) {
+    if (!el.usersList) return;
+    if (users.length === 0) {
+        el.usersList.innerHTML = '<div class="subtle">Ingen brugere endnu.</div>';
+        return;
+    }
+    el.usersList.innerHTML = users.map(u => {
+        const isSelf = state.user && state.user.id === u.id;
+        const roleOpts = ['owner','editor','viewer'].map(r =>
+            `<option value="${r}"${r === u.role ? ' selected' : ''}>${r}</option>`
+        ).join('');
+        return `
+            <div class="user-row" data-user-id="${u.id}">
+                <div class="user-row-main">
+                    <div class="user-row-name">${escapeHtml(u.name)}${isSelf ? ' <em>(dig)</em>' : ''}</div>
+                    <div class="user-row-email">${escapeHtml(u.email)}</div>
+                </div>
+                <select class="user-role-select" data-user-id="${u.id}">${roleOpts}</select>
+                <button class="ghost user-row-pw" data-user-id="${u.id}" title="Sæt ny adgangskode">🔑</button>
+                <button class="danger user-row-delete" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function createUser() {
+    const name = (el.newUserName?.value || '').trim();
+    const email = (el.newUserEmail?.value || '').trim();
+    const password = el.newUserPassword?.value || '';
+    const role = el.newUserRole?.value || 'editor';
+    if (el.newUserError) el.newUserError.classList.add('hidden');
+    try {
+        await api('POST', 'users', { name, email, password, role });
+        if (el.newUserName) el.newUserName.value = '';
+        if (el.newUserEmail) el.newUserEmail.value = '';
+        if (el.newUserPassword) el.newUserPassword.value = '';
+        if (el.newUserRole) el.newUserRole.value = 'editor';
+        showStatusMessage(`Brugeren "${name}" er oprettet.`);
+        await refreshUsersList();
+    } catch (e) {
+        if (el.newUserError) {
+            el.newUserError.textContent = e.message;
+            el.newUserError.classList.remove('hidden');
+        }
+    }
+}
+
+async function updateUserRole(id, role) {
+    try {
+        await api('PATCH', `users/${id}`, { role });
+        await refreshUsersList();
+        showStatusMessage('Rolle opdateret.');
+    } catch (e) {
+        showStatusMessage(`Kunne ikke ændre rolle: ${e.message}`);
+        await refreshUsersList();
+    }
+}
+
+async function changeUserPassword(id) {
+    const next = window.prompt('Indtast ny adgangskode (mindst 6 tegn):');
+    if (next === null) return;
+    if (next.length < 6) { showStatusMessage('Adgangskode skal være mindst 6 tegn.'); return; }
+    try {
+        await api('PATCH', `users/${id}`, { password: next });
+        showStatusMessage('Adgangskoden er opdateret.');
+    } catch (e) {
+        showStatusMessage(`Kunne ikke ændre adgangskode: ${e.message}`);
+    }
+}
+
+async function deleteUser(id) {
+    const target = (await api('GET', 'users')).users.find(u => u.id === id);
+    if (!target) return;
+    const ok = window.confirm(`Slet brugeren "${target.name}" (${target.email})?`);
+    if (!ok) return;
+    try {
+        await api('DELETE', `users/${id}`);
+        await refreshUsersList();
+        showStatusMessage('Brugeren er slettet.');
+    } catch (e) {
+        showStatusMessage(`Kunne ikke slette: ${e.message}`);
+    }
+}
+
+// ── Wire DOM events ─────────────────────────────────────────
+
+el.accountBtn?.addEventListener('click', openAccountPanel);
+el.closeLoginBtn?.addEventListener('click', () => closeStandAlone());
+el.loginForm?.addEventListener('submit', submitLogin);
+el.logoutBtn?.addEventListener('click', doLogout);
+el.changePasswordBtn?.addEventListener('click', () => {
+    showStandAlone(el.changePasswordPanel);
+});
+el.closeChangePasswordBtn?.addEventListener('click', () => closeStandAlone());
+el.changePasswordForm?.addEventListener('submit', submitChangePassword);
+
+el.usersBtn?.addEventListener('click', openUsersPanel);
+el.closeUsersBtn?.addEventListener('click', () => closeStandAlone());
+el.createUserBtn?.addEventListener('click', createUser);
+
+el.usersList?.addEventListener('change', (event) => {
+    const sel = event.target.closest('.user-role-select');
+    if (!sel) return;
+    updateUserRole(Number(sel.dataset.userId), sel.value);
+});
+el.usersList?.addEventListener('click', (event) => {
+    const del = event.target.closest('.user-row-delete');
+    if (del && !del.disabled) {
+        deleteUser(Number(del.dataset.userId));
+        return;
+    }
+    const pw = event.target.closest('.user-row-pw');
+    if (pw) {
+        changeUserPassword(Number(pw.dataset.userId));
+    }
+});
+
+el.loadCloudListBtn?.addEventListener('click', loadCloudList);
+el.saveCloudListBtn?.addEventListener('click', saveCloudList);
+el.deleteCloudListBtn?.addEventListener('click', deleteCloudList);
+
+// ── Site-admin panel (kræver isAdmin) ───────────────────────
+
+let adminCache = { clubs: [], users: [] };
+
+function formatDateTime(iso) {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso.replace(' ', 'T') + (iso.includes('Z') ? '' : 'Z'));
+        return d.toLocaleString('da-DK', { dateStyle: 'short', timeStyle: 'short' });
+    } catch (_) { return iso; }
+}
+
+async function openAdminPanel() {
+    if (!state.user || !state.user.isAdmin) return;
+    closeMenu();
+    showStandAlone(el.adminPanel);
+    await refreshAdminData();
+}
+
+async function refreshAdminData() {
+    try {
+        const [overview, users, activity] = await Promise.all([
+            api('GET', 'admin/overview'),
+            api('GET', 'admin/users'),
+            api('GET', 'admin/activity?limit=100'),
+        ]);
+        adminCache.clubs = overview.clubs || [];
+        adminCache.users = users.users || [];
+        renderAdminStats(overview.stats || {});
+        renderAdminClubs();
+        renderAdminUsers();
+        renderAdminActivity(activity.activity || []);
+        renderAdminClubSelect();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke hente admin-data: ${e.message}`);
+    }
+}
+
+function renderAdminStats(s) {
+    if (!el.adminStats) return;
+    const card = (label, value) => `
+        <div class="admin-stat-card">
+            <div class="admin-stat-value">${value}</div>
+            <div class="admin-stat-label">${label}</div>
+        </div>`;
+    el.adminStats.innerHTML =
+        card('Klubber', s.totalClubs ?? 0) +
+        card('Brugere', s.totalUsers ?? 0) +
+        card('Spillerlister', s.totalLists ?? 0) +
+        card('Aktive brugere (30 dage)', s.activeUsers30d ?? 0) +
+        card('Handlinger (7 dage)', s.actions7d ?? 0) +
+        card('Handlinger (30 dage)', s.actions30d ?? 0);
+}
+
+function renderAdminClubs() {
+    if (!el.adminClubsList) return;
+    if (adminCache.clubs.length === 0) {
+        el.adminClubsList.innerHTML = '<div class="subtle">Ingen klubber.</div>';
+        return;
+    }
+    const isOwnClub = (c) => state.user && state.user.club && state.user.club.id === c.id;
+    el.adminClubsList.innerHTML = adminCache.clubs.map(c => `
+        <div class="user-row">
+            <div class="user-row-main">
+                <div class="user-row-name">${escapeHtml(c.name)}${isOwnClub(c) ? ' <em>(din klub)</em>' : ''}</div>
+                <div class="user-row-email">${c.userCount} bruger${c.userCount === 1 ? '' : 'e'} · ${c.listCount} liste${c.listCount === 1 ? '' : 'r'} · sidst aktiv: ${formatDateTime(c.lastActivity)}</div>
+            </div>
+            <button class="danger user-row-delete" data-admin-club-delete="${c.id}" ${isOwnClub(c) ? 'disabled' : ''} title="Slet klub">✕</button>
+        </div>
+    `).join('');
+}
+
+function renderAdminClubSelect() {
+    if (!el.adminNewUserClub) return;
+    el.adminNewUserClub.innerHTML = adminCache.clubs
+        .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+        .join('');
+}
+
+function renderAdminUsers() {
+    if (!el.adminUsersList) return;
+    if (adminCache.users.length === 0) {
+        el.adminUsersList.innerHTML = '<div class="subtle">Ingen brugere.</div>';
+        return;
+    }
+    el.adminUsersList.innerHTML = adminCache.users.map(u => {
+        const isSelf = state.user && state.user.id === u.id;
+        const roleOpts = ['owner','editor','viewer'].map(r =>
+            `<option value="${r}"${r === u.role ? ' selected' : ''}>${r}</option>`).join('');
+        return `
+            <div class="user-row">
+                <div class="user-row-main">
+                    <div class="user-row-name">${escapeHtml(u.name)}${u.isAdmin ? ' 🛠' : ''}${isSelf ? ' <em>(dig)</em>' : ''}</div>
+                    <div class="user-row-email">${escapeHtml(u.email)} · ${escapeHtml(u.clubName)}</div>
+                    <div class="user-row-usage">Login: ${u.loginCount} gange · Sidst: ${formatDateTime(u.lastLoginAt)}</div>
+                </div>
+                <select class="user-role-select" data-admin-user-role="${u.id}">${roleOpts}</select>
+                <button class="ghost user-row-pw" data-admin-user-pw="${u.id}" title="Sæt ny adgangskode">🔑</button>
+                <button class="danger user-row-delete" data-admin-user-delete="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAdminActivity(items) {
+    if (!el.adminActivityList) return;
+    if (items.length === 0) {
+        el.adminActivityList.innerHTML = '<div class="subtle">Ingen aktivitet endnu.</div>';
+        return;
+    }
+    const actionLabels = {
+        login: 'loggede ind',
+        logout: 'loggede ud',
+        password_change: 'skiftede adgangskode',
+        list_create: 'oprettede listen',
+        list_update: 'opdaterede listen',
+        list_delete: 'slettede listen',
+        user_create: 'oprettede brugeren',
+        user_update: 'opdaterede brugeren',
+        user_delete: 'slettede en bruger',
+        club_create: 'oprettede klubben',
+        club_delete: 'slettede klubben',
+    };
+    el.adminActivityList.innerHTML = items.map(a => `
+        <div class="admin-activity-row">
+            <span class="admin-activity-time">${formatDateTime(a.createdAt)}</span>
+            <span class="admin-activity-text">
+                <strong>${escapeHtml(a.userName || 'Ukendt')}</strong>
+                (${escapeHtml(a.clubName || '—')})
+                ${actionLabels[a.action] || escapeHtml(a.action)}
+                ${a.detail ? `<em>${escapeHtml(a.detail)}</em>` : ''}
+            </span>
+        </div>
+    `).join('');
+}
+
+async function adminCreateClub() {
+    const name = (el.newClubName?.value || '').trim();
+    if (!name) { showStatusMessage('Skriv et klubnavn.'); return; }
+    try {
+        await api('POST', 'admin/clubs', { name });
+        if (el.newClubName) el.newClubName.value = '';
+        showStatusMessage(`Klubben "${name}" er oprettet.`);
+        await refreshAdminData();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke oprette klub: ${e.message}`);
+    }
+}
+
+async function adminDeleteClub(id) {
+    const club = adminCache.clubs.find(c => c.id === id);
+    if (!club) return;
+    const ok = window.confirm(
+        `Slet klubben "${club.name}"?\n\n` +
+        `ALLE klubbens ${club.userCount} brugere og ${club.listCount} spillerlister slettes permanent!`
+    );
+    if (!ok) return;
+    try {
+        await api('DELETE', `admin/clubs/${id}`);
+        showStatusMessage(`Klubben "${club.name}" er slettet.`);
+        await refreshAdminData();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke slette: ${e.message}`);
+    }
+}
+
+async function adminCreateUser() {
+    const clubId = Number(el.adminNewUserClub?.value);
+    const name = (el.adminNewUserName?.value || '').trim();
+    const email = (el.adminNewUserEmail?.value || '').trim();
+    const password = el.adminNewUserPassword?.value || '';
+    const role = el.adminNewUserRole?.value || 'editor';
+    if (el.adminNewUserError) el.adminNewUserError.classList.add('hidden');
+    try {
+        await api('POST', 'admin/users', { clubId, name, email, password, role });
+        if (el.adminNewUserName) el.adminNewUserName.value = '';
+        if (el.adminNewUserEmail) el.adminNewUserEmail.value = '';
+        if (el.adminNewUserPassword) el.adminNewUserPassword.value = '';
+        showStatusMessage(`Brugeren "${name}" er oprettet.`);
+        await refreshAdminData();
+    } catch (e) {
+        if (el.adminNewUserError) {
+            el.adminNewUserError.textContent = e.message;
+            el.adminNewUserError.classList.remove('hidden');
+        }
+    }
+}
+
+el.adminBtn?.addEventListener('click', openAdminPanel);
+el.closeAdminBtn?.addEventListener('click', () => closeStandAlone());
+el.createClubBtn?.addEventListener('click', adminCreateClub);
+el.adminCreateUserBtn?.addEventListener('click', adminCreateUser);
+
+el.adminClubsList?.addEventListener('click', (event) => {
+    const del = event.target.closest('[data-admin-club-delete]');
+    if (del && !del.disabled) adminDeleteClub(Number(del.dataset.adminClubDelete));
+});
+
+el.adminUsersList?.addEventListener('change', async (event) => {
+    const sel = event.target.closest('[data-admin-user-role]');
+    if (!sel) return;
+    try {
+        await api('PATCH', `admin/users/${Number(sel.dataset.adminUserRole)}`, { role: sel.value });
+        showStatusMessage('Rolle opdateret.');
+        await refreshAdminData();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke ændre rolle: ${e.message}`);
+        await refreshAdminData();
+    }
+});
+
+el.adminUsersList?.addEventListener('click', async (event) => {
+    const del = event.target.closest('[data-admin-user-delete]');
+    if (del && !del.disabled) {
+        const id = Number(del.dataset.adminUserDelete);
+        const target = adminCache.users.find(u => u.id === id);
+        if (!target) return;
+        if (!window.confirm(`Slet brugeren "${target.name}" (${target.email})?`)) return;
+        try {
+            await api('DELETE', `admin/users/${id}`);
+            showStatusMessage('Brugeren er slettet.');
+            await refreshAdminData();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke slette: ${e.message}`);
+        }
+        return;
+    }
+    const pw = event.target.closest('[data-admin-user-pw]');
+    if (pw) {
+        const id = Number(pw.dataset.adminUserPw);
+        const next = window.prompt('Indtast ny adgangskode (mindst 6 tegn):');
+        if (next === null) return;
+        if (next.length < 6) { showStatusMessage('Adgangskode skal være mindst 6 tegn.'); return; }
+        try {
+            await api('PATCH', `admin/users/${id}`, { password: next });
+            showStatusMessage('Adgangskoden er opdateret.');
+        } catch (e) {
+            showStatusMessage(`Kunne ikke ændre adgangskode: ${e.message}`);
+        }
+    }
+});
+
+bootstrapAuth();
 
 loadDefaults();

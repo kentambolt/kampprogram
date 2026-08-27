@@ -587,9 +587,25 @@ select option {
 .settings-panel,
 .new-player-panel,
 .import-export-panel,
+.bulk-delete-panel,
+.login-panel,
+.users-panel,
+.change-password-panel,
+.admin-panel {
+    display: none;
+}
+
 .settings-panel.open,
 .new-player-panel.open,
 .import-export-panel.open,
+.bulk-delete-panel.open,
+.login-panel.open,
+.users-panel.open,
+.change-password-panel.open,
+.admin-panel.open {
+    display: block;
+}
+
 textarea {
     resize: vertical;
 }
@@ -1610,15 +1626,201 @@ prefill-card-header {
     align-items: flex-start;
     gap: 8px;
 }
-.checkbox-with-hint__text {
-    display: block;
-    line-height: 1.35;
+.checkbox-with-hint__text 
+
+/* ===========================================================
+   Login / users / cloud-lists styles
+   =========================================================== */
+
+.login-panel .muted,
+.users-panel .muted {
+    margin-bottom: 16px;
 }
-.setting-inline-hint {
-    display: block;
-    margin-top: 2px;
-    font-style: italic;
-    font-size: 13px;
+
+.login-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
+.login-error {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(185, 28, 28, 0.08);
+    border: 1px solid rgba(185, 28, 28, 0.35);
+    border-radius: 10px;
+    color: #b91c1c;
+    font-size: 14px;
+}
+
+.lists-section-title {
+    margin: 20px 0 10px;
+    font-size: 14px;
     color: var(--muted, #777);
-    font-weight: 400;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.lists-section-title:first-child {
+    margin-top: 0;
+}
+.cloud-lists-section {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+}
+
+.user-create-form {
+    background: var(--panel-2, #f7f8f5);
+    border-radius: 12px;
+    padding: 14px 16px 4px;
+    margin-bottom: 18px;
+}
+.user-create-form h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.user-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border, #e1e1e1);
+    border-radius: 10px;
+    background: var(--panel);
+    flex-wrap: wrap;
+}
+.user-row-main {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+.user-row-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.user-row-email {
+    color: var(--muted, #777);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.user-role-select {
+    width: auto;
+    min-width: 90px;
+    height: 36px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    text-align: left;
+    text-align-last: left;
+}
+.user-row-pw,
+.user-row-delete {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.user-row-delete:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+    .user-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .user-row-pw,
+    .user-row-delete {
+        align-self: flex-end;
+    }
+}
+
+
+/* ===========================================================
+   Admin-panel
+   =========================================================== */
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+.admin-stat-card {
+    background: var(--panel-2, #f7f8f5);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-align: center;
+}
+.admin-stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+.admin-stat-label {
+    font-size: 12px;
+    color: var(--muted, #777);
+    margin-top: 4px;
+}
+
+.admin-clubs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.user-row-usage {
+    font-size: 12px;
+    color: var(--muted, #777);
+}
+
+.admin-activity {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: var(--panel);
+}
+.admin-activity-row {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--panel-2, #f0f0f0);
+    font-size: 14px;
+}
+.admin-activity-row:last-child {
+    border-bottom: none;
+}
+.admin-activity-time {
+    flex: 0 0 auto;
+    color: var(--muted, #777);
+    font-size: 12px;
+    white-space: nowrap;
+    min-width: 110px;
+}
+.admin-activity-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.admin-activity-text em {
+    color: var(--muted, #555);
 }

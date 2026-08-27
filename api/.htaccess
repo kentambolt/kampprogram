@@ -1,0 +1,15 @@
+# All API requests are routed through index.php.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Deny direct access to library files and config.
+<FilesMatch "\.(sql|md|example|ini)$">
+    Require all denied
+</FilesMatch>
+
+# Block the lib/ and handlers/ folders from direct access.
+RedirectMatch 404 /api/lib/
+RedirectMatch 404 /api/handlers/
+RedirectMatch 404 /api/config\.php
