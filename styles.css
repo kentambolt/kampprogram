@@ -584,26 +584,12 @@ select option {
     width: 100%;
 }
 
-.settings-panel,
-.new-player-panel,
-.import-export-panel,
-.bulk-delete-panel,
-.login-panel,
-.users-panel,
-.change-password-panel,
-.admin-panel {
+/* ALLE standalone-paneler (Indstillinger, Slet spillere, Login, Admin osv.)
+   er skjult som udgangspunkt. showStandAlone() viser præcis ét ad gangen
+   via inline style, som overtrumfer denne regel. Én fælles regel — så kan
+   et nyt panel aldrig glemmes i en klasseliste igen. */
+.standalone {
     display: none;
-}
-
-.settings-panel.open,
-.new-player-panel.open,
-.import-export-panel.open,
-.bulk-delete-panel.open,
-.login-panel.open,
-.users-panel.open,
-.change-password-panel.open,
-.admin-panel.open {
-    display: block;
 }
 
 textarea {

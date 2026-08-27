@@ -2532,7 +2532,6 @@ function addPlayer() {
     renderPlayerManagerList();
     renderPlayerStats();
 
-    el.newPlayerPanel.classList.remove('open');
     showStatusMessage(`Spilleren ${name} er oprettet.`);
 
     saveState();
@@ -2821,20 +2820,24 @@ function closeMenu() {
 }
 
 function showStandAlone(panel) {
+    // Ryd inline-styles på alle paneler, så CSS-basereglen (.standalone
+    // { display: none }) gælder — og vis så kun det ønskede panel.
     for (let element of document.getElementsByClassName("standalone")) {
-        element.style.display = 'none';
+        element.style.display = '';
     }
     el.mainPage.style.display = "none";
     panel.style.display = "block";
     closeMenu();
+    // Standalone-paneler kan være lange; start altid fra toppen.
+    window.scrollTo(0, 0);
 }
 
 
 function closeStandAlone() {
     for (let element of document.getElementsByClassName("standalone")) {
-        element.style.display = 'none';
+        element.style.display = '';
     }
-    el.mainPage.style.display = "block";
+    el.mainPage.style.display = "";
 }
 
 
