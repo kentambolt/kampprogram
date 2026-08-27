@@ -183,6 +183,14 @@ button:disabled {
     opacity: 1;
 }
 
+/* Sektionsskille i menuen (fx mellem dagligt brug og konto/administration) */
+.menu-dropdown button.menu-item--section {
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    border-radius: 0;
+}
+
 /* Danger item gets a separator on top and a subtle red tint on hover */
 .menu-dropdown button.menu-item.danger {
     color: var(--danger);
@@ -311,6 +319,8 @@ textarea {
 
 input[type="number"],
 input[type="text"],
+input[type="email"],
+input[type="password"],
 select,
 textarea {
     width: 100%;
@@ -322,8 +332,16 @@ textarea {
     text-align: center;
 }
 
+/* E-mail og adgangskode læses lettest venstrestillet. */
+input[type="email"],
+input[type="password"] {
+    text-align: left;
+}
+
 input[type="number"]:focus,
 input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
 select:focus,
 textarea:focus {
     outline: none;
@@ -798,8 +816,8 @@ prefill-card-header {
 }
 
 .level-select {
-    width: 72px;
-    min-width: 72px;
+    width: 140px;
+    min-width: 130px;
 }
 
 .player-row-inline-controls select:not(.level-select) {
@@ -1028,8 +1046,8 @@ prefill-card-header {
     }
 
     .level-select {
-        width: 52px !important;
-        min-width: 52px !important;
+        width: 128px !important;
+        min-width: 118px !important;
         padding-left: 8px;
         padding-right: 8px;
     }
@@ -1660,7 +1678,7 @@ prefill-card-header {
 .user-create-form {
     background: var(--panel-2, #f7f8f5);
     border-radius: 12px;
-    padding: 14px 16px 4px;
+    padding: 14px 16px 16px;
     margin-bottom: 18px;
 }
 .user-create-form h3 {
@@ -1809,4 +1827,181 @@ prefill-card-header {
 }
 .admin-activity-text em {
     color: var(--muted, #555);
+}
+
+
+/* ===========================================================
+   Multi-klub: medlemskabschips + invitationer
+   =========================================================== */
+
+.user-row-memberships {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.membership-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    background: var(--panel-2, #f7f8f5);
+}
+.membership-chip em {
+    color: var(--muted, #777);
+    font-style: normal;
+}
+.membership-chip-remove {
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted, #777);
+    font-size: 11px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.membership-chip-remove:hover {
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.1);
+}
+
+.invite-link-box {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--panel-2, #f7f8f5);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    word-break: break-all;
+}
+.invite-link-box a {
+    color: var(--accent, #4A5240);
+}
+
+
+/* ===========================================================
+   Klubside
+   =========================================================== */
+
+.user-row--clickable {
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.user-row--clickable:hover {
+    background: var(--panel-2, #f7f8f5);
+    border-color: var(--accent, #4A5240);
+}
+.user-row-open {
+    font-size: 22px;
+    color: var(--muted, #777);
+    flex: 0 0 auto;
+    padding: 0 4px;
+}
+
+.club-danger-zone {
+    margin-top: 24px;
+    padding: 14px 16px;
+    border: 1px solid rgba(185, 28, 28, 0.35);
+    border-radius: 12px;
+    background: rgba(185, 28, 28, 0.04);
+}
+.club-danger-zone h3 {
+    margin-top: 0;
+    color: #b91c1c;
+}
+
+
+/* ===========================================================
+   Hold (squads) på klubsiden
+   =========================================================== */
+
+/* Luft under opret-hold-rækken, før holdlisten begynder. */
+#clubSquadCreateRow {
+    margin-bottom: 18px;
+}
+
+.squad-row {
+    padding: 14px 16px;
+    align-items: flex-start;
+}
+.squad-row .user-row-main {
+    min-width: 0;
+}
+.squad-row-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.squad-chevron {
+    flex: 0 0 auto;
+    font-size: 16px;
+    color: var(--muted, #777);
+    width: 18px;
+    text-align: center;
+}
+.squad-row--open {
+    border-color: var(--accent, #4A5240);
+    background: var(--panel);
+}
+.squad-detail {
+    margin-top: 12px;
+    padding: 12px 0 4px;
+    border-top: 1px dashed var(--border);
+    cursor: default;
+}
+.squad-detail .user-row-memberships {
+    margin-bottom: 4px;
+}
+.squad-add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.squad-add-row select,
+.squad-add-row input[type="text"] {
+    flex: 1 1 180px;
+    height: 40px;
+    box-sizing: border-box;
+    text-align: left;
+    text-align-last: left;
+}
+.squad-add-row select#squadNewPlayerLevel {
+    flex: 0 1 140px;
+}
+.squad-help {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted, #777);
+    font-style: italic;
+}
+
+/* "Gem session til klubben" i Lav kampe-panelet. */
+.session-share-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: var(--panel-2, #f7f8f5);
+}
+.session-share-row .session-share-hint {
+    flex: 1 1 260px;
+    font-size: 13px;
+    color: var(--muted, #777);
+    line-height: 1.4;
 }

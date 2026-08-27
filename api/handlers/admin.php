@@ -2,15 +2,17 @@
 // /api/admin/* — site-admin: overblik og administration på tværs af klubber.
 // Alle endpoints kræver is_admin = 1.
 
-// GET /api/admin/overview — klubber med antal brugere/lister + seneste aktivitet.
+// GET /api/admin/overview
 function handle_admin_overview(): void {
     require_admin();
 
     $clubs = db()->query(
         'SELECT c.id, c.name, c.slug, c.created_at,
-                (SELECT COUNT(*) FROM users u WHERE u.club_id = c.id)        AS user_count,
-                (SELECT COUNT(*) FROM player_lists p WHERE p.club_id = c.id) AS list_count,
-                (SELECT MAX(u.last_login_at) FROM users u WHERE u.club_id = c.id) AS last_activity
+                (SELECT COUNT(*) FROM club_members cm WHERE cm.club_id = c.id)   AS user_count,
+                (SELECT COUNT(*) FROM player_lists p WHERE p.club_id = c.id)     AS list_count,
+                (SELECT MAX(u.last_login_at) FROM club_members cm
+                 JOIN users u ON u.id = cm.user_id
+                 WHERE cm.club_id = c.id)                                         AS last_activity
          FROM clubs c
          ORDER BY c.name ASC'
     )->fetchAll();
@@ -47,34 +49,46 @@ function handle_admin_overview(): void {
     ]);
 }
 
-// GET /api/admin/users — alle brugere på tværs af klubber, med usage-info.
+// GET /api/admin/users — alle brugere med deres medlemskaber.
 function handle_admin_users_list(): void {
     require_admin();
 
     $rows = db()->query(
-        'SELECT u.id, u.club_id, u.email, u.name, u.role, u.is_admin,
-                u.last_login_at, u.login_count, u.created_at,
-                c.name AS club_name
+        'SELECT u.id, u.email, u.name, u.is_admin,
+                u.last_login_at, u.login_count, u.created_at
          FROM users u
-         JOIN clubs c ON c.id = u.club_id
-         ORDER BY c.name ASC, u.name ASC'
+         ORDER BY u.name ASC'
     )->fetchAll();
+
+    // Medlemskaber i ét opslag, grupperet pr. bruger.
+    $memberships = db()->query(
+        'SELECT cm.user_id, cm.club_id, cm.role, c.name AS club_name
+         FROM club_members cm
+         JOIN clubs c ON c.id = cm.club_id
+         ORDER BY c.name ASC'
+    )->fetchAll();
+    $byUser = [];
+    foreach ($memberships as $m) {
+        $byUser[(int)$m['user_id']][] = [
+            'clubId'   => (int)$m['club_id'],
+            'clubName' => $m['club_name'],
+            'role'     => $m['role'],
+        ];
+    }
 
     json_response(['users' => array_map(fn($r) => [
         'id'          => (int)$r['id'],
-        'clubId'      => (int)$r['club_id'],
-        'clubName'    => $r['club_name'],
         'email'       => $r['email'],
         'name'        => $r['name'],
-        'role'        => $r['role'],
         'isAdmin'     => !empty($r['is_admin']),
         'lastLoginAt' => $r['last_login_at'],
         'loginCount'  => (int)$r['login_count'],
         'createdAt'   => $r['created_at'],
+        'memberships' => $byUser[(int)$r['id']] ?? [],
     ], $rows)]);
 }
 
-// GET /api/admin/activity?limit=100 — seneste hændelser.
+// GET /api/admin/activity?limit=100
 function handle_admin_activity(): void {
     require_admin();
 
@@ -102,7 +116,7 @@ function handle_admin_activity(): void {
     ], $stmt->fetchAll())]);
 }
 
-// POST /api/admin/clubs — opret ny klub.
+// POST /api/admin/clubs {name}
 function handle_admin_create_club(): void {
     $admin = require_admin();
 
@@ -112,14 +126,12 @@ function handle_admin_create_club(): void {
         json_error('Klubnavn skal være mellem 1 og 120 tegn.', 422);
     }
 
-    // Slug: små bogstaver, danske tegn translittereret, alt andet → bindestreg.
     $slug = strtolower($name);
     $slug = strtr($slug, ['æ' => 'ae', 'ø' => 'oe', 'å' => 'aa']);
     $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
     $slug = trim($slug, '-');
     if ($slug === '') $slug = 'klub';
 
-    // Sørg for at slug er unik (tilføj tal ved kollision).
     $base = $slug; $i = 2;
     while (true) {
         $stmt = db()->prepare('SELECT COUNT(*) AS c FROM clubs WHERE slug = ?');
@@ -128,49 +140,40 @@ function handle_admin_create_club(): void {
         $slug = $base . '-' . $i++;
     }
 
-    $stmt = db()->prepare('INSERT INTO clubs (name, slug) VALUES (?, ?)');
-    $stmt->execute([$name, $slug]);
+    db()->prepare('INSERT INTO clubs (name, slug) VALUES (?, ?)')->execute([$name, $slug]);
     $id = (int)db()->lastInsertId();
     log_activity($admin, 'club_create', $name);
 
     json_response(['club' => ['id' => $id, 'name' => $name, 'slug' => $slug]], 201);
 }
 
-// DELETE /api/admin/clubs/:id — slet klub (kaskade sletter brugere + lister).
+// DELETE /api/admin/clubs/:id
 function handle_admin_delete_club(int $id): void {
     $admin = require_admin();
-
-    if ((int)$admin['club_id'] === $id) {
-        json_error('Du kan ikke slette den klub, du selv er medlem af.', 409);
-    }
 
     $stmt = db()->prepare('SELECT name FROM clubs WHERE id = ?');
     $stmt->execute([$id]);
     $club = $stmt->fetch();
     if (!$club) json_error('Klubben findes ikke.', 404);
 
-    $stmt = db()->prepare('DELETE FROM clubs WHERE id = ?');
-    $stmt->execute([$id]);
+    db()->prepare('DELETE FROM clubs WHERE id = ?')->execute([$id]);
     log_activity($admin, 'club_delete', $club['name']);
 
     json_response(['ok' => true]);
 }
 
-// POST /api/admin/users — opret bruger i en vilkårlig klub.
+// POST /api/admin/users {name, email, password, isAdmin?, clubId?, role?}
+// Opretter global bruger; medlemskab er valgfrit (kan tilføjes bagefter).
 function handle_admin_create_user(): void {
     $admin = require_admin();
 
     $body = read_json_body();
-    $clubId   = (int)($body['clubId'] ?? 0);
     $email    = trim((string)($body['email'] ?? ''));
     $name     = trim((string)($body['name']  ?? ''));
     $password = (string)($body['password']   ?? '');
-    $role     = (string)($body['role']       ?? 'editor');
     $isAdmin  = !empty($body['isAdmin']) ? 1 : 0;
-
-    $stmt = db()->prepare('SELECT id FROM clubs WHERE id = ?');
-    $stmt->execute([$clubId]);
-    if (!$stmt->fetch()) json_error('Klubben findes ikke.', 422);
+    $clubId   = isset($body['clubId']) ? (int)$body['clubId'] : null;
+    $role     = (string)($body['role'] ?? 'editor');
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('Ugyldig e-mail.', 422);
     if ($name === '' || strlen($name) > 120) json_error('Navn skal være mellem 1 og 120 tegn.', 422);
@@ -179,23 +182,30 @@ function handle_admin_create_user(): void {
 
     $hash = password_hash($password, PASSWORD_BCRYPT);
     try {
-        $stmt = db()->prepare(
-            'INSERT INTO users (club_id, email, name, password_hash, role, is_admin)
-             VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([$clubId, $email, $name, $hash, $role, $isAdmin]);
+        db()->prepare('INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?)')
+            ->execute([$email, $name, $hash, $isAdmin]);
     } catch (PDOException $e) {
         if ((int)$e->errorInfo[1] === 1062) {
-            json_error('Der findes allerede en bruger med denne e-mail i klubben.', 409);
+            json_error('Der findes allerede en bruger med denne e-mail.', 409);
         }
         throw $e;
     }
+    $userId = (int)db()->lastInsertId();
+
+    if ($clubId) {
+        $stmt = db()->prepare('SELECT id FROM clubs WHERE id = ?');
+        $stmt->execute([$clubId]);
+        if ($stmt->fetch()) {
+            db()->prepare('INSERT INTO club_members (club_id, user_id, role) VALUES (?, ?, ?)')
+                ->execute([$clubId, $userId, $role]);
+        }
+    }
     log_activity($admin, 'user_create', "$name <$email>");
 
-    json_response(['ok' => true, 'id' => (int)db()->lastInsertId()], 201);
+    json_response(['ok' => true, 'id' => $userId], 201);
 }
 
-// PATCH /api/admin/users/:id — redigér bruger på tværs af klubber.
+// PATCH /api/admin/users/:id {name?, email?, password?, isAdmin?}
 function handle_admin_update_user(int $id): void {
     $admin = require_admin();
 
@@ -218,11 +228,6 @@ function handle_admin_update_user(int $id): void {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('Ugyldig e-mail.', 422);
         $updates[] = 'email = ?'; $params[] = $email;
     }
-    if (array_key_exists('role', $body)) {
-        $role = (string)$body['role'];
-        if (!in_array($role, ['owner','editor','viewer'], true)) json_error('Ugyldig rolle.', 422);
-        $updates[] = 'role = ?'; $params[] = $role;
-    }
     if (array_key_exists('password', $body)) {
         $password = (string)$body['password'];
         if (strlen($password) < 6) json_error('Adgangskode skal være mindst 6 tegn.', 422);
@@ -230,7 +235,6 @@ function handle_admin_update_user(int $id): void {
     }
     if (array_key_exists('isAdmin', $body)) {
         $flag = !empty($body['isAdmin']) ? 1 : 0;
-        // Man kan ikke fjerne admin-flaget fra sig selv (lockout-beskyttelse).
         if ((int)$admin['id'] === $id && $flag === 0) {
             json_error('Du kan ikke fjerne admin-rettigheder fra dig selv.', 409);
         }
@@ -243,9 +247,7 @@ function handle_admin_update_user(int $id): void {
     try {
         db()->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
     } catch (PDOException $e) {
-        if ((int)$e->errorInfo[1] === 1062) {
-            json_error('E-mailen er allerede i brug i klubben.', 409);
-        }
+        if ((int)$e->errorInfo[1] === 1062) json_error('E-mailen er allerede i brug.', 409);
         throw $e;
     }
     log_activity($admin, 'user_update', $target['name']);
@@ -253,7 +255,7 @@ function handle_admin_update_user(int $id): void {
     json_response(['ok' => true]);
 }
 
-// DELETE /api/admin/users/:id
+// DELETE /api/admin/users/:id — sletter kontoen globalt (medlemskaber kaskade-slettes).
 function handle_admin_delete_user(int $id): void {
     $admin = require_admin();
 
@@ -266,6 +268,70 @@ function handle_admin_delete_user(int $id): void {
 
     db()->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     log_activity($admin, 'user_delete', "{$target['name']} <{$target['email']}>");
+
+    json_response(['ok' => true]);
+}
+
+// POST /api/admin/memberships {userId, clubId, role} — tilføj/opdatér medlemskab.
+function handle_admin_add_membership(): void {
+    $admin = require_admin();
+
+    $body = read_json_body();
+    $userId = (int)($body['userId'] ?? 0);
+    $clubId = (int)($body['clubId'] ?? 0);
+    $role   = (string)($body['role'] ?? 'editor');
+
+    if (!in_array($role, ['owner','editor','viewer'], true)) json_error('Ugyldig rolle.', 422);
+
+    $stmt = db()->prepare('SELECT name FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    if (!$user) json_error('Brugeren findes ikke.', 404);
+
+    $stmt = db()->prepare('SELECT name FROM clubs WHERE id = ?');
+    $stmt->execute([$clubId]);
+    $club = $stmt->fetch();
+    if (!$club) json_error('Klubben findes ikke.', 404);
+
+    db()->prepare(
+        'INSERT INTO club_members (club_id, user_id, role) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE role = VALUES(role)'
+    )->execute([$clubId, $userId, $role]);
+    log_activity($admin, 'membership_add', "{$user['name']} → {$club['name']} ($role)");
+
+    json_response(['ok' => true]);
+}
+
+// DELETE /api/admin/memberships?userId=&clubId= — fjern medlemskab.
+function handle_admin_remove_membership(): void {
+    $admin = require_admin();
+
+    $userId = (int)($_GET['userId'] ?? 0);
+    $clubId = (int)($_GET['clubId'] ?? 0);
+
+    $stmt = db()->prepare(
+        'SELECT us.name AS user_name, c.name AS club_name, cm.role
+         FROM club_members cm
+         JOIN users us ON us.id = cm.user_id
+         JOIN clubs c ON c.id = cm.club_id
+         WHERE cm.club_id = ? AND cm.user_id = ?'
+    );
+    $stmt->execute([$clubId, $userId]);
+    $m = $stmt->fetch();
+    if (!$m) json_error('Medlemskabet findes ikke.', 404);
+
+    // Beskyt mod at fjerne klubbens sidste owner.
+    if ($m['role'] === 'owner') {
+        $stmt = db()->prepare('SELECT COUNT(*) AS c FROM club_members WHERE club_id = ? AND role = "owner"');
+        $stmt->execute([$clubId]);
+        if ((int)$stmt->fetch()['c'] <= 1) {
+            json_error('Du kan ikke fjerne klubbens sidste owner.', 409);
+        }
+    }
+
+    db()->prepare('DELETE FROM club_members WHERE club_id = ? AND user_id = ?')
+        ->execute([$clubId, $userId]);
+    log_activity($admin, 'membership_remove', "{$m['user_name']} ← {$m['club_name']}");
 
     json_response(['ok' => true]);
 }

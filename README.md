@@ -151,17 +151,38 @@ kampprogram/                    <-- denne mappe deployes som webroot
 
 - Uden login virker appen som før — alt gemmes i din browsers `localStorage`.
 - Når du logger ind, kan du i panelet "Spillerlister" gemme og hente klub-delte spillerlister fra serveren.
-- Owner-rollen ser desuden menupunktet "Brugere" til at oprette og redigere klubbens brugere.
+- En bruger kan være **medlem af flere klubber** med hver sin rolle. Er du
+  medlem af 2+ klubber, vises en klubskifter under 👤-panelet; alle
+  klub-funktioner (lister, medlemmer) arbejder på den aktive klub.
+- Owner-rollen ser menupunktet "Brugere" med klubbens medlemmer og
+  invitationer.
 
-### Roller
+### Invitationer
 
-| Rolle    | Læs klub-lister | Gem/redigér klub-lister | Administrer brugere |
-|----------|:---------------:|:-----------------------:|:-------------------:|
-| `viewer` | ✓               |                         |                     |
-| `editor` | ✓               | ✓                       |                     |
-| `owner`  | ✓               | ✓                       | ✓                   |
+Nye medlemmer inviteres pr. e-mail (menu → 👥 Brugere → Invitér medlem):
 
-Du kan tildele rolle når du opretter en bruger, og ændre den bagefter.
+1. Owner skriver e-mail + vælger rolle → systemet sender en mail med et link
+   (linket vises også i UI'et, så det kan deles manuelt via fx SMS)
+2. Modtageren åbner linket:
+   - Har de allerede en konto → logger ind → medlemskab tilføjes automatisk
+   - Har de ingen konto → opretter navn + adgangskode → konto + medlemskab
+   - Er de allerede logget ind med den inviterede e-mail → én accept-knap
+3. Invitationer udløber efter 14 dage og kan tilbagekaldes af owner
+
+Mailen sendes med PHP's `mail()`. Afsenderadresse og link-basen sættes i
+`api/config.php` under `mail` (`from`, `fromName`, `baseUrl`).
+
+### Roller (pr. klub)
+
+| Rolle    | Læs klub-lister | Gem/redigér klub-lister | Medlemmer & invitationer |
+|----------|:---------------:|:-----------------------:|:------------------------:|
+| `viewer` | ✓               |                         |                          |
+| `editor` | ✓               | ✓                       |                          |
+| `owner`  | ✓               | ✓                       | ✓                        |
+
+Roller er pr. medlemskab — samme bruger kan være owner i én klub og viewer i
+en anden. Owner kan ændre roller og fjerne medlemmer fra klubben (kontoen
+slettes ikke — kun adgangen til klubben).
 
 ### Site-admin (🛠 Admin)
 
@@ -182,21 +203,59 @@ andre direkte i databasen: `UPDATE users SET is_admin = 1 WHERE id = ...;`
 
 ## Tilføj endnu en klub
 
-Default-installationen kommer med én klub (`Min Klub`). Vil du have flere klubber på samme installation, kan du oprette dem direkte i MySQL:
+Klubber oprettes i admin-panelet: menu → **🛠 Admin** → "Opret ny klub".
+Tilføj derefter dig selv (eller andre) via "Tilføj medlemskab" — eller
+invitér medlemmer pr. e-mail fra 👥 Brugere-panelet, når klubben er valgt
+som aktiv klub.
 
-```sql
-INSERT INTO clubs (name, slug) VALUES ('Anden Klub', 'anden-klub');
+## Klubside
 
--- Find klub-id:
-SELECT id FROM clubs WHERE slug = 'anden-klub';
+Klik på menu → **🏸 [klubnavn]** (eller en klub i admin-oversigten) for at
+åbne klubbens side. Her findes:
 
--- Lav en owner (brug PHP til at generere hash):
---   php -r "echo password_hash('din-kode', PASSWORD_BCRYPT);"
-INSERT INTO users (club_id, email, name, password_hash, role)
-VALUES (2, 'admin@anden-klub.dk', 'Admin', '$2y$10$...', 'owner');
-```
+- **Standard antal baner** (kun owner/admin): forvalget for alle medlemmer
+  når de genererer kampe
+- **Igangværende sessioner**: gem aftenens session, så et andet medlem kan
+  klikke "↓ Overtag" og fortsætte med at generere runder. Gemmes igen under
+  samme navn overskrives den (praktisk efter hver runde)
+- **Farezone** (kun owner/admin): slet klubben — kræver at man skriver
+  klubbens navn som bekræftelse
 
-Brugere er låst til deres egen klub — der er ingen risiko for at se en anden klubs data.
+## Niveauer
+
+Spillere har 5 navngivne niveauer: **Nybegynder, Let øvet, Øvet, Rutineret,
+Elite**. Tal vises aldrig i appen — de bruges kun internt af
+match-algoritmen (som stadig kører i browseren). Tekst-import bruger
+formatet `navn,niveau` med tal 1-5 (1=Nybegynder, 5=Elite); værdier over
+5 sættes blot til 5.
+
+## Hold
+
+En klub har én fælles **spillerbase** og kan have flere **hold** — navngivne
+delmængder af spillerbasen. En spiller kan være på flere hold.
+
+- **Hent hold**: Spillerlister-panelet → "☁ Klubbens hold" → vælg hold →
+  Hent. Så er aftenens liste kun holdets spillere, ikke hele klubben.
+- **Gem hold**: "Gem nuværende spillere som hold" — spillerne oprettes/
+  opdateres automatisk i klubbens spillerbase.
+- **Fremmødt gæst fra et andet hold?** Brug "＋ Fra klubben…"-vælgeren
+  øverst i Spillere-panelet — den viser klubbens spillere, som ikke
+  allerede er på aftenens liste.
+- **Administrér hold**: klubsiden (🏸) → Hold → ⚙ på et hold: se medlemmer,
+  fjern (✕) eller tilføj fra spillerbasen. Opret også tomme hold her.
+
+Roller: alle klubmedlemmer kan hente hold og bruge quick-tilføj;
+**editor+** kan oprette/gemme/slette hold og ændre holdmedlemmer.
+
+## Opgradering fra tidligere version
+
+Kør i rækkefølge (via phpMyAdmin → Importér), afhængigt af hvor du er:
+
+1. `upgrade_multiclub.sql` — fra v2 (én klub pr. bruger) til multi-klub
+2. `upgrade_clubpages.sql` — tilføjer klub-baner + delte sessioner
+3. `upgrade_squads.sql` — tilføjer hold + klub-spillerbase
+
+Ny frisk installation bruger blot `schema.sql` (indeholder alt).
 
 ## Nginx
 

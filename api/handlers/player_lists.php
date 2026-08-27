@@ -24,9 +24,9 @@ function pl_normalise_players($input): array {
         if (!is_array($p)) continue;
         $name = trim((string)($p['name'] ?? ''));
         if ($name === '') continue;
-        $level = (int)($p['level'] ?? 5);
+        $level = (int)($p['level'] ?? 3);
+        if ($level > 5) $level = 5;
         if ($level < 1) $level = 1;
-        if ($level > 9) $level = 9;
         $out[] = ['name' => $name, 'level' => $level];
     }
     return $out;
@@ -34,6 +34,7 @@ function pl_normalise_players($input): array {
 
 function handle_player_lists_list(): void {
     $u = require_auth();
+    require_club($u);
     $stmt = db()->prepare(
         'SELECT id, name, players, created_at, updated_at
          FROM player_lists
@@ -47,6 +48,7 @@ function handle_player_lists_list(): void {
 
 function handle_player_lists_create(): void {
     $u = require_auth();
+    require_club($u);
     require_role($u, 'editor');
 
     $body = read_json_body();
@@ -83,6 +85,7 @@ function handle_player_lists_create(): void {
 
 function handle_player_lists_update(int $id): void {
     $u = require_auth();
+    require_club($u);
     require_role($u, 'editor');
 
     $body = read_json_body();
@@ -120,6 +123,7 @@ function handle_player_lists_update(int $id): void {
 
 function handle_player_lists_delete(int $id): void {
     $u = require_auth();
+    require_club($u);
     require_role($u, 'editor');
 
     $stmt = db()->prepare('SELECT name FROM player_lists WHERE id = ? AND club_id = ?');

@@ -1,5 +1,9 @@
 <?php
-// Session-baseret autentificering.
+// Session-baseret autentificering med multi-klub medlemskab.
+//
+// En bruger er global (én pr. e-mail) og kan være medlem af flere klubber
+// via club_members. Sessionen husker den "aktive" klub; alle klub-scopede
+// endpoints arbejder på den. $_SESSION['club_id'] styres af switch-club.
 
 function auth_start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
@@ -18,21 +22,48 @@ function auth_start_session(): void {
     session_start();
 }
 
-// Returnerer den loggede brugers række (med klubnavn vedhæftet), eller null.
+// Returnerer den loggede bruger inkl. medlemskaber og aktiv klub, eller null.
+// Struktur:
+//   id, email, name, is_admin,
+//   clubs: [ [club_id, role, club_name, club_slug], ... ],
+//   club_id / role / club_name / club_slug: den AKTIVE klub (null hvis ingen)
 function auth_current_user(): ?array {
     auth_start_session();
     if (empty($_SESSION['user_id'])) return null;
 
-    $stmt = db()->prepare(
-        'SELECT u.id, u.club_id, u.email, u.name, u.role, u.is_admin,
-                c.name AS club_name, c.slug AS club_slug
-         FROM users u
-         JOIN clubs c ON c.id = u.club_id
-         WHERE u.id = ?'
-    );
+    $stmt = db()->prepare('SELECT id, email, name, is_admin FROM users WHERE id = ?');
     $stmt->execute([$_SESSION['user_id']]);
-    $row = $stmt->fetch();
-    return $row ?: null;
+    $user = $stmt->fetch();
+    if (!$user) return null;
+
+    $stmt = db()->prepare(
+        'SELECT cm.club_id, cm.role, c.name AS club_name, c.slug AS club_slug,
+                c.default_court_count
+         FROM club_members cm
+         JOIN clubs c ON c.id = cm.club_id
+         WHERE cm.user_id = ?
+         ORDER BY c.name ASC'
+    );
+    $stmt->execute([$user['id']]);
+    $clubs = $stmt->fetchAll();
+    $user['clubs'] = $clubs;
+
+    // Aktiv klub: sessionens valg hvis stadig gyldigt, ellers første medlemskab.
+    $active = null;
+    $wanted = $_SESSION['club_id'] ?? null;
+    foreach ($clubs as $c) {
+        if ($wanted !== null && (int)$c['club_id'] === (int)$wanted) { $active = $c; break; }
+    }
+    if ($active === null && count($clubs) > 0) $active = $clubs[0];
+
+    $user['club_id']   = $active ? (int)$active['club_id'] : null;
+    $user['role']      = $active ? $active['role'] : null;
+    $user['club_name'] = $active ? $active['club_name'] : null;
+    $user['club_slug'] = $active ? $active['club_slug'] : null;
+    $user['club_default_courts'] = ($active && $active['default_court_count'] !== null)
+        ? (int)$active['default_court_count'] : null;
+
+    return $user;
 }
 
 // Returnerer brugeren eller afslutter med 401.
@@ -42,12 +73,20 @@ function require_auth(): array {
     return $u;
 }
 
+// Kræver at brugeren har en aktiv klub (medlem af mindst én).
+function require_club(array $user): void {
+    if (empty($user['club_id'])) {
+        json_error('Du er ikke medlem af nogen klub.', 403);
+    }
+}
+
 function auth_login(int $userId): void {
     auth_start_session();
     // Regenerér session-id ved login som beskyttelse mod session-fixation.
     session_regenerate_id(true);
-    $_SESSION['user_id']   = $userId;
+    $_SESSION['user_id'] = $userId;
     $_SESSION['logged_at'] = time();
+    unset($_SESSION['club_id']);   // aktiv klub vælges frisk
 }
 
 function auth_logout(): void {
@@ -62,17 +101,25 @@ function auth_logout(): void {
 }
 
 // Public-facing brugerobjekt (uden password_hash).
-function public_user(array $row): array {
+function public_user(array $u): array {
     return [
-        'id'      => (int)$row['id'],
-        'email'   => $row['email'],
-        'name'    => $row['name'],
-        'role'    => $row['role'],
-        'isAdmin' => !empty($row['is_admin']),
-        'club'    => [
-            'id'   => (int)$row['club_id'],
-            'name' => $row['club_name'] ?? null,
-            'slug' => $row['club_slug'] ?? null,
-        ],
+        'id'      => (int)$u['id'],
+        'email'   => $u['email'],
+        'name'    => $u['name'],
+        'isAdmin' => !empty($u['is_admin']),
+        'club'    => $u['club_id'] ? [
+            'id'   => (int)$u['club_id'],
+            'name' => $u['club_name'],
+            'slug' => $u['club_slug'],
+            'role' => $u['role'],
+            'defaultCourtCount' => $u['club_default_courts'] ?? null,
+        ] : null,
+        'clubs'   => array_map(fn($c) => [
+            'id'   => (int)$c['club_id'],
+            'name' => $c['club_name'],
+            'slug' => $c['club_slug'],
+            'role' => $c['role'],
+            'defaultCourtCount' => $c['default_court_count'] !== null ? (int)$c['default_court_count'] : null,
+        ], $u['clubs'] ?? []),
     ];
 }

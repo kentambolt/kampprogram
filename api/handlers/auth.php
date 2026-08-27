@@ -1,5 +1,6 @@
 <?php
-// /api/auth/login, /api/auth/logout, /api/me, /api/auth/change-password
+// /api/auth/login, /api/auth/logout, /api/auth/switch-club,
+// /api/auth/change-password, /api/me
 
 function handle_auth_login(): void {
     $body = read_json_body();
@@ -10,13 +11,7 @@ function handle_auth_login(): void {
         json_error('Email og adgangskode skal udfyldes.', 422);
     }
 
-    $stmt = db()->prepare(
-        'SELECT u.*, c.name AS club_name, c.slug AS club_slug
-         FROM users u
-         JOIN clubs c ON c.id = u.club_id
-         WHERE u.email = ?
-         LIMIT 1'
-    );
+    $stmt = db()->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $row = $stmt->fetch();
 
@@ -30,13 +25,12 @@ function handle_auth_login(): void {
     auth_login((int)$row['id']);
 
     // Opdatér usage-statistik + log.
-    $stmt = db()->prepare(
-        'UPDATE users SET last_login_at = NOW(), login_count = login_count + 1 WHERE id = ?'
-    );
-    $stmt->execute([$row['id']]);
-    log_activity(['id' => (int)$row['id'], 'club_id' => (int)$row['club_id']], 'login');
+    db()->prepare('UPDATE users SET last_login_at = NOW(), login_count = login_count + 1 WHERE id = ?')
+        ->execute([$row['id']]);
 
-    json_response(['user' => public_user($row)]);
+    $u = auth_current_user();
+    log_activity($u, 'login');
+    json_response(['user' => public_user($u)]);
 }
 
 function handle_auth_logout(): void {
@@ -49,6 +43,23 @@ function handle_auth_logout(): void {
 function handle_me(): void {
     $u = auth_current_user();
     if (!$u) json_response(['user' => null]);
+    json_response(['user' => public_user($u)]);
+}
+
+// POST /api/auth/switch-club {clubId} — skift aktiv klub i sessionen.
+function handle_auth_switch_club(): void {
+    $u = require_auth();
+    $body = read_json_body();
+    $clubId = (int)($body['clubId'] ?? 0);
+
+    $isMember = false;
+    foreach ($u['clubs'] as $c) {
+        if ((int)$c['club_id'] === $clubId) { $isMember = true; break; }
+    }
+    if (!$isMember) json_error('Du er ikke medlem af den klub.', 403);
+
+    $_SESSION['club_id'] = $clubId;
+    $u = auth_current_user();
     json_response(['user' => public_user($u)]);
 }
 
@@ -71,8 +82,7 @@ function handle_auth_change_password(): void {
     }
 
     $hash = password_hash($next, PASSWORD_BCRYPT);
-    $stmt = db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
-    $stmt->execute([$hash, $u['id']]);
+    db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([$hash, $u['id']]);
     log_activity($u, 'password_change');
 
     json_response(['ok' => true]);

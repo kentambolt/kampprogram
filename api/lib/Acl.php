@@ -14,6 +14,7 @@ function role_at_least(array $user, string $required): bool {
 }
 
 function require_role(array $user, string $required): void {
+    if (!empty($user['is_admin'])) return;   // site-admin må alt
     if (!role_at_least($user, $required)) {
         json_error('Du har ikke rettigheder til denne handling.', 403);
     }

@@ -49,6 +49,18 @@
                             <span class="menu-radio-marker" aria-hidden="true">●</span>
                             <span>Efter niveau (lav → høj)</span>
                         </button>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="created-desc" aria-checked="false">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Nyeste først</span>
+                        </button>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="created-asc" aria-checked="false">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Ældste først</span>
+                        </button>
+                        <button class="menu-item menu-radio" type="button" data-sort-value="active-first" aria-checked="false">
+                            <span class="menu-radio-marker" aria-hidden="true">●</span>
+                            <span>Aktive først</span>
+                        </button>
                     </div>
                     <button class="danger menu-item" id="bulkDeleteBtn" type="button">✕ Slet spillere…</button>
                 </div>
@@ -56,9 +68,10 @@
             <div class="header-menu">
                 <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu" title="Menu">☰</button>
                 <div class="menu-dropdown" id="menuDropdown">
+                    <button class="menu-item hidden" id="clubBtn">🏸 Klub</button>
                     <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
                     <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
-                    <button class="menu-item account-menu-item" id="accountBtn">👤 Log ind</button>
+                    <button class="menu-item menu-item--section account-menu-item" id="accountBtn">👤 Log ind</button>
                     <button class="menu-item hidden" id="usersBtn">👥 Brugere</button>
                     <button class="menu-item hidden" id="adminBtn">🛠 Admin</button>
                     <button class="danger menu-item" id="resetAllBtn">✕ Nulstil</button>
@@ -77,6 +90,9 @@
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
                         <div class="actions player-actions">
+                            <select id="quickAddClubPlayer" class="sort-select hidden" aria-label="Tilføj spiller fra klubben">
+                                <option value="">＋ Fra klubben…</option>
+                            </select>
                             <button class="primary" id="newPlayerBtn">+ Opret</button>
                         </div>
                     </div>
@@ -105,28 +121,28 @@
 
                         <div class="collapsible-content">
                             <div id="cloudListsSection" class="cloud-lists-section hidden">
-                                <h4 class="lists-section-title">☁ Klubbens spillerlister</h4>
+                                <h4 class="lists-section-title">☁ Klubbens hold</h4>
                                 <div class="settings-row" style="margin-top: 0;">
-                                    <label for="cloudPlayerList">Hent klub-liste</label>
+                                    <label for="cloudPlayerList">Hent hold</label>
                                     <div class="actions">
                                         <select id="cloudPlayerList">
-                                            <option value="">Vælg liste</option>
+                                            <option value="">Vælg hold</option>
                                         </select>
                                         <button class="primary" id="loadCloudListBtn">↓ Hent</button>
                                     </div>
                                 </div>
                                 <div class="settings-row cloud-editor-only">
-                                    <label for="newCloudListName">Gem nuværende spillere som ny klub-liste</label>
+                                    <label for="newCloudListName">Gem nuværende spillere som hold</label>
                                     <div class="actions">
                                         <input id="newCloudListName" type="text" placeholder="Fx Torsdagsholdet"/>
                                         <button class="primary" id="saveCloudListBtn">✓ Gem</button>
                                     </div>
                                 </div>
                                 <div class="settings-row cloud-editor-only">
-                                    <label for="deleteCloudList">Slet klub-liste</label>
+                                    <label for="deleteCloudList">Slet hold</label>
                                     <div class="actions">
                                         <select id="deleteCloudList">
-                                            <option value="">Vælg liste</option>
+                                            <option value="">Vælg hold</option>
                                         </select>
                                         <button class="danger" id="deleteCloudListBtn">✕ Slet</button>
                                     </div>
@@ -189,6 +205,11 @@
                             <input id="courtCount" type="number" min="1" value="2"/>
                         </div>
                         <button class="primary" id="generateBtn">▶ Lav næste kamprunde</button>
+                    </div>
+
+                    <div class="session-share-row hidden" id="sessionShareRow">
+                        <button class="ghost" id="saveClubSessionBtn" type="button">☁ Gem session til klubben</button>
+                        <span class="session-share-hint">Gemmer aftenens tilstand (fremmødte, runder, bænk), så et andet klubmedlem kan overtage.</span>
                     </div>
 
                     <div class="prefill-panel collapsible-panel collapsed" id="prefillPanel">
@@ -317,10 +338,10 @@
 
                 <div class="settings-row" id="maximizeCourtsRow">
                     <label class="checkbox-with-hint">
-                        <input id="maximizeCourts" type="checkbox" checked />
+                        <input id="maximizeCourts" type="checkbox" />
                         <span class="checkbox-with-hint__text">
                             Brug flest mulige baner (ellers færreste mulige).
-                            <em class="setting-inline-hint">Fx 4 single-kampe fremfor 2 doubler.</em>
+                            <em class="setting-inline-hint">Fx 4 single-kampe fremfor 2 doubler. Som standard bruges færrest mulige baner.</em>
                         </span>
                     </label>
                 </div>
@@ -373,10 +394,6 @@
                 <div class="user-create-form">
                     <h3>Opret bruger</h3>
                     <div class="settings-row">
-                        <label for="adminNewUserClub">Klub</label>
-                        <select id="adminNewUserClub"></select>
-                    </div>
-                    <div class="settings-row">
                         <label for="adminNewUserName">Navn</label>
                         <input id="adminNewUserName" type="text"/>
                     </div>
@@ -389,7 +406,11 @@
                         <input id="adminNewUserPassword" type="text" placeholder="Mindst 6 tegn"/>
                     </div>
                     <div class="settings-row">
-                        <label for="adminNewUserRole">Rolle</label>
+                        <label for="adminNewUserClub">Tilføj til klub (valgfrit)</label>
+                        <select id="adminNewUserClub"></select>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminNewUserRole">Rolle i klubben</label>
                         <select id="adminNewUserRole">
                             <option value="viewer">viewer</option>
                             <option value="editor" selected>editor</option>
@@ -401,18 +422,122 @@
                     </div>
                     <div class="login-error hidden" id="adminNewUserError"></div>
                 </div>
+                <div class="user-create-form">
+                    <h3>Tilføj medlemskab</h3>
+                    <div class="settings-row">
+                        <label for="adminMemberUser">Bruger</label>
+                        <select id="adminMemberUser"></select>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminMemberClub">Klub</label>
+                        <select id="adminMemberClub"></select>
+                    </div>
+                    <div class="settings-row">
+                        <label for="adminMemberRole">Rolle</label>
+                        <select id="adminMemberRole">
+                            <option value="viewer">viewer</option>
+                            <option value="editor" selected>editor</option>
+                            <option value="owner">owner</option>
+                        </select>
+                    </div>
+                    <div class="login-actions">
+                        <button class="primary" id="adminAddMembershipBtn" type="button">+ Tilføj til klub</button>
+                    </div>
+                </div>
                 <div class="users-list" id="adminUsersList"></div>
 
                 <h3 class="mt24">Seneste aktivitet</h3>
                 <div class="admin-activity" id="adminActivityList"></div>
             </div>
 
+
+
+            <div class="panel club-panel standalone" id="clubPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m" id="clubPanelTitle">Klub</h2>
+                    <button class="ghost" id="closeClubBtn">✕ Luk</button>
+                </div>
+                <p class="muted" id="clubPanelStats"></p>
+
+                <div id="clubCourtsRow" class="settings-row hidden">
+                    <label for="clubCourtsInput">Standard antal baner for klubben</label>
+                    <div class="actions">
+                        <input id="clubCourtsInput" type="number" min="1" max="50" placeholder="fx 4" style="width: 6rem;"/>
+                        <button class="primary" id="saveClubCourtsBtn" type="button">✓ Gem</button>
+                    </div>
+                    <em class="setting-inline-hint">Forvalgt antal baner for alle klubbens medlemmer, når de genererer kampe.</em>
+                </div>
+
+                <h3 class="mt24">Hold</h3>
+                <p class="muted">Et hold er en delmængde af klubbens spillere — hent holdet i "Spillerlister"-panelet, når I skal spille. En spiller kan være på flere hold.</p>
+                <div id="clubSquadCreateRow" class="settings-row hidden">
+                    <label for="clubNewSquadName">Opret nyt (tomt) hold</label>
+                    <div class="actions">
+                        <input id="clubNewSquadName" type="text" placeholder="Fx Herrer A"/>
+                        <button class="primary" id="clubCreateSquadBtn" type="button">+ Opret hold</button>
+                    </div>
+                </div>
+                <div class="users-list" id="clubSquadsList"></div>
+
+                <h3 class="mt24">Igangværende sessioner</h3>
+                <p class="muted">Overtag en session, et andet medlem har gemt — så fortsætter du med fuld kontekst (fremmødte, runder, hvem der har siddet over). Selve gemningen sker fra "Lav kampe"-panelet, hvor aftenen er i gang.</p>
+                <div class="users-list" id="clubSessionsList"></div>
+
+                <div id="clubDangerZone" class="club-danger-zone hidden">
+                    <h3 class="mt24">Farezone</h3>
+                    <p class="muted">Sletning fjerner klubben permanent inkl. alle medlemskaber, spillerlister og sessioner.</p>
+                    <button class="danger" id="deleteClubBtn" type="button">✕ Slet klubben permanent</button>
+                </div>
+            </div>
+
+            <div class="panel invite-panel standalone" id="invitePanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Invitation</h2>
+                    <button class="ghost" id="closeInviteBtn">✕ Luk</button>
+                </div>
+                <p id="inviteInfoText"></p>
+                <div id="inviteAcceptView" class="hidden">
+                    <div class="login-actions">
+                        <button class="primary" type="button" id="acceptInviteBtn">✓ Acceptér invitation</button>
+                    </div>
+                </div>
+                <div id="inviteLoginView" class="hidden">
+                    <p class="muted">Du har allerede en konto — log ind for at acceptere invitationen.</p>
+                    <form id="inviteLoginForm" novalidate>
+                        <div class="settings-row">
+                            <label for="inviteLoginPassword">Adgangskode</label>
+                            <input id="inviteLoginPassword" type="password" autocomplete="current-password"/>
+                        </div>
+                        <div class="login-actions">
+                            <button class="primary" type="submit">Log ind og acceptér</button>
+                        </div>
+                    </form>
+                </div>
+                <div id="inviteRegisterView" class="hidden">
+                    <p class="muted">Opret en konto for at acceptere invitationen.</p>
+                    <form id="inviteRegisterForm" novalidate>
+                        <div class="settings-row">
+                            <label for="inviteRegName">Dit navn</label>
+                            <input id="inviteRegName" type="text"/>
+                        </div>
+                        <div class="settings-row">
+                            <label for="inviteRegPassword">Vælg adgangskode (mindst 6 tegn)</label>
+                            <input id="inviteRegPassword" type="password" autocomplete="new-password" minlength="6"/>
+                        </div>
+                        <div class="login-actions">
+                            <button class="primary" type="submit">Opret konto og acceptér</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="login-error hidden" id="inviteFlowError"></div>
+            </div>
+
             <div class="panel login-panel standalone" id="loginPanel">
                 <div class="flex-row">
-                    <h2 class="h-no-m">Log ind</h2>
+                    <h2 class="h-no-m" id="loginPanelTitle">Log ind</h2>
                     <button class="ghost" id="closeLoginBtn">✕ Luk</button>
                 </div>
-                <p class="muted">Log ind for at gemme og hente spillerlister fra din klub.</p>
+                <p class="muted" id="loginIntro">Log ind for at hente klubbens hold og dele sessioner med andre medlemmer.</p>
                 <form id="loginForm" autocomplete="on" novalidate>
                     <div class="settings-row">
                         <label for="loginEmail">E-mail</label>
@@ -428,7 +553,12 @@
                     <div class="login-error hidden" id="loginError"></div>
                 </form>
                 <div id="loggedInView" class="hidden">
-                    <p>Du er logget ind som <strong id="loggedInName"></strong> (<span id="loggedInRole"></span>) i klubben <strong id="loggedInClub"></strong>.</p>
+                    <p>Du er logget ind som <strong id="loggedInName"></strong><span id="loggedInClubInfo"> — <span id="loggedInRole"></span> i klubben <strong id="loggedInClub"></strong></span>.</p>
+                    <p class="muted hidden" id="noClubHint"></p>
+                    <div class="settings-row hidden" id="clubSwitchRow">
+                        <label for="clubSwitchSelect">Aktiv klub</label>
+                        <select id="clubSwitchSelect"></select>
+                    </div>
                     <div class="login-actions">
                         <button class="ghost" type="button" id="changePasswordBtn">Skift adgangskode</button>
                         <button class="danger" type="button" id="logoutBtn">Log ud</button>
@@ -438,38 +568,33 @@
 
             <div class="panel users-panel standalone" id="usersPanel">
                 <div class="flex-row">
-                    <h2 class="h-no-m">Brugere</h2>
+                    <h2 class="h-no-m">Medlemmer</h2>
                     <button class="ghost" id="closeUsersBtn">✕ Luk</button>
                 </div>
-                <p class="muted">Owner-rollen kan oprette og redigere brugere i klubben. Send selv login-oplysninger til den enkelte bruger.</p>
+                <p class="muted">Invitér nye medlemmer pr. e-mail. Modtageren får et link, hvor de logger ind — eller opretter en konto — og automatisk bliver medlem af klubben.</p>
                 <div class="user-create-form">
-                    <h3>Opret bruger</h3>
+                    <h3>Invitér medlem</h3>
                     <div class="settings-row">
-                        <label for="newUserName">Navn</label>
-                        <input id="newUserName" type="text"/>
+                        <label for="inviteEmail">E-mail</label>
+                        <input id="inviteEmail" type="email" placeholder="navn@eksempel.dk"/>
                     </div>
                     <div class="settings-row">
-                        <label for="newUserEmail">E-mail</label>
-                        <input id="newUserEmail" type="email"/>
-                    </div>
-                    <div class="settings-row">
-                        <label for="newUserPassword">Adgangskode</label>
-                        <input id="newUserPassword" type="text" placeholder="Mindst 6 tegn"/>
-                    </div>
-                    <div class="settings-row">
-                        <label for="newUserRole">Rolle</label>
-                        <select id="newUserRole">
+                        <label for="inviteRole">Rolle</label>
+                        <select id="inviteRole">
                             <option value="viewer">viewer — kun læse</option>
                             <option value="editor" selected>editor — gemme/redigere lister</option>
                             <option value="owner">owner — fuld adgang</option>
                         </select>
                     </div>
                     <div class="login-actions">
-                        <button class="primary" type="button" id="createUserBtn">Opret bruger</button>
+                        <button class="primary" type="button" id="sendInviteBtn">✉ Send invitation</button>
                     </div>
-                    <div class="login-error hidden" id="newUserError"></div>
+                    <div class="login-error hidden" id="inviteError"></div>
+                    <div class="invite-link-box hidden" id="inviteLinkBox"></div>
                 </div>
-                <h3 class="mt24">Eksisterende brugere</h3>
+                <h3 class="mt24">Afventende invitationer</h3>
+                <div class="users-list" id="invitesList"></div>
+                <h3 class="mt24">Medlemmer</h3>
                 <div class="users-list" id="usersList"></div>
             </div>
 
@@ -516,11 +641,11 @@
                 </div>
 
                 <div class="settings-row">
-                    <label for="playerImportText">Indsæt spillerliste (navn,niveau)</label>
+                    <label for="playerImportText">Indsæt spillerliste (navn,niveau 1-5 hvor 1=Nybegynder og 5=Elite)</label>
                     <textarea
                             id="playerImportText"
                             rows="10"
-                            placeholder="Hans,3&#10;Anne,7&#10;Lotte,2&#10;Peter,4&#10;Mie,2"
+                            placeholder="Hans,3&#10;Anne,4&#10;Lotte,2&#10;Peter,5&#10;Mie,1"
                     ></textarea>
                 </div>
 
@@ -561,15 +686,11 @@
                     <div>
                         <label for="newPlayerLevel">Niveau</label>
                         <select id="newPlayerLevel">
-                            <option value="1">1</option>
-                            <option value="2" selected>2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
+                            <option value="1">Nybegynder</option>
+                            <option value="2">Let øvet</option>
+                            <option value="3" selected>Øvet</option>
+                            <option value="4">Rutineret</option>
+                            <option value="5">Elite</option>
                         </select>
                     </div>
                 </div>

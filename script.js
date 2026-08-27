@@ -19,6 +19,19 @@ const HARD_REJECT_THRESHOLD = -1e8;
 const COURT_FORMAT_AUTO = 'auto';
 const MAX_TEAM_SIZE = 11;
 
+// 5 navngivne niveauer. Tallene (1-5) bruges KUN internt af
+// match-algoritmen — brugerne ser aldrig tal.
+const LEVEL_NAMES = ['Nybegynder', 'Let øvet', 'Øvet', 'Rutineret', 'Elite'];
+
+function clampLevel(raw) {
+    const n = Number(raw) || 3;
+    return Math.max(1, Math.min(5, Math.round(n)));
+}
+
+function levelName(level) {
+    return LEVEL_NAMES[clampLevel(level) - 1];
+}
+
 
 const state = {
     roster: [],
@@ -31,7 +44,9 @@ const state = {
     sortPlayersBy: 'name',
     // Server-auth state. user = null when not logged in.
     user: null,
-    cloudLists: [],
+    // Klubbens hold + fælles spillerbase (hentes efter login/klubskifte).
+    cloudSquads: [],
+    clubPlayers: [],
 };
 
 const STORAGE_KEY = 'kampprogram-state-v3';
@@ -156,6 +171,9 @@ const el = {
     loginPassword: document.getElementById('loginPassword'),
     loginSubmitBtn: document.getElementById('loginSubmitBtn'),
     loginError: document.getElementById('loginError'),
+    loginPanelTitle: document.getElementById('loginPanelTitle'),
+    loginIntro: document.getElementById('loginIntro'),
+    noClubHint: document.getElementById('noClubHint'),
     loggedInView: document.getElementById('loggedInView'),
     loggedInName: document.getElementById('loggedInName'),
     loggedInRole: document.getElementById('loggedInRole'),
@@ -171,12 +189,50 @@ const el = {
     usersPanel: document.getElementById('usersPanel'),
     closeUsersBtn: document.getElementById('closeUsersBtn'),
     usersList: document.getElementById('usersList'),
-    newUserName: document.getElementById('newUserName'),
-    newUserEmail: document.getElementById('newUserEmail'),
-    newUserPassword: document.getElementById('newUserPassword'),
-    newUserRole: document.getElementById('newUserRole'),
-    createUserBtn: document.getElementById('createUserBtn'),
-    newUserError: document.getElementById('newUserError'),
+    invitesList: document.getElementById('invitesList'),
+    inviteEmail: document.getElementById('inviteEmail'),
+    inviteRole: document.getElementById('inviteRole'),
+    sendInviteBtn: document.getElementById('sendInviteBtn'),
+    inviteError: document.getElementById('inviteError'),
+    inviteLinkBox: document.getElementById('inviteLinkBox'),
+    clubSwitchRow: document.getElementById('clubSwitchRow'),
+    clubSwitchSelect: document.getElementById('clubSwitchSelect'),
+    loggedInClubInfo: document.getElementById('loggedInClubInfo'),
+    invitePanel: document.getElementById('invitePanel'),
+    closeInviteBtn: document.getElementById('closeInviteBtn'),
+    inviteInfoText: document.getElementById('inviteInfoText'),
+    inviteAcceptView: document.getElementById('inviteAcceptView'),
+    inviteLoginView: document.getElementById('inviteLoginView'),
+    inviteRegisterView: document.getElementById('inviteRegisterView'),
+    acceptInviteBtn: document.getElementById('acceptInviteBtn'),
+    inviteLoginForm: document.getElementById('inviteLoginForm'),
+    inviteLoginPassword: document.getElementById('inviteLoginPassword'),
+    inviteRegisterForm: document.getElementById('inviteRegisterForm'),
+    inviteRegName: document.getElementById('inviteRegName'),
+    inviteRegPassword: document.getElementById('inviteRegPassword'),
+    inviteFlowError: document.getElementById('inviteFlowError'),
+    adminMemberUser: document.getElementById('adminMemberUser'),
+    adminMemberClub: document.getElementById('adminMemberClub'),
+    adminMemberRole: document.getElementById('adminMemberRole'),
+    adminAddMembershipBtn: document.getElementById('adminAddMembershipBtn'),
+    clubBtn: document.getElementById('clubBtn'),
+    clubPanel: document.getElementById('clubPanel'),
+    closeClubBtn: document.getElementById('closeClubBtn'),
+    clubPanelTitle: document.getElementById('clubPanelTitle'),
+    clubPanelStats: document.getElementById('clubPanelStats'),
+    clubCourtsRow: document.getElementById('clubCourtsRow'),
+    clubCourtsInput: document.getElementById('clubCourtsInput'),
+    saveClubCourtsBtn: document.getElementById('saveClubCourtsBtn'),
+    sessionShareRow: document.getElementById('sessionShareRow'),
+    saveClubSessionBtn: document.getElementById('saveClubSessionBtn'),
+    clubSessionsList: document.getElementById('clubSessionsList'),
+    clubDangerZone: document.getElementById('clubDangerZone'),
+    deleteClubBtn: document.getElementById('deleteClubBtn'),
+    quickAddClubPlayer: document.getElementById('quickAddClubPlayer'),
+    clubSquadCreateRow: document.getElementById('clubSquadCreateRow'),
+    clubNewSquadName: document.getElementById('clubNewSquadName'),
+    clubCreateSquadBtn: document.getElementById('clubCreateSquadBtn'),
+    clubSquadsList: document.getElementById('clubSquadsList'),
     cloudListsSection: document.getElementById('cloudListsSection'),
     cloudPlayerList: document.getElementById('cloudPlayerList'),
     loadCloudListBtn: document.getElementById('loadCloudListBtn'),
@@ -224,7 +280,7 @@ function getRawEnabledFormats() {
 function deriveTeamSize(activeCount) {
     const enabled = getRawEnabledFormats();
     if (enabled.length === 0) return null;
-    const maximize = el.maximizeCourts?.checked ?? true;
+    const maximize = el.maximizeCourts?.checked ?? false;
 
     let bestN = null;
     let bestKey = null;
@@ -378,9 +434,7 @@ function renderTeams() {
     if (el.teamsTitle) el.teamsTitle.textContent = `Hold (${state.teams.length})`;
 
     el.teamsArea.innerHTML = state.teams.map((team) => {
-        const totalLevelHtml = shouldShowLevels()
-            ? `<span class="team-card-total">Total: ${team.level}</span>`
-            : '';
+        const totalLevelHtml = '';
         return `
             <div class="team-card">
                 <div class="team-card-header">
@@ -391,7 +445,7 @@ function renderTeams() {
                     ${team.members.map(m => `
                         <div class="team-card-member">
                             <span>${escapeHtml(m.name)}</span>
-                            ${shouldShowLevels() ? `<span class="level">${m.level}</span>` : ''}
+                            ${shouldShowLevels() ? `<span class="level">${escapeHtml(levelName(m.level))}</span>` : ''}
                         </div>
                     `).join('')}
                 </div>
@@ -436,15 +490,18 @@ function normalizePlayer(player) {
             active: player.active === undefined ? true : Boolean(player.active),
             members: player.members.map(m => ({
                 name: normalizeName(m.name),
-                level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+                level: clampLevel(m.level),
             })),
             id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
         };
     }
     return {
         name: normalizeName(player.name),
-        level: Math.min(9, Math.max(1, Number(player.level) || 1)),
+        level: clampLevel(player.level),
         active: Boolean(player.active),
+        // Oprettelsestidspunkt (til sortering). Gamle spillere uden stempel
+        // får ét første gang, de normaliseres — stabilt derefter.
+        createdAt: Number(player.createdAt) || Date.now(),
     };
 }
 
@@ -452,7 +509,7 @@ function normalizeTeam(team) {
     if (!team || !Array.isArray(team.members)) return null;
     const members = team.members.map(m => ({
         name: normalizeName(m.name),
-        level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+        level: clampLevel(m.level),
     }));
     return {
         id: team.id || `team-${Math.random().toString(36).slice(2, 8)}`,
@@ -463,9 +520,10 @@ function normalizeTeam(team) {
     };
 }
 
-function getLevelOptions(selectedLevel = 1) {
-    return Array.from({length: 9}, (_, i) => i + 1)
-        .map(level => `<option value="${level}" ${Number(selectedLevel) === level ? 'selected' : ''}>${level}</option>`)
+function getLevelOptions(selectedLevel = 3) {
+    const sel = clampLevel(selectedLevel);
+    return LEVEL_NAMES
+        .map((name, i) => `<option value="${i + 1}" ${sel === i + 1 ? 'selected' : ''}>${name}</option>`)
         .join('');
 }
 
@@ -480,7 +538,7 @@ function getPlayerSelectOptions(includeEmpty = true) {
         .sort((a, b) => a.name.localeCompare(b.name, 'da'));
 
     activePlayers.forEach(player => {
-        const levelSuffix = shouldShowLevels() ? ` (${player.level})` : '';
+        const levelSuffix = shouldShowLevels() ? ` (${levelName(player.level)})` : '';
         options.push(`<option value="${escapeHtml(player.name)}">${escapeHtml(player.name)}${levelSuffix}</option>`);
     });
 
@@ -512,7 +570,7 @@ function saveState() {
                 }
                 return formats.length > 0 ? formats : [1, 2];
             })(),
-            maximizeCourts: el.maximizeCourts?.checked ?? true,
+            maximizeCourts: el.maximizeCourts?.checked ?? false,
             defaultCourtCount: el.defaultCourtCount?.value ?? '2',
             teamMode: el.teamMode?.checked ?? false,
             prefills: getPrefillStateFromUi(),
@@ -609,7 +667,7 @@ function restoreState() {
                 const cb = document.getElementById(`format-${n}v${n}`);
                 if (cb) cb.checked = savedFormats.includes(n);
             }
-            if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? true;
+            if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? false;
             if (el.teamMode) {
                 el.teamMode.checked = Boolean(data.ui.teamMode);
                 syncTeamModeToggle();
@@ -681,14 +739,14 @@ function normalizePlayerForRound(player) {
             active: true,
             members: player.members.map(m => ({
                 name: normalizeName(m.name),
-                level: Math.min(9, Math.max(1, Number(m.level) || 1)),
+                level: clampLevel(m.level),
             })),
             id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
         };
     }
     return {
         name: normalizeName(player.name),
-        level: Math.min(9, Math.max(1, Number(player.level) || 1)),
+        level: clampLevel(player.level),
         active: true,
     };
 }
@@ -986,10 +1044,16 @@ function isLevelVisibleForPlayer(_playerName) {
 // Sort a player list according to the user's chosen sort mode. Falls back
 // to alphabetical when levels aren't in use (sorting by hidden values is silly).
 function sortPlayersForDisplay(players) {
-    const mode = isUsingSkillLevels() ? (state.sortPlayersBy || 'name') : 'name';
+    let mode = state.sortPlayersBy || 'name';
+    // Niveau-sortering er meningsløs når niveauer ikke er i brug.
+    if (!isUsingSkillLevels() && mode.startsWith('level')) mode = 'name';
     const byName = (a, b) => a.name.localeCompare(b.name, 'da');
-    if (mode === 'level-asc')  return [...players].sort((a, b) => (a.level - b.level) || byName(a, b));
-    if (mode === 'level-desc') return [...players].sort((a, b) => (b.level - a.level) || byName(a, b));
+    const created = (p) => Number(p.createdAt) || 0;
+    if (mode === 'level-asc')    return [...players].sort((a, b) => (a.level - b.level) || byName(a, b));
+    if (mode === 'level-desc')   return [...players].sort((a, b) => (b.level - a.level) || byName(a, b));
+    if (mode === 'created-desc') return [...players].sort((a, b) => (created(b) - created(a)) || byName(a, b));
+    if (mode === 'created-asc')  return [...players].sort((a, b) => (created(a) - created(b)) || byName(a, b));
+    if (mode === 'active-first') return [...players].sort((a, b) => ((b.active ? 1 : 0) - (a.active ? 1 : 0)) || byName(a, b));
     return [...players].sort(byName);
 }
 
@@ -1286,7 +1350,7 @@ function comparePlanScore(candidateKey, bestKey) {
 
     // Court count preference: maximise or minimise based on setting
     if (candidateKey[1] !== bestKey[1]) {
-        const maximize = el.maximizeCourts?.checked ?? true;
+        const maximize = el.maximizeCourts?.checked ?? false;
         return maximize ? (candidateKey[1] - bestKey[1]) : (bestKey[1] - candidateKey[1]);
     }
 
@@ -1712,16 +1776,15 @@ function renderRoster() {
     el.playerRosterArea.innerHTML = sortPlayersForDisplay(activePlayers)
         .map(player => {
             const index = state.roster.findIndex(p => p.name === player.name);
-            const levelHtml = shouldShowLevels() ? `<span class="lowered">${player.level}</span>` : '';
             return `
             <button class="player-chip" type="button" data-action="remove-player" data-player-index="${index}" title="Klik for at sætte spilleren som inaktiv">
                 ${escapeHtml(player.name)}
-                ${levelHtml}
             </button>
         `;
         }).join('');
 
     renderPrefillArea(getPrefillStateFromUi());
+    syncQuickAddOptions();
 }
 
 function renderPlayerManagerList() {
@@ -1838,7 +1901,7 @@ function buildResultSlotSelectHtml(round, currentName, courtIndex, side, slotInd
         const isTeam = Boolean(p.members);
         const label = isTeam
             ? p.name
-            : `${p.name}${shouldShowLevels() ? ` (${p.level})` : ''}`;
+            : `${p.name}${shouldShowLevels() ? ` (${levelName(p.level)})` : ''}`;
         return `<option value="${escapeHtml(p.name)}" ${p.name === currentName ? 'selected' : ''}>${escapeHtml(label)}</option>`;
     }).join('');
 
@@ -1958,7 +2021,7 @@ function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing, ma
         const memberLines = entry.members.map(m => `
             <div class="team-member-line">
                 <span>${escapeHtml(m.name)}</span>
-                ${shouldShowLevels() ? `<span class="level">${m.level}</span>` : ''}
+                ${shouldShowLevels() ? `<span class="level">${escapeHtml(levelName(m.level))}</span>` : ''}
             </div>
         `).join('');
 
@@ -1991,7 +2054,7 @@ function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing, ma
     }
     return `<div class="player-line">
         <span>${escapeHtml(entry.name)}</span>
-        ${shouldShowLevels() ? `<span class="level">${entry.level}</span>` : ''}
+        ${shouldShowLevels() && !entry.members ? `<span class="level">${escapeHtml(levelName(entry.level))}</span>` : ''}
     </div>`;
 }
 
@@ -2152,7 +2215,7 @@ function buildSessionPayload() {
     //                'none'|'prefer'|'oneNew'|'allNew' -> 0|1|2|3
     const encLevelRule = (v) => ({none:0, prefer:1, require:2})[v] ?? 1;
     const encNewRule   = (v) => ({none:0, prefer:1, oneNew:2, allNew:3})[v] ?? 1;
-    const encSort      = (v) => ({name:0, 'level-asc':1, 'level-desc':2})[v] ?? 0;
+    const encSort      = (v) => ({name:0, 'level-asc':1, 'level-desc':2, 'created-desc':3, 'created-asc':4, 'active-first':5})[v] ?? 0;
 
     const u = [
         Number(el.courtCount.value) || 2,
@@ -2162,7 +2225,7 @@ function buildSessionPayload() {
         encNewRule(el.newOpponentRule?.value),
         el.disallowExactRepeat?.checked ? 1 : 0,
         formatsMask,
-        (el.maximizeCourts?.checked ?? true) ? 1 : 0,
+        (el.maximizeCourts?.checked ?? false) ? 1 : 0,
         Number(el.defaultCourtCount?.value) || 2,
         el.teamMode?.checked ? 1 : 0,
         state.showAllLevels ? 1 : 0,
@@ -2279,7 +2342,7 @@ function expandSessionPayload(data) {
     // Decoders for v3-shape values
     const decLevelRule = (n) => ['none','prefer','require'][Number(n) || 0] || 'none';
     const decNewRule   = (n) => ['none','prefer','oneNew','allNew'][Number(n) || 0] || 'none';
-    const decSort      = (n) => ['name','level-asc','level-desc'][Number(n) || 0] || 'name';
+    const decSort      = (n) => ['name','level-asc','level-desc','created-desc','created-asc','active-first'][Number(n) || 0] || 'name';
 
     let ui;
     if (isV3) {
@@ -2438,7 +2501,7 @@ function applySessionPayload(data) {
             const cb = document.getElementById(`format-${n}v${n}`);
             if (cb) cb.checked = savedFormats.includes(n);
         }
-        if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? true;
+        if (el.maximizeCourts) el.maximizeCourts.checked = data.ui.maximizeCourts ?? false;
         if (el.teamMode) {
             el.teamMode.checked = Boolean(data.ui.teamMode);
             syncTeamModeToggle();
@@ -2513,8 +2576,8 @@ function addPlayer() {
         return;
     }
 
-    if (!Number.isInteger(level) || level < 1 || level > 9) {
-        showStatusMessage('Niveau skal være et heltal fra 1 til 9.');
+    if (!Number.isInteger(level) || level < 1 || level > 5) {
+        showStatusMessage('Vælg et niveau.');
         return;
     }
 
@@ -2523,10 +2586,10 @@ function addPlayer() {
         return;
     }
 
-    state.roster.push({name, level, active: true});
+    state.roster.push({name, level, active: true, createdAt: Date.now()});
 
     el.newPlayerName.value = '';
-    el.newPlayerLevel.value = '2';
+    el.newPlayerLevel.value = '3';
 
     renderRoster();
     renderPlayerManagerList();
@@ -2561,7 +2624,7 @@ function parsePlayersFromText(text) {
         }
 
         if (!Number.isInteger(level) || level < 1 || level > 9) {
-            throw new Error(`Ugyldigt niveau for "${name}". Niveau skal være et heltal fra 1 til 9.`);
+            throw new Error(`Ugyldigt niveau for "${name}". Brug et tal fra 1 til 5 (1=Nybegynder, 5=Elite).`);
         }
 
         const lowerName = name.toLowerCase();
@@ -2572,7 +2635,7 @@ function parsePlayersFromText(text) {
         seenNames.add(lowerName);
         players.push({
             name,
-            level,
+            level: clampLevel(level),
             active: false
         });
     }
@@ -3075,7 +3138,7 @@ function renderBulkDeleteList() {
     const showLevels = shouldShowLevels();
     el.bulkDeleteList.innerHTML = players.map(p => {
         const safeName = escapeHtml(p.name);
-        const level = showLevels ? `<span class="bulk-delete-level">niveau ${p.level}</span>` : '';
+        const level = showLevels ? `<span class="bulk-delete-level">${escapeHtml(levelName(p.level))}</span>` : '';
         return `
             <label class="bulk-delete-row">
                 <input type="checkbox" data-bulk-name="${safeName}"/>
@@ -3255,124 +3318,319 @@ async function bootstrapAuth() {
     } catch (e) {
         applyAuthState(null);
     }
+    // Invitationslink? (?invite=TOKEN) → åbn invitationsflowet.
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('invite');
+        if (token) await openInviteFlow(token);
+    } catch (e) { /* ignorér */ }
 }
+
+// ── Invitationsflow (landing fra mail-link) ──
+
+const inviteFlow = { token: null, info: null };
+
+function showInviteError(msg) {
+    if (!el.inviteFlowError) return;
+    el.inviteFlowError.textContent = msg;
+    el.inviteFlowError.classList.remove('hidden');
+}
+
+async function openInviteFlow(token) {
+    inviteFlow.token = token;
+    try {
+        const res = await api('GET', `invites/info?token=${encodeURIComponent(token)}`);
+        inviteFlow.info = res.invite;
+    } catch (e) {
+        showStatusMessage(e.message || 'Invitationen er ugyldig eller udløbet.');
+        clearInviteParam();
+        return;
+    }
+    const info = inviteFlow.info;
+    const roleLabels = { owner: 'ejer', editor: 'redaktør', viewer: 'læser' };
+    if (el.inviteInfoText) {
+        el.inviteInfoText.innerHTML =
+            `Du er inviteret til klubben <strong>${escapeHtml(info.clubName)}</strong> ` +
+            `som <strong>${roleLabels[info.role] || info.role}</strong> ` +
+            `(sendt til <strong>${escapeHtml(info.email)}</strong>).`;
+    }
+    el.inviteFlowError?.classList.add('hidden');
+    // Vis den rigtige undervisning:
+    //  1) logget ind med korrekt e-mail → acceptér-knap
+    //  2) konto findes → login-form
+    //  3) ingen konto → registrerings-form
+    el.inviteAcceptView?.classList.toggle('hidden', !info.canAcceptNow);
+    el.inviteLoginView?.classList.toggle('hidden', info.canAcceptNow || !info.accountExists);
+    el.inviteRegisterView?.classList.toggle('hidden', info.canAcceptNow || info.accountExists);
+    showStandAlone(el.invitePanel);
+}
+
+function clearInviteParam() {
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('invite');
+        window.history.replaceState({}, '', url.toString());
+    } catch (e) { /* ignorér */ }
+}
+
+async function finishInviteAccept(user) {
+    applyAuthState(user);
+    clearInviteParam();
+    closeStandAlone();
+    showStatusMessage(`Velkommen til ${user.club ? user.club.name : 'klubben'}!`);
+}
+
+el.closeInviteBtn?.addEventListener('click', () => {
+    clearInviteParam();
+    closeStandAlone();
+});
+
+el.acceptInviteBtn?.addEventListener('click', async () => {
+    try {
+        const res = await api('POST', 'invites/accept', { token: inviteFlow.token });
+        await finishInviteAccept(res.user);
+    } catch (e) {
+        showInviteError(e.message);
+    }
+});
+
+el.inviteLoginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = el.inviteLoginPassword?.value || '';
+    if (!password) return;
+    try {
+        await api('POST', 'auth/login', { email: inviteFlow.info.email, password });
+        const res = await api('POST', 'invites/accept', { token: inviteFlow.token });
+        await finishInviteAccept(res.user);
+    } catch (e) {
+        showInviteError(e.message);
+    }
+});
+
+el.inviteRegisterForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = (el.inviteRegName?.value || '').trim();
+    const password = el.inviteRegPassword?.value || '';
+    if (!name || !password) { showInviteError('Udfyld både navn og adgangskode.'); return; }
+    try {
+        const res = await api('POST', 'invites/register', {
+            token: inviteFlow.token, name, password,
+        });
+        await finishInviteAccept(res.user);
+    } catch (e) {
+        showInviteError(e.message);
+    }
+});
 
 function applyAuthState(user) {
     state.user = user;
     syncAccountUI();
     if (user) {
         refreshCloudLists();
+        // Klubbens standard-antal baner bliver forvalget.
+        const cc = user.club && user.club.defaultCourtCount;
+        if (cc) {
+            if (el.defaultCourtCount) el.defaultCourtCount.value = String(cc);
+            if (el.courtCount) el.courtCount.value = String(cc);
+            renderPrefillArea(getPrefillStateFromUi());
+        }
     } else {
-        state.cloudLists = [];
+        state.cloudSquads = [];
+        state.clubPlayers = [];
         renderCloudLists();
     }
 }
 
 function syncAccountUI() {
     const u = state.user;
+    const activeRole = u && u.club ? u.club.role : null;
     if (el.accountBtn) {
-        el.accountBtn.textContent = u ? `👤 ${u.name} — Log ud` : '👤 Log ind';
+        const clubSuffix = u && u.club ? ` (${u.club.name})` : '';
+        el.accountBtn.textContent = u ? `👤 ${u.name}${clubSuffix}` : '👤 Log ind';
     }
     if (el.usersBtn) {
-        el.usersBtn.classList.toggle('hidden', !(u && u.role === 'owner'));
+        // Owner i aktiv klub — eller site-admin med en aktiv klub.
+        const canManageMembers = !!(u && u.club && (activeRole === 'owner' || u.isAdmin));
+        el.usersBtn.classList.toggle('hidden', !canManageMembers);
     }
     if (el.adminBtn) {
         el.adminBtn.classList.toggle('hidden', !(u && u.isAdmin));
     }
-    if (el.cloudListsSection) {
-        el.cloudListsSection.classList.toggle('hidden', !u);
+    if (el.clubBtn) {
+        el.clubBtn.classList.toggle('hidden', !(u && u.club));
+        if (u && u.club) el.clubBtn.textContent = `🏸 ${u.club.name}`;
     }
-    // Hide "save" + "delete" rows in cloud section if user is viewer-only.
-    const isEditor = !!(u && (u.role === 'owner' || u.role === 'editor'));
+    if (el.cloudListsSection) {
+        // Cloud-sektionen kræver både login og medlemskab af mindst én klub.
+        el.cloudListsSection.classList.toggle('hidden', !(u && u.club));
+    }
+    const isEditor = activeRole === 'owner' || activeRole === 'editor' || !!(u && u.isAdmin && u.club);
     document.querySelectorAll('.cloud-editor-only').forEach(node => {
         node.classList.toggle('hidden', !isEditor);
     });
+    if (el.sessionShareRow) el.sessionShareRow.classList.toggle('hidden', !isEditor);
     if (el.loggedInView)  el.loggedInView.classList.toggle('hidden', !u);
     if (el.loginForm)     el.loginForm.classList.toggle('hidden', !!u);
+    // Panelet skifter karakter efter login: titel + intro følger tilstanden.
+    if (el.loginPanelTitle) el.loginPanelTitle.textContent = u ? 'Min konto' : 'Log ind';
+    if (el.loginIntro) el.loginIntro.classList.toggle('hidden', !!u);
     if (u) {
         if (el.loggedInName) el.loggedInName.textContent = u.name;
-        if (el.loggedInRole) el.loggedInRole.textContent = u.role;
-        if (el.loggedInClub) el.loggedInClub.textContent = u.club ? u.club.name : '';
+        if (el.loggedInClubInfo) el.loggedInClubInfo.classList.toggle('hidden', !u.club);
+        if (el.noClubHint) {
+            const showHint = !u.club;
+            el.noClubHint.classList.toggle('hidden', !showHint);
+            if (showHint) {
+                el.noClubHint.textContent = u.isAdmin
+                    ? 'Du er ikke medlem af nogen klub endnu. Tilføj dig selv via 🛠 Admin → "Tilføj medlemskab".'
+                    : 'Du er ikke medlem af nogen klub endnu. Bed en klub-ejer om at invitere dig pr. e-mail.';
+            }
+        }
+        if (u.club) {
+            if (el.loggedInRole) el.loggedInRole.textContent = u.club.role;
+            if (el.loggedInClub) el.loggedInClub.textContent = u.club.name;
+        }
+        // Klubskifter: vis kun ved 2+ medlemskaber.
+        const clubs = u.clubs || [];
+        if (el.clubSwitchRow) el.clubSwitchRow.classList.toggle('hidden', clubs.length < 2);
+        if (el.clubSwitchSelect && clubs.length >= 2) {
+            el.clubSwitchSelect.innerHTML = clubs.map(c =>
+                `<option value="${c.id}"${u.club && c.id === u.club.id ? ' selected' : ''}>${escapeHtml(c.name)} (${c.role})</option>`
+            ).join('');
+        }
     }
 }
 
 // ── Cloud player lists ──────────────────────────────────────
 
+function activeClubId() {
+    return state.user && state.user.club ? state.user.club.id : null;
+}
+
 async function refreshCloudLists() {
+    const clubId = activeClubId();
+    if (!clubId) { state.cloudSquads = []; state.clubPlayers = []; renderCloudLists(); return; }
     try {
-        const res = await api('GET', 'player-lists');
-        state.cloudLists = res.lists || [];
+        const [squadsRes, playersRes] = await Promise.all([
+            api('GET', `clubs/${clubId}/squads`),
+            api('GET', `clubs/${clubId}/players`),
+        ]);
+        state.cloudSquads = squadsRes.squads || [];
+        state.clubPlayers = playersRes.players || [];
         renderCloudLists();
     } catch (e) {
-        showStatusMessage(`Kunne ikke hente klub-lister: ${e.message}`);
+        showStatusMessage(`Kunne ikke hente klubbens hold: ${e.message}`);
     }
 }
 
 function renderCloudLists() {
     const fill = (selectEl) => {
         if (!selectEl) return;
-        const placeholder = '<option value="">Vælg liste</option>';
-        const opts = state.cloudLists
-            .map(l => `<option value="${l.id}">${escapeHtml(l.name)} (${l.players.length})</option>`)
+        const placeholder = '<option value="">Vælg hold</option>';
+        const opts = state.cloudSquads
+            .map(s => `<option value="${s.id}">${escapeHtml(s.name)} (${s.memberCount})</option>`)
             .join('');
         selectEl.innerHTML = placeholder + opts;
     };
     fill(el.cloudPlayerList);
     fill(el.deleteCloudList);
+    syncQuickAddOptions();
+}
+
+// Quick-add: tilføj en spiller fra klubbens spillerbase til aftenens liste
+// (fx en spiller fra et andet hold, der møder op til træning).
+function syncQuickAddOptions() {
+    if (!el.quickAddClubPlayer) return;
+    const clubId = activeClubId();
+    const rosterNames = new Set(state.roster.map(p => p.name.toLowerCase()));
+    const candidates = (state.clubPlayers || [])
+        .filter(p => !rosterNames.has(p.name.toLowerCase()));
+    const show = !!clubId && candidates.length > 0;
+    el.quickAddClubPlayer.classList.toggle('hidden', !show);
+    if (!show) return;
+    el.quickAddClubPlayer.innerHTML =
+        '<option value="">＋ Fra klubben…</option>' +
+        candidates.map(p =>
+            `<option value="${p.id}">${escapeHtml(p.name)}${shouldShowLevels() ? ` (${levelName(p.level)})` : ''}</option>`
+        ).join('');
 }
 
 async function loadCloudList() {
     const id = el.cloudPlayerList?.value;
-    if (!id) { showStatusMessage('Vælg først en klub-liste.'); return; }
-    const list = state.cloudLists.find(l => String(l.id) === String(id));
-    if (!list) { showStatusMessage('Listen kunne ikke findes.'); return; }
-    // Replace the roster with the cloud list's players (all inactive on load).
-    replaceRoster(list.players.map(p => ({ name: p.name, level: p.level, active: false })));
-    showStatusMessage(`Hentede "${list.name}" fra klubben.`);
+    if (!id) { showStatusMessage('Vælg først et hold.'); return; }
+    const clubId = activeClubId();
+    if (!clubId) return;
+    try {
+        const res = await api('GET', `clubs/${clubId}/squads/${id}`);
+        const squad = res.squad;
+        replaceRoster(squad.members.map(p => ({ name: p.name, level: p.level, active: false })));
+        showStatusMessage(`Hentede holdet "${squad.name}" (${squad.members.length} spillere).`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke hente holdet: ${e.message}`);
+    }
 }
 
 async function saveCloudList() {
     if (!state.user) { showStatusMessage('Du skal være logget ind.'); return; }
+    const clubId = activeClubId();
+    if (!clubId) { showStatusMessage('Du er ikke medlem af nogen klub.'); return; }
     const name = (el.newCloudListName?.value || '').trim();
-    if (!name) { showStatusMessage('Skriv et navn til klub-listen.'); return; }
+    if (!name) { showStatusMessage('Skriv et navn til holdet.'); return; }
     if (state.roster.length === 0) { showStatusMessage('Der er ingen spillere at gemme.'); return; }
 
-    // Strip transient state — only persist name + level.
-    const players = state.roster.map(p => ({ name: p.name, level: p.level }));
+    const players = state.roster
+        .filter(p => !p.members)   // hold-superspillere (team-mode) gemmes ikke
+        .map(p => ({ name: p.name, level: p.level }));
 
-    // If a list with this name exists, overwrite (PUT); otherwise POST.
-    const existing = state.cloudLists.find(l => l.name.toLowerCase() === name.toLowerCase());
+    const existing = state.cloudSquads.find(s => s.name.toLowerCase() === name.toLowerCase());
     try {
         if (existing) {
-            const ok = window.confirm(`Klub-listen "${existing.name}" findes allerede. Vil du overskrive den?`);
+            const ok = window.confirm(`Holdet "${existing.name}" findes allerede. Vil du overskrive medlemslisten?`);
             if (!ok) return;
-            await api('PUT', `player-lists/${existing.id}`, { name, players });
+            await api('PUT', `clubs/${clubId}/squads/${existing.id}`, { players });
         } else {
-            await api('POST', 'player-lists', { name, players });
+            await api('POST', `clubs/${clubId}/squads`, { name, players });
         }
         if (el.newCloudListName) el.newCloudListName.value = '';
         await refreshCloudLists();
-        showStatusMessage(`Klub-listen "${name}" er gemt.`);
+        showStatusMessage(`Holdet "${name}" er gemt (${players.length} spillere).`);
     } catch (e) {
-        showStatusMessage(`Kunne ikke gemme: ${e.message}`);
+        showStatusMessage(`Kunne ikke gemme holdet: ${e.message}`);
     }
 }
 
 async function deleteCloudList() {
     const id = el.deleteCloudList?.value;
-    if (!id) { showStatusMessage('Vælg først en klub-liste.'); return; }
-    const list = state.cloudLists.find(l => String(l.id) === String(id));
-    if (!list) return;
-    const ok = window.confirm(`Slet klub-listen "${list.name}"? Dette kan ikke fortrydes.`);
+    if (!id) { showStatusMessage('Vælg først et hold.'); return; }
+    const clubId = activeClubId();
+    if (!clubId) return;
+    const squad = state.cloudSquads.find(s => String(s.id) === String(id));
+    if (!squad) return;
+    const ok = window.confirm(`Slet holdet "${squad.name}"?\n\nSpillerne bliver i klubbens spillerbase — kun holdet forsvinder.`);
     if (!ok) return;
     try {
-        await api('DELETE', `player-lists/${list.id}`);
+        await api('DELETE', `clubs/${clubId}/squads/${id}`);
         await refreshCloudLists();
-        showStatusMessage(`Klub-listen "${list.name}" er slettet.`);
+        showStatusMessage(`Holdet "${squad.name}" er slettet.`);
     } catch (e) {
         showStatusMessage(`Kunne ikke slette: ${e.message}`);
     }
 }
+
+el.quickAddClubPlayer?.addEventListener('change', () => {
+    const pid = Number(el.quickAddClubPlayer.value);
+    if (!pid) return;
+    const p = (state.clubPlayers || []).find(x => x.id === pid);
+    el.quickAddClubPlayer.value = '';
+    if (!p) return;
+    if (state.roster.some(r => r.name.toLowerCase() === p.name.toLowerCase())) return;
+    state.roster.push({ name: p.name, level: p.level, active: true, createdAt: Date.now() });
+    renderRoster();
+    renderPlayerManagerList();
+    updatePanelVisibility();
+    saveState();
+    showStatusMessage(`${p.name} er tilføjet til aftenens liste.`);
+});
 
 // ── Login / logout flow ─────────────────────────────────────
 
@@ -3438,7 +3696,8 @@ async function submitChangePassword(event) {
 // ── User management (owner only) ────────────────────────────
 
 async function openUsersPanel() {
-    if (!state.user || state.user.role !== 'owner') return;
+    const clubRole = state.user && state.user.club ? state.user.club.role : null;
+    if (!state.user || (clubRole !== 'owner' && !state.user.isAdmin)) return;
     closeMenu();
     showStandAlone(el.usersPanel);
     await refreshUsersList();
@@ -3447,8 +3706,12 @@ async function openUsersPanel() {
 async function refreshUsersList() {
     if (!el.usersList) return;
     try {
-        const res = await api('GET', 'users');
-        renderUsersList(res.users || []);
+        const [membersRes, invitesRes] = await Promise.all([
+            api('GET', 'users'),
+            api('GET', 'invites'),
+        ]);
+        renderUsersList(membersRes.users || []);
+        renderInvitesList(invitesRes.invites || []);
     } catch (e) {
         el.usersList.innerHTML = `<div class="login-error">${escapeHtml(e.message)}</div>`;
     }
@@ -3457,7 +3720,7 @@ async function refreshUsersList() {
 function renderUsersList(users) {
     if (!el.usersList) return;
     if (users.length === 0) {
-        el.usersList.innerHTML = '<div class="subtle">Ingen brugere endnu.</div>';
+        el.usersList.innerHTML = '<div class="subtle">Ingen medlemmer endnu.</div>';
         return;
     }
     el.usersList.innerHTML = users.map(u => {
@@ -3472,31 +3735,54 @@ function renderUsersList(users) {
                     <div class="user-row-email">${escapeHtml(u.email)}</div>
                 </div>
                 <select class="user-role-select" data-user-id="${u.id}">${roleOpts}</select>
-                <button class="ghost user-row-pw" data-user-id="${u.id}" title="Sæt ny adgangskode">🔑</button>
-                <button class="danger user-row-delete" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet">✕</button>
+                <button class="danger user-row-delete" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="Fjern fra klubben">✕</button>
             </div>
         `;
     }).join('');
 }
 
-async function createUser() {
-    const name = (el.newUserName?.value || '').trim();
-    const email = (el.newUserEmail?.value || '').trim();
-    const password = el.newUserPassword?.value || '';
-    const role = el.newUserRole?.value || 'editor';
-    if (el.newUserError) el.newUserError.classList.add('hidden');
+function renderInvitesList(invites) {
+    if (!el.invitesList) return;
+    if (invites.length === 0) {
+        el.invitesList.innerHTML = '<div class="subtle">Ingen afventende invitationer.</div>';
+        return;
+    }
+    el.invitesList.innerHTML = invites.map(i => `
+        <div class="user-row">
+            <div class="user-row-main">
+                <div class="user-row-name">${escapeHtml(i.email)}</div>
+                <div class="user-row-email">rolle: ${i.role} · udløber ${formatDateTime(i.expiresAt)}</div>
+            </div>
+            <button class="ghost user-row-pw" data-invite-copy="${escapeHtml(i.link)}" title="Kopiér invitationslink">🔗</button>
+            <button class="danger user-row-delete" data-invite-revoke="${i.id}" title="Tilbagekald">✕</button>
+        </div>
+    `).join('');
+}
+
+async function sendInvite() {
+    const email = (el.inviteEmail?.value || '').trim();
+    const role = el.inviteRole?.value || 'editor';
+    if (el.inviteError) el.inviteError.classList.add('hidden');
+    if (el.inviteLinkBox) el.inviteLinkBox.classList.add('hidden');
+    if (!email) { showStatusMessage('Skriv en e-mail.'); return; }
     try {
-        await api('POST', 'users', { name, email, password, role });
-        if (el.newUserName) el.newUserName.value = '';
-        if (el.newUserEmail) el.newUserEmail.value = '';
-        if (el.newUserPassword) el.newUserPassword.value = '';
-        if (el.newUserRole) el.newUserRole.value = 'editor';
-        showStatusMessage(`Brugeren "${name}" er oprettet.`);
+        const res = await api('POST', 'invites', { email, role });
+        if (el.inviteEmail) el.inviteEmail.value = '';
+        if (res.mailSent) {
+            showStatusMessage(`Invitation sendt til ${email}.`);
+        } else {
+            showStatusMessage('Invitationen er oprettet, men mailen kunne ikke sendes — del linket manuelt.');
+        }
+        // Vis altid linket, så det kan deles manuelt (fx via SMS).
+        if (el.inviteLinkBox) {
+            el.inviteLinkBox.innerHTML = `Invitationslink: <a href="${escapeHtml(res.link)}" target="_blank" rel="noopener">${escapeHtml(res.link)}</a>`;
+            el.inviteLinkBox.classList.remove('hidden');
+        }
         await refreshUsersList();
     } catch (e) {
-        if (el.newUserError) {
-            el.newUserError.textContent = e.message;
-            el.newUserError.classList.remove('hidden');
+        if (el.inviteError) {
+            el.inviteError.textContent = e.message;
+            el.inviteError.classList.remove('hidden');
         }
     }
 }
@@ -3512,29 +3798,17 @@ async function updateUserRole(id, role) {
     }
 }
 
-async function changeUserPassword(id) {
-    const next = window.prompt('Indtast ny adgangskode (mindst 6 tegn):');
-    if (next === null) return;
-    if (next.length < 6) { showStatusMessage('Adgangskode skal være mindst 6 tegn.'); return; }
-    try {
-        await api('PATCH', `users/${id}`, { password: next });
-        showStatusMessage('Adgangskoden er opdateret.');
-    } catch (e) {
-        showStatusMessage(`Kunne ikke ændre adgangskode: ${e.message}`);
-    }
-}
-
-async function deleteUser(id) {
+async function removeMember(id) {
     const target = (await api('GET', 'users')).users.find(u => u.id === id);
     if (!target) return;
-    const ok = window.confirm(`Slet brugeren "${target.name}" (${target.email})?`);
+    const ok = window.confirm(`Fjern "${target.name}" (${target.email}) fra klubben?\n\nDeres konto slettes ikke — de mister kun adgangen til denne klub.`);
     if (!ok) return;
     try {
         await api('DELETE', `users/${id}`);
         await refreshUsersList();
-        showStatusMessage('Brugeren er slettet.');
+        showStatusMessage('Medlemmet er fjernet fra klubben.');
     } catch (e) {
-        showStatusMessage(`Kunne ikke slette: ${e.message}`);
+        showStatusMessage(`Kunne ikke fjerne: ${e.message}`);
     }
 }
 
@@ -3552,7 +3826,7 @@ el.changePasswordForm?.addEventListener('submit', submitChangePassword);
 
 el.usersBtn?.addEventListener('click', openUsersPanel);
 el.closeUsersBtn?.addEventListener('click', () => closeStandAlone());
-el.createUserBtn?.addEventListener('click', createUser);
+el.sendInviteBtn?.addEventListener('click', sendInvite);
 
 el.usersList?.addEventListener('change', (event) => {
     const sel = event.target.closest('.user-role-select');
@@ -3561,19 +3835,409 @@ el.usersList?.addEventListener('change', (event) => {
 });
 el.usersList?.addEventListener('click', (event) => {
     const del = event.target.closest('.user-row-delete');
-    if (del && !del.disabled) {
-        deleteUser(Number(del.dataset.userId));
+    if (del && !del.disabled) removeMember(Number(del.dataset.userId));
+});
+el.invitesList?.addEventListener('click', async (event) => {
+    const copy = event.target.closest('[data-invite-copy]');
+    if (copy) {
+        try {
+            await navigator.clipboard.writeText(copy.dataset.inviteCopy);
+            showStatusMessage('Invitationslink kopieret.');
+        } catch (_) {
+            window.prompt('Kopiér linket:', copy.dataset.inviteCopy);
+        }
         return;
     }
-    const pw = event.target.closest('.user-row-pw');
-    if (pw) {
-        changeUserPassword(Number(pw.dataset.userId));
+    const revoke = event.target.closest('[data-invite-revoke]');
+    if (revoke) {
+        if (!window.confirm('Tilbagekald invitationen?')) return;
+        try {
+            await api('DELETE', `invites/${Number(revoke.dataset.inviteRevoke)}`);
+            await refreshUsersList();
+            showStatusMessage('Invitationen er tilbagekaldt.');
+        } catch (e) {
+            showStatusMessage(`Kunne ikke tilbagekalde: ${e.message}`);
+        }
+    }
+});
+
+// ── Klubskifter ──
+el.clubSwitchSelect?.addEventListener('change', async () => {
+    const clubId = Number(el.clubSwitchSelect.value);
+    try {
+        const res = await api('POST', 'auth/switch-club', { clubId });
+        applyAuthState(res.user);
+        showStatusMessage(`Aktiv klub: ${res.user.club.name}.`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke skifte klub: ${e.message}`);
     }
 });
 
 el.loadCloudListBtn?.addEventListener('click', loadCloudList);
 el.saveCloudListBtn?.addEventListener('click', saveCloudList);
 el.deleteCloudListBtn?.addEventListener('click', deleteCloudList);
+
+// ── Klubside (info, indstillinger, delte sessioner, sletning) ──
+
+const clubPage = { id: null, club: null };
+
+async function openClubPage(clubId) {
+    try {
+        const res = await api('GET', `clubs/${clubId}`);
+        clubPage.id = clubId;
+        clubPage.club = res.club;
+        renderClubPage();
+        showStandAlone(el.clubPanel);
+        await Promise.all([refreshClubSessions(), refreshClubSquadsAdmin()]);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke åbne klubben: ${e.message}`);
+    }
+}
+
+function renderClubPage() {
+    const c = clubPage.club;
+    if (!c) return;
+    if (el.clubPanelTitle) el.clubPanelTitle.textContent = c.name;
+    if (el.clubPanelStats) {
+        el.clubPanelStats.textContent =
+            `${c.memberCount} medlem${c.memberCount === 1 ? '' : 'mer'} · ` +
+            `${c.listCount} spillerliste${c.listCount === 1 ? '' : 'r'} · ` +
+            `${c.sessionCount} session${c.sessionCount === 1 ? '' : 'er'}` +
+            ` · din rolle: ${c.yourRole}`;
+    }
+    if (el.clubCourtsRow) el.clubCourtsRow.classList.toggle('hidden', !c.canManage);
+    if (el.clubCourtsInput) el.clubCourtsInput.value = c.defaultCourtCount ?? '';
+    if (el.clubSquadCreateRow) el.clubSquadCreateRow.classList.toggle('hidden', !c.canEdit);
+    if (el.clubDangerZone) el.clubDangerZone.classList.toggle('hidden', !c.canManage);
+}
+
+// ── Hold-administration på klubsiden ──
+
+const squadAdmin = { squads: [], players: [], expandedId: null, expandedMembers: [] };
+
+async function refreshClubSquadsAdmin() {
+    if (!clubPage.id || !el.clubSquadsList) return;
+    try {
+        const [squadsRes, playersRes] = await Promise.all([
+            api('GET', `clubs/${clubPage.id}/squads`),
+            api('GET', `clubs/${clubPage.id}/players`),
+        ]);
+        squadAdmin.squads = squadsRes.squads || [];
+        squadAdmin.players = playersRes.players || [];
+        if (squadAdmin.expandedId !== null) {
+            const stillThere = squadAdmin.squads.some(s => s.id === squadAdmin.expandedId);
+            if (!stillThere) squadAdmin.expandedId = null;
+        }
+        if (squadAdmin.expandedId !== null) {
+            const res = await api('GET', `clubs/${clubPage.id}/squads/${squadAdmin.expandedId}`);
+            squadAdmin.expandedMembers = res.squad.members || [];
+        }
+        renderClubSquadsAdmin();
+    } catch (e) {
+        el.clubSquadsList.innerHTML = `<div class="login-error">${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function renderClubSquadsAdmin() {
+    if (!el.clubSquadsList) return;
+    const canEdit = clubPage.club && clubPage.club.canEdit;
+    if (squadAdmin.squads.length === 0) {
+        el.clubSquadsList.innerHTML = '<div class="subtle">Ingen hold endnu. Opret et hold ovenfor — eller gem aftenens spillere som hold i "Spillerlister"-panelet.</div>';
+        return;
+    }
+    el.clubSquadsList.innerHTML = squadAdmin.squads.map(s => {
+        const isOpen = squadAdmin.expandedId === s.id;
+        let detail = '';
+        if (isOpen) {
+            const memberIds = new Set(squadAdmin.expandedMembers.map(m => m.id));
+            const chips = squadAdmin.expandedMembers.map(m => `
+                <span class="membership-chip">
+                    ${escapeHtml(m.name)}${shouldShowLevels() ? ` <em>(${levelName(m.level)})</em>` : ''}
+                    ${canEdit ? `<button class="membership-chip-remove" type="button"
+                        data-squad-member-remove="${m.id}" title="Fjern fra holdet">✕</button>` : ''}
+                </span>
+            `).join('');
+            const addable = squadAdmin.players.filter(p => !memberIds.has(p.id));
+            const editRows = canEdit ? `
+                ${addable.length > 0 ? `
+                <div class="squad-add-row">
+                    <select id="squadAddSelect">
+                        <option value="">Vælg spiller fra klubben…</option>
+                        ${addable.map(p => `<option value="${p.id}">${escapeHtml(p.name)}${shouldShowLevels() ? ` (${levelName(p.level)})` : ''}</option>`).join('')}
+                    </select>
+                    <button class="primary" type="button" data-squad-member-add>+ Tilføj</button>
+                </div>` : ''}
+                <div class="squad-add-row">
+                    <input id="squadNewPlayerName" type="text" placeholder="Ny spillers navn"/>
+                    <select id="squadNewPlayerLevel">${getLevelOptions(3)}</select>
+                    <button class="primary" type="button" data-squad-create-player>＋ Opret &amp; tilføj</button>
+                </div>
+                <div class="squad-help">Vælg en eksisterende spiller fra klubben — eller opret en helt ny spiller direkte på holdet.</div>
+            ` : '';
+            detail = `
+                <div class="squad-detail">
+                    <div class="user-row-memberships">${chips || '<span class="subtle">Ingen spillere på holdet endnu.</span>'}</div>
+                    ${editRows}
+                </div>
+            `;
+        }
+        return `
+            <div class="user-row squad-row user-row--clickable${isOpen ? ' squad-row--open' : ''}" data-squad-expand="${s.id}" role="button" tabindex="0" title="${isOpen ? 'Klik for at lukke' : 'Klik for at administrere holdet'}">
+                <div class="user-row-main">
+                    <div class="squad-row-header">
+                        <span class="squad-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
+                        <div>
+                            <div class="user-row-name">${escapeHtml(s.name)}</div>
+                            <div class="user-row-email">${s.memberCount} spiller${s.memberCount === 1 ? '' : 'e'}${isOpen ? '' : ' · klik for at se og redigere'}</div>
+                        </div>
+                    </div>
+                    ${detail}
+                </div>
+                ${canEdit ? `<button class="danger user-row-delete" type="button" data-squad-delete="${s.id}" title="Slet holdet">✕</button>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+async function toggleSquadExpand(sid) {
+    if (squadAdmin.expandedId === sid) {
+        squadAdmin.expandedId = null;
+        squadAdmin.expandedMembers = [];
+        renderClubSquadsAdmin();
+        return;
+    }
+    try {
+        const res = await api('GET', `clubs/${clubPage.id}/squads/${sid}`);
+        squadAdmin.expandedId = sid;
+        squadAdmin.expandedMembers = res.squad.members || [];
+        renderClubSquadsAdmin();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke hente holdet: ${e.message}`);
+    }
+}
+
+el.clubCreateSquadBtn?.addEventListener('click', async () => {
+    const name = (el.clubNewSquadName?.value || '').trim();
+    if (!name) { showStatusMessage('Skriv et holdnavn.'); return; }
+    try {
+        await api('POST', `clubs/${clubPage.id}/squads`, { name, players: [] });
+        if (el.clubNewSquadName) el.clubNewSquadName.value = '';
+        showStatusMessage(`Holdet "${name}" er oprettet.`);
+        await refreshClubSquadsAdmin();
+        await refreshCloudLists();
+    } catch (e) {
+        showStatusMessage(`Kunne ikke oprette holdet: ${e.message}`);
+    }
+});
+
+el.clubSquadsList?.addEventListener('click', async (event) => {
+    const del = event.target.closest('[data-squad-delete]');
+    if (del) {
+        const sid = Number(del.dataset.squadDelete);
+        const squad = squadAdmin.squads.find(s => s.id === sid);
+        if (!squad) return;
+        if (!window.confirm(`Slet holdet "${squad.name}"?\n\nSpillerne bliver i klubbens spillerbase.`)) return;
+        try {
+            await api('DELETE', `clubs/${clubPage.id}/squads/${sid}`);
+            showStatusMessage(`Holdet "${squad.name}" er slettet.`);
+            await refreshClubSquadsAdmin();
+            await refreshCloudLists();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke slette: ${e.message}`);
+        }
+        return;
+    }
+
+    const removeMember = event.target.closest('[data-squad-member-remove]');
+    if (removeMember && squadAdmin.expandedId !== null) {
+        const pid = Number(removeMember.dataset.squadMemberRemove);
+        try {
+            await api('DELETE', `clubs/${clubPage.id}/squads/${squadAdmin.expandedId}/members/${pid}`);
+            await refreshClubSquadsAdmin();
+            await refreshCloudLists();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke fjerne spilleren: ${e.message}`);
+        }
+        return;
+    }
+
+    const addMember = event.target.closest('[data-squad-member-add]');
+    if (addMember && squadAdmin.expandedId !== null) {
+        const sel = document.getElementById('squadAddSelect');
+        const pid = Number(sel?.value);
+        if (!pid) { showStatusMessage('Vælg en spiller.'); return; }
+        try {
+            await api('POST', `clubs/${clubPage.id}/squads/${squadAdmin.expandedId}/members`, { playerId: pid });
+            await refreshClubSquadsAdmin();
+            await refreshCloudLists();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke tilføje spilleren: ${e.message}`);
+        }
+        return;
+    }
+
+    const createPlayer = event.target.closest('[data-squad-create-player]');
+    if (createPlayer && squadAdmin.expandedId !== null) {
+        const nameInput = document.getElementById('squadNewPlayerName');
+        const levelSel = document.getElementById('squadNewPlayerLevel');
+        const name = (nameInput?.value || '').trim();
+        if (!name) { showStatusMessage('Skriv spillerens navn.'); return; }
+        try {
+            await api('POST', `clubs/${clubPage.id}/squads/${squadAdmin.expandedId}/members`, {
+                name, level: Number(levelSel?.value) || 3,
+            });
+            showStatusMessage(`${name} er oprettet og tilføjet holdet.`);
+            await refreshClubSquadsAdmin();
+            await refreshCloudLists();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke oprette spilleren: ${e.message}`);
+        }
+        return;
+    }
+
+    // Klik inde i den udfoldede detail-boks (fx i select/input) skal ikke folde sammen.
+    if (event.target.closest('.squad-detail')) return;
+
+    const expand = event.target.closest('[data-squad-expand]');
+    if (expand) toggleSquadExpand(Number(expand.dataset.squadExpand));
+});
+
+async function refreshClubSessions() {
+    if (!el.clubSessionsList || !clubPage.id) return;
+    try {
+        const res = await api('GET', `clubs/${clubPage.id}/sessions`);
+        renderClubSessions(res.sessions || []);
+    } catch (e) {
+        el.clubSessionsList.innerHTML = `<div class="login-error">${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function renderClubSessions(sessions) {
+    if (!el.clubSessionsList) return;
+    if (sessions.length === 0) {
+        el.clubSessionsList.innerHTML = '<div class="subtle">Ingen gemte sessioner.</div>';
+        return;
+    }
+    const canEdit = clubPage.club && clubPage.club.canEdit;
+    el.clubSessionsList.innerHTML = sessions.map(s => `
+        <div class="user-row">
+            <div class="user-row-main">
+                <div class="user-row-name">${escapeHtml(s.name)}</div>
+                <div class="user-row-email">Opdateret ${formatDateTime(s.updatedAt)}${s.updatedBy ? ` af ${escapeHtml(s.updatedBy)}` : ''}</div>
+            </div>
+            <button class="primary" data-load-session="${s.id}" title="Hent og fortsæt sessionen">↓ Overtag</button>
+            ${canEdit ? `<button class="danger user-row-delete" data-delete-session="${s.id}" title="Slet">✕</button>` : ''}
+        </div>
+    `).join('');
+}
+
+async function saveSessionToClub() {
+    const clubId = activeClubId();
+    if (!clubId) { showStatusMessage('Du skal være logget ind og medlem af en klub.'); return; }
+    const defaultName = new Date().toLocaleDateString('da-DK', {
+        weekday: 'long', day: 'numeric', month: 'numeric',
+    });
+    const name = window.prompt(
+        'Navn på sessionen (gemmes hos klubben — samme navn overskriver):',
+        defaultName
+    );
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { showStatusMessage('Giv sessionen et navn.'); return; }
+    try {
+        const payload = buildSessionPayload();
+        await api('POST', `clubs/${clubId}/sessions`, { name: trimmed, payload });
+        showStatusMessage(`Sessionen "${trimmed}" er gemt — andre medlemmer kan nu overtage den fra klubsiden.`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke gemme sessionen: ${e.message}`);
+    }
+}
+
+async function loadClubSession(sid) {
+    if (!clubPage.id) return;
+    const ok = window.confirm(
+        'Hent sessionen og overtag den?\n\n' +
+        'Din nuværende lokale opsætning (spillere, historik, indstillinger) erstattes.'
+    );
+    if (!ok) return;
+    try {
+        const res = await api('GET', `clubs/${clubPage.id}/sessions/${sid}`);
+        const expanded = expandSessionPayload(res.session.payload);
+        applySessionPayload(expanded);
+        closeStandAlone();
+        showStatusMessage(`Sessionen "${res.session.name}" er hentet — du kan fortsætte med næste runde.`);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke hente sessionen: ${e.message}`);
+    }
+}
+
+async function deleteClubSession(sid) {
+    if (!clubPage.id) return;
+    if (!window.confirm('Slet den gemte session?')) return;
+    try {
+        await api('DELETE', `clubs/${clubPage.id}/sessions/${sid}`);
+        await refreshClubSessions();
+        showStatusMessage('Sessionen er slettet.');
+    } catch (e) {
+        showStatusMessage(`Kunne ikke slette: ${e.message}`);
+    }
+}
+
+async function saveClubCourts() {
+    if (!clubPage.id) return;
+    const raw = el.clubCourtsInput?.value ?? '';
+    const value = raw === '' ? null : Math.max(1, Math.min(50, parseInt(raw, 10) || 1));
+    try {
+        await api('PATCH', `clubs/${clubPage.id}`, { defaultCourtCount: value });
+        showStatusMessage(value === null
+            ? 'Klubbens standard-baner er nulstillet.'
+            : `Klubbens standard er nu ${value} baner.`);
+        // Genindlæs me så aktiv-klub-info (og forvalget) opdateres.
+        const res = await api('GET', 'me');
+        applyAuthState(res.user || null);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke gemme: ${e.message}`);
+    }
+}
+
+async function deleteClubFromPage() {
+    const c = clubPage.club;
+    if (!c) return;
+    const phrase = window.prompt(
+        `ADVARSEL: Dette sletter klubben "${c.name}" permanent, inkl. ` +
+        `${c.memberCount} medlemskab(er), ${c.listCount} spillerliste(r) og ` +
+        `${c.sessionCount} session(er).\n\nSkriv klubbens navn for at bekræfte:`
+    );
+    if (phrase === null) return;
+    if (phrase.trim().toLowerCase() !== c.name.toLowerCase()) {
+        showStatusMessage('Navnet matchede ikke — klubben er IKKE slettet.');
+        return;
+    }
+    try {
+        await api('DELETE', `clubs/${clubPage.id}`);
+        closeStandAlone();
+        showStatusMessage(`Klubben "${c.name}" er slettet.`);
+        const res = await api('GET', 'me');
+        applyAuthState(res.user || null);
+    } catch (e) {
+        showStatusMessage(`Kunne ikke slette klubben: ${e.message}`);
+    }
+}
+
+el.clubBtn?.addEventListener('click', () => {
+    closeMenu();
+    if (state.user && state.user.club) openClubPage(state.user.club.id);
+});
+el.closeClubBtn?.addEventListener('click', () => closeStandAlone());
+el.saveClubCourtsBtn?.addEventListener('click', saveClubCourts);
+el.saveClubSessionBtn?.addEventListener('click', saveSessionToClub);
+el.deleteClubBtn?.addEventListener('click', deleteClubFromPage);
+el.clubSessionsList?.addEventListener('click', (event) => {
+    const load = event.target.closest('[data-load-session]');
+    if (load) { loadClubSession(Number(load.dataset.loadSession)); return; }
+    const del = event.target.closest('[data-delete-session]');
+    if (del) deleteClubSession(Number(del.dataset.deleteSession));
+});
 
 // ── Site-admin panel (kræver isAdmin) ───────────────────────
 
@@ -3608,6 +4272,7 @@ async function refreshAdminData() {
         renderAdminUsers();
         renderAdminActivity(activity.activity || []);
         renderAdminClubSelect();
+        renderAdminMembershipSelects();
     } catch (e) {
         showStatusMessage(`Kunne ikke hente admin-data: ${e.message}`);
     }
@@ -3637,19 +4302,19 @@ function renderAdminClubs() {
     }
     const isOwnClub = (c) => state.user && state.user.club && state.user.club.id === c.id;
     el.adminClubsList.innerHTML = adminCache.clubs.map(c => `
-        <div class="user-row">
+        <div class="user-row user-row--clickable" data-open-club="${c.id}" role="button" tabindex="0" title="Åbn klubbens side">
             <div class="user-row-main">
                 <div class="user-row-name">${escapeHtml(c.name)}${isOwnClub(c) ? ' <em>(din klub)</em>' : ''}</div>
                 <div class="user-row-email">${c.userCount} bruger${c.userCount === 1 ? '' : 'e'} · ${c.listCount} liste${c.listCount === 1 ? '' : 'r'} · sidst aktiv: ${formatDateTime(c.lastActivity)}</div>
             </div>
-            <button class="danger user-row-delete" data-admin-club-delete="${c.id}" ${isOwnClub(c) ? 'disabled' : ''} title="Slet klub">✕</button>
+            <span class="user-row-open" aria-hidden="true">›</span>
         </div>
     `).join('');
 }
 
 function renderAdminClubSelect() {
     if (!el.adminNewUserClub) return;
-    el.adminNewUserClub.innerHTML = adminCache.clubs
+    el.adminNewUserClub.innerHTML = '<option value="">(ingen klub)</option>' + adminCache.clubs
         .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
         .join('');
 }
@@ -3662,21 +4327,40 @@ function renderAdminUsers() {
     }
     el.adminUsersList.innerHTML = adminCache.users.map(u => {
         const isSelf = state.user && state.user.id === u.id;
-        const roleOpts = ['owner','editor','viewer'].map(r =>
-            `<option value="${r}"${r === u.role ? ' selected' : ''}>${r}</option>`).join('');
+        const chips = (u.memberships || []).map(m => `
+            <span class="membership-chip">
+                ${escapeHtml(m.clubName)} <em>(${m.role})</em>
+                <button class="membership-chip-remove" type="button"
+                        data-remove-membership="${u.id}:${m.clubId}"
+                        title="Fjern fra ${escapeHtml(m.clubName)}">✕</button>
+            </span>
+        `).join('');
         return `
             <div class="user-row">
                 <div class="user-row-main">
                     <div class="user-row-name">${escapeHtml(u.name)}${u.isAdmin ? ' 🛠' : ''}${isSelf ? ' <em>(dig)</em>' : ''}</div>
-                    <div class="user-row-email">${escapeHtml(u.email)} · ${escapeHtml(u.clubName)}</div>
+                    <div class="user-row-email">${escapeHtml(u.email)}</div>
                     <div class="user-row-usage">Login: ${u.loginCount} gange · Sidst: ${formatDateTime(u.lastLoginAt)}</div>
+                    <div class="user-row-memberships">${chips || '<span class="subtle">Ingen klubber</span>'}</div>
                 </div>
-                <select class="user-role-select" data-admin-user-role="${u.id}">${roleOpts}</select>
                 <button class="ghost user-row-pw" data-admin-user-pw="${u.id}" title="Sæt ny adgangskode">🔑</button>
-                <button class="danger user-row-delete" data-admin-user-delete="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet">✕</button>
+                <button class="danger user-row-delete" data-admin-user-delete="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet kontoen">✕</button>
             </div>
         `;
     }).join('');
+}
+
+function renderAdminMembershipSelects() {
+    if (el.adminMemberUser) {
+        el.adminMemberUser.innerHTML = adminCache.users
+            .map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`)
+            .join('');
+    }
+    if (el.adminMemberClub) {
+        el.adminMemberClub.innerHTML = adminCache.clubs
+            .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+            .join('');
+    }
 }
 
 function renderAdminActivity(items) {
@@ -3724,32 +4408,18 @@ async function adminCreateClub() {
     }
 }
 
-async function adminDeleteClub(id) {
-    const club = adminCache.clubs.find(c => c.id === id);
-    if (!club) return;
-    const ok = window.confirm(
-        `Slet klubben "${club.name}"?\n\n` +
-        `ALLE klubbens ${club.userCount} brugere og ${club.listCount} spillerlister slettes permanent!`
-    );
-    if (!ok) return;
-    try {
-        await api('DELETE', `admin/clubs/${id}`);
-        showStatusMessage(`Klubben "${club.name}" er slettet.`);
-        await refreshAdminData();
-    } catch (e) {
-        showStatusMessage(`Kunne ikke slette: ${e.message}`);
-    }
-}
 
 async function adminCreateUser() {
-    const clubId = Number(el.adminNewUserClub?.value);
+    const clubIdRaw = el.adminNewUserClub?.value || '';
     const name = (el.adminNewUserName?.value || '').trim();
     const email = (el.adminNewUserEmail?.value || '').trim();
     const password = el.adminNewUserPassword?.value || '';
     const role = el.adminNewUserRole?.value || 'editor';
     if (el.adminNewUserError) el.adminNewUserError.classList.add('hidden');
     try {
-        await api('POST', 'admin/users', { clubId, name, email, password, role });
+        const payload = { name, email, password, role };
+        if (clubIdRaw !== '') payload.clubId = Number(clubIdRaw);
+        await api('POST', 'admin/users', payload);
         if (el.adminNewUserName) el.adminNewUserName.value = '';
         if (el.adminNewUserEmail) el.adminNewUserEmail.value = '';
         if (el.adminNewUserPassword) el.adminNewUserPassword.value = '';
@@ -3769,24 +4439,49 @@ el.createClubBtn?.addEventListener('click', adminCreateClub);
 el.adminCreateUserBtn?.addEventListener('click', adminCreateUser);
 
 el.adminClubsList?.addEventListener('click', (event) => {
-    const del = event.target.closest('[data-admin-club-delete]');
-    if (del && !del.disabled) adminDeleteClub(Number(del.dataset.adminClubDelete));
+    const row = event.target.closest('[data-open-club]');
+    if (row) openClubPage(Number(row.dataset.openClub));
 });
 
-el.adminUsersList?.addEventListener('change', async (event) => {
-    const sel = event.target.closest('[data-admin-user-role]');
-    if (!sel) return;
+// Genindlæs egen profil (menu, klubskifter, cloud-hold osv.) efter
+// medlemskabsændringer — fx når admin tilføjer sig selv til en klub.
+async function reloadOwnProfile() {
     try {
-        await api('PATCH', `admin/users/${Number(sel.dataset.adminUserRole)}`, { role: sel.value });
-        showStatusMessage('Rolle opdateret.');
+        const res = await api('GET', 'me');
+        applyAuthState(res.user || null);
+    } catch (e) { /* ignorér */ }
+}
+
+el.adminAddMembershipBtn?.addEventListener('click', async () => {
+    const userId = Number(el.adminMemberUser?.value);
+    const clubId = Number(el.adminMemberClub?.value);
+    const role = el.adminMemberRole?.value || 'editor';
+    if (!userId || !clubId) { showStatusMessage('Vælg både bruger og klub.'); return; }
+    try {
+        await api('POST', 'admin/memberships', { userId, clubId, role });
+        showStatusMessage('Medlemskab tilføjet.');
         await refreshAdminData();
+        await reloadOwnProfile();
     } catch (e) {
-        showStatusMessage(`Kunne ikke ændre rolle: ${e.message}`);
-        await refreshAdminData();
+        showStatusMessage(`Kunne ikke tilføje medlemskab: ${e.message}`);
     }
 });
 
 el.adminUsersList?.addEventListener('click', async (event) => {
+    const chipRemove = event.target.closest('[data-remove-membership]');
+    if (chipRemove) {
+        const [userId, clubId] = chipRemove.dataset.removeMembership.split(':').map(Number);
+        if (!window.confirm('Fjern medlemskabet?')) return;
+        try {
+            await api('DELETE', `admin/memberships?userId=${userId}&clubId=${clubId}`);
+            showStatusMessage('Medlemskab fjernet.');
+            await refreshAdminData();
+            await reloadOwnProfile();
+        } catch (e) {
+            showStatusMessage(`Kunne ikke fjerne: ${e.message}`);
+        }
+        return;
+    }
     const del = event.target.closest('[data-admin-user-delete]');
     if (del && !del.disabled) {
         const id = Number(del.dataset.adminUserDelete);
