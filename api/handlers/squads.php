@@ -116,6 +116,17 @@ function handle_club_player_update(int $clubId, int $pid): void {
     if (!$row) json_error('Spilleren findes ikke i klubben.', 404);
 
     $body = read_json_body();
+    if (array_key_exists('name', $body)) {
+        $name = trim((string)$body['name']);
+        if ($name === '' || strlen($name) > 120) json_error('Ugyldigt spillernavn.', 422);
+        try {
+            db()->prepare('UPDATE club_players SET name = ? WHERE id = ?')
+                ->execute([$name, $pid]);
+        } catch (PDOException $e) {
+            if ((int)$e->errorInfo[1] === 1062) json_error('En spiller med dette navn findes allerede i klubben.', 409);
+            throw $e;
+        }
+    }
     if (array_key_exists('level', $body)) {
         db()->prepare('UPDATE club_players SET level = ? WHERE id = ?')
             ->execute([squad_clamp_level($body['level']), $pid]);

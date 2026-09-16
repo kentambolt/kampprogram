@@ -2286,3 +2286,74 @@ prefill-card-header {
     padding-top: 14px;
     border-top: 1px dashed var(--border);
 }
+
+/* ── ⋮-menu pr. spiller i "Alle spillere" ────────────────── */
+
+.level-badge {
+    flex: 0 0 auto;
+    font-size: 12.5px;
+    color: var(--muted);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+.player-menu-anchor {
+    position: relative;
+    flex: 0 0 auto;
+    display: inline-flex;
+}
+.player-menu-toggle {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.player-menu-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+.player-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    min-width: 190px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-pop);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.player-menu-item {
+    width: 100%;
+    text-align: left;
+    margin: 0;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-weight: 500;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.player-menu-item:hover {
+    background: var(--panel-2);
+}

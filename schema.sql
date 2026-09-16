@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS club_matches (
     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_club_match (club_id, rid, court_index),
     KEY idx_club_played (club_id, played_at_ms),
-    CONSTRAINT fk_cm_club FOREIGN KEY (club_id)
+    CONSTRAINT fk_cmatch_club FOREIGN KEY (club_id)
         REFERENCES clubs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

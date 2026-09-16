@@ -1858,6 +1858,11 @@ function renderRoster() {
     syncQuickAddOptions();
 }
 
+// ⋮-menuens tilstand: hvilken spillers menu er åben, og hvilken spillers
+// niveau er i redigeringstilstand (inline select).
+let openPlayerMenuIndex = null;
+let editingLevelIndex = null;
+
 function renderPlayerManagerList() {
     const players = sortPlayersForDisplay(state.roster);
 
@@ -1868,26 +1873,41 @@ function renderPlayerManagerList() {
 
     el.playerManagerListArea.innerHTML = players.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
+        const showLevel = isUsingSkillLevels() && shouldShowLevels();
 
-        // Level controls: shown only when levels are enabled AND globally visible.
-        const levelControls = (isUsingSkillLevels() && shouldShowLevels()) ? `
-            <div class="player-row-inline-controls">
+        // Niveau vises altid (når niveauer bruges/vises), men er kun
+        // redigerbart efter "Rediger niveau" i ⋮-menuen.
+        const levelHtml = !showLevel ? '' : (editingLevelIndex === index ? `
                 <select class="level-select" data-player-level-index="${index}">
                     ${getLevelOptions(player.level)}
-                </select>
-            </div>` : '';
+                </select>` : `
+                <span class="level-badge">${levelName(player.level)}</span>`);
+
+        const photoItems = player.photo
+            ? `<button class="player-menu-item" type="button" data-player-action="photo-change" data-index="${index}">📷 Skift billede</button>
+               <button class="player-menu-item" type="button" data-player-action="photo-remove" data-index="${index}">✕ Fjern billede</button>`
+            : `<button class="player-menu-item" type="button" data-player-action="photo-add" data-index="${index}">📷 Indsæt billede</button>`;
+
+        const menuHtml = openPlayerMenuIndex === index ? `
+                <div class="player-menu">
+                    ${showLevel ? `<button class="player-menu-item" type="button" data-player-action="edit-level" data-index="${index}">⚖ Rediger niveau</button>` : ''}
+                    <button class="player-menu-item" type="button" data-player-action="edit-name" data-index="${index}">✎ Rediger navn</button>
+                    ${photoItems}
+                    <button class="player-menu-item" type="button" data-player-action="goto" data-index="${index}">📊 Gå til spiller</button>
+                </div>` : '';
 
         return `
             <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}">
                 <div class="player-row-main compact-player-row">
-                    <span class="avatar-wrap">
-                        <button class="avatar-btn" type="button" data-photo-index="${index}" title="Tilføj eller skift billede (valgfrit)">${playerAvatarHtml(player)}</button>
-                        ${player.photo ? `<button class="avatar-remove" type="button" data-photo-remove-index="${index}" title="Fjern billede">✕</button>` : ''}
-                    </span>
+                    ${playerAvatarHtml(player)}
                     <button class="player-row-name" onclick="${player.active ? `removePlayer(${index})` : `markArrived(${index})`}">
                         <strong>${escapeHtml(player.name)}</strong>
                     </button>
-                    ${levelControls}
+                    ${levelHtml}
+                    <span class="player-menu-anchor">
+                        <button class="player-menu-toggle" type="button" data-player-menu-toggle="${index}" title="Flere muligheder" aria-label="Flere muligheder for ${escapeHtml(player.name)}">⋮</button>
+                        ${menuHtml}
+                    </span>
                 </div>
             </div>
         `;
@@ -3524,6 +3544,7 @@ function updatePlayerLevel(index, level) {
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 9) return;
 
     player.level = parsed;
+    editingLevelIndex = null;
     pushPlayerUpdateToClub(player, {level: parsed});
     renderRoster();
     renderPlayerManagerList();
@@ -4058,20 +4079,19 @@ function confirmBulkDelete() {
 
 // ── Per-player level reveal (event delegation on the player containers) ──
 function handlePlayerAreaClick(event) {
-    // ✕ på avatar → fjern spillerfoto.
-    const photoRemoveBtn = event.target.closest('[data-photo-remove-index]');
-    if (photoRemoveBtn) {
-        const idx = Number(photoRemoveBtn.dataset.photoRemoveIndex);
-        const player = state.roster[idx];
-        if (player) applyPlayerPhoto(player.name, null);
+    // Punkt i ⋮-menuen.
+    const actionBtn = event.target.closest('[data-player-action]');
+    if (actionBtn) {
+        handlePlayerMenuAction(actionBtn.dataset.playerAction, Number(actionBtn.dataset.index));
         return;
     }
-    // Avatar-klik → vælg/skift spillerfoto.
-    const avatarBtn = event.target.closest('[data-photo-index]');
-    if (avatarBtn) {
-        const idx = Number(avatarBtn.dataset.photoIndex);
-        const player = state.roster[idx];
-        if (player) openPhotoPicker(player.name);
+    // ⋮-knappen åbner/lukker menuen.
+    const toggle = event.target.closest('[data-player-menu-toggle]');
+    if (toggle) {
+        const idx = Number(toggle.dataset.playerMenuToggle);
+        openPlayerMenuIndex = (openPlayerMenuIndex === idx) ? null : idx;
+        editingLevelIndex = null;
+        renderPlayerManagerList();
         return;
     }
     // Roster-chip click → toggle player active.
@@ -4080,6 +4100,139 @@ function handlePlayerAreaClick(event) {
         const idx = Number(chip.dataset.playerIndex);
         if (Number.isInteger(idx)) removePlayer(idx);
     }
+}
+
+function handlePlayerMenuAction(action, index) {
+    const player = state.roster[index];
+    openPlayerMenuIndex = null;
+    if (!player) { renderPlayerManagerList(); return; }
+    if (action === 'edit-level') {
+        editingLevelIndex = index;
+        renderPlayerManagerList();
+        return;
+    }
+    renderPlayerManagerList();
+    if (action === 'edit-name')    { renamePlayer(index); return; }
+    if (action === 'photo-add' || action === 'photo-change') { openPhotoPicker(player.name); return; }
+    if (action === 'photo-remove') { applyPlayerPhoto(player.name, null); return; }
+    if (action === 'goto')         { openStatsForPlayer(player.name); return; }
+}
+
+// Luk ⋮-menu / inline niveau-redigering ved klik udenfor.
+document.addEventListener('click', (event) => {
+    let changed = false;
+    if (openPlayerMenuIndex !== null
+        && !event.target.closest('[data-player-menu-toggle]')
+        && !event.target.closest('.player-menu')) {
+        openPlayerMenuIndex = null;
+        changed = true;
+    }
+    if (editingLevelIndex !== null
+        && !event.target.closest('.level-select')
+        && !event.target.closest('[data-player-action]')) {
+        editingLevelIndex = null;
+        changed = true;
+    }
+    if (changed) renderPlayerManagerList();
+});
+
+// Omdøb en spiller. Klubben spørges først (kan afvise ved navnesammenfald),
+// og derefter opdateres navnet i roster, historik, hold og kamparkiv, så
+// statistik og "nye makkere"-regler følger med. Identiteten bæres af pid.
+async function renamePlayer(index) {
+    const player = state.roster[index];
+    if (!player || player.members) return;
+    const oldName = player.name;
+    const input = window.prompt('Nyt navn til spilleren:', oldName);
+    if (input === null) return;
+    const newName = normalizeName(input);
+    if (!newName) { showStatusMessage('Navnet må ikke være tomt.'); return; }
+    if (newName === oldName) return;
+    if (state.roster.some((p, i) => i !== index && !p.members && p.name.toLowerCase() === newName.toLowerCase())) {
+        showStatusMessage(`Der findes allerede en spiller ved navn ${newName}.`);
+        return;
+    }
+
+    const cpid = clubIdFromPid(player.pid);
+    if (cpid && canEditActiveClub()) {
+        try {
+            await api('PATCH', `clubs/${activeClubId()}/players/${cpid}`, {name: newName});
+            const cp = (state.clubPlayers || []).find(x => x.id === cpid);
+            if (cp) cp.name = newName;
+        } catch (e) {
+            showStatusMessage(`Kunne ikke omdøbe i klubben: ${e.message}`);
+            return;
+        }
+    }
+
+    applyPlayerRename(player, oldName, newName);
+    showStatusMessage(`${oldName} hedder nu ${newName}.`);
+}
+
+function applyPlayerRename(player, oldName, newName) {
+    player.name = newName;
+    const cpid = clubIdFromPid(player.pid);
+
+    const fixEntry = (entry) => {
+        if (!entry) return;
+        if (Array.isArray(entry.members)) { entry.members.forEach(fixEntry); return; }
+        if ((player.pid && entry.pid === player.pid) || entry.name === oldName) entry.name = newName;
+    };
+    state.history.forEach(round => {
+        (round.courts || []).forEach(court => {
+            (court.teamA?.players || []).forEach(fixEntry);
+            (court.teamB?.players || []).forEach(fixEntry);
+        });
+        (round.benched || []).forEach(fixEntry);
+    });
+    (state.teams || []).forEach(team => (team.members || []).forEach(fixEntry));
+
+    (state.matchLog || []).forEach(e => {
+        const fixSide = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach((item, i) => {
+                if (typeof item === 'string') {
+                    if (item === oldName) arr[i] = newName;
+                } else if (item && typeof item === 'object') {
+                    if ((player.pid && item.pid === player.pid)
+                        || (cpid && item.id === cpid)
+                        || item.name === oldName) {
+                        item.name = newName;
+                    }
+                }
+            });
+        };
+        fixSide(e.a);
+        fixSide(e.b);
+    });
+
+    if (statsExpandedName === oldName) statsExpandedName = newName;
+
+    renderRoster();
+    renderPlayerManagerList();
+    renderPlayerStats();
+    renderHistory();
+    if (state.lastResult) renderRound(state.lastResult);
+    if (isStatsPanelOpen()) renderStatsPanel();
+    saveState();
+}
+
+// "Gå til spiller": åbn statistikpanelet med spillerens række udfoldet.
+// "✕ Luk" i panelet fører tilbage til hovedsiden.
+function openStatsForPlayer(name) {
+    statsExpandedName = name;
+    renderStatsPanel();
+    showStandAlone(el.statsPanel);
+    refreshCloudMatches();
+    requestAnimationFrame(() => {
+        const rows = el.statsListArea ? el.statsListArea.querySelectorAll('[data-stats-name]') : [];
+        for (const row of rows) {
+            if (row.dataset.statsName === name) {
+                row.scrollIntoView({block: 'center'});
+                break;
+            }
+        }
+    });
 }
 el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
 el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
