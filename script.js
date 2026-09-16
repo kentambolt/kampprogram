@@ -823,6 +823,12 @@ function clonePlayers(players) {
     return players.map(player => normalizePlayer(player));
 }
 
+// SVG-ikon fra den self-hostede sprite (custom-ikoner, samme origin —
+// virker offline via service workeren). currentColor arver knappens farve.
+function icon(name, cls = '') {
+    return `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true" focusable="false"><use href="icons.svg#kp-${name}"></use></svg>`;
+}
+
 function normalizeName(name) {
     return String(name || '').trim();
 }
@@ -1158,7 +1164,7 @@ function syncLevelsMenuItem() {
     const label = el.toggleLevelsBtn.querySelector('.menu-item-label');
     // When levels are visible, clicking will HIDE → show eyes-with-slash and "Skjul" label.
     // When levels are hidden,  clicking will SHOW → show plain eyes and "Vis" label.
-    if (eye) eye.classList.toggle('eye-icon--off', !state.showAllLevels);
+    if (eye) eye.innerHTML = icon(state.showAllLevels ? 'eye' : 'eye-off');
     if (label) label.textContent = state.showAllLevels ? 'Skjul niveauer' : 'Vis niveauer';
 }
 
@@ -1884,20 +1890,20 @@ function renderPlayerManagerList() {
                 <span class="level-badge">${levelName(player.level)}</span>`);
 
         const photoItems = player.photo
-            ? `<button class="player-menu-item" type="button" data-player-action="photo-change" data-index="${index}">📷 Skift billede</button>
-               <button class="player-menu-item" type="button" data-player-action="photo-remove" data-index="${index}">✕ Fjern billede</button>`
-            : `<button class="player-menu-item" type="button" data-player-action="photo-add" data-index="${index}">📷 Indsæt billede</button>`;
+            ? `<button class="player-menu-item" type="button" data-player-action="photo-change" data-index="${index}">${icon('camera')} Skift billede</button>
+               <button class="player-menu-item" type="button" data-player-action="photo-remove" data-index="${index}">${icon('close')} Fjern billede</button>`
+            : `<button class="player-menu-item" type="button" data-player-action="photo-add" data-index="${index}">${icon('camera')} Indsæt billede</button>`;
 
         const menuHtml = openPlayerMenuIndex === index ? `
                 <div class="player-menu">
-                    ${showLevel ? `<button class="player-menu-item" type="button" data-player-action="edit-level" data-index="${index}">⚖ Rediger niveau</button>` : ''}
-                    <button class="player-menu-item" type="button" data-player-action="edit-name" data-index="${index}">✎ Rediger navn</button>
+                    ${showLevel ? `<button class="player-menu-item" type="button" data-player-action="edit-level" data-index="${index}">${icon('level')} Rediger niveau</button>` : ''}
+                    <button class="player-menu-item" type="button" data-player-action="edit-name" data-index="${index}">${icon('edit')} Rediger navn</button>
                     ${photoItems}
-                    <button class="player-menu-item" type="button" data-player-action="goto" data-index="${index}">📊 Gå til spiller</button>
+                    <button class="player-menu-item" type="button" data-player-action="goto" data-index="${index}">${icon('statistics')} Gå til spiller</button>
                 </div>` : '';
 
         return `
-            <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}">
+            <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}${openPlayerMenuIndex === index ? ' is-menu-open' : ''}">
                 <div class="player-row-main compact-player-row">
                     ${playerAvatarHtml(player)}
                     <button class="player-row-name" onclick="${player.active ? `removePlayer(${index})` : `markArrived(${index})`}">
@@ -1905,7 +1911,7 @@ function renderPlayerManagerList() {
                     </button>
                     ${levelHtml}
                     <span class="player-menu-anchor">
-                        <button class="player-menu-toggle" type="button" data-player-menu-toggle="${index}" title="Flere muligheder" aria-label="Flere muligheder for ${escapeHtml(player.name)}">⋮</button>
+                        <button class="player-menu-toggle" type="button" data-player-menu-toggle="${index}" title="Flere muligheder" aria-label="Flere muligheder for ${escapeHtml(player.name)}">${icon('more')}</button>
                         ${menuHtml}
                     </span>
                 </div>
@@ -2450,15 +2456,15 @@ function renderStatsPanel() {
                     <div><strong>${row.draw}</strong><span>uafgjort</span></div>
                 </div>
                 <div class="stats-photo-actions">
-                    <button type="button" class="secondary" data-stats-photo="${escapeHtml(row.name)}">📷 ${row.photo ? 'Skift billede' : 'Tilføj billede'}</button>
-                    ${row.photo ? `<button type="button" class="secondary" data-stats-photo-remove="${escapeHtml(row.name)}">✕ Fjern billede</button>` : ''}
+                    <button type="button" class="secondary" data-stats-photo="${escapeHtml(row.name)}">${icon('camera')} ${row.photo ? 'Skift billede' : 'Tilføj billede'}</button>
+                    ${row.photo ? `<button type="button" class="secondary" data-stats-photo-remove="${escapeHtml(row.name)}">${icon('close')} Fjern billede</button>` : ''}
                 </div>
             </div>` : '';
 
         const hintHtml = row.hint
             ? `<div class="stats-row-meta"><span class="level-hint level-hint--${row.hint}">${row.hint === 'up'
-                ? `▲ Har vundet ${Math.round(row.winPct * 100)} % af ${row.decided} afgjorte kampe — overvej højere niveau`
-                : `▼ Har tabt ${Math.round((1 - row.winPct) * 100)} % af ${row.decided} afgjorte kampe — overvej lavere niveau`}</span></div>`
+                ? `${icon('level-up', 'icon--sm')} Har vundet ${Math.round(row.winPct * 100)} % af ${row.decided} afgjorte kampe — overvej højere niveau`
+                : `${icon('level-down', 'icon--sm')} Har tabt ${Math.round((1 - row.winPct) * 100)} % af ${row.decided} afgjorte kampe — overvej lavere niveau`}</span></div>`
             : '';
 
         return `
@@ -2471,7 +2477,7 @@ function renderStatsPanel() {
                         <div class="stats-row-meta">${wldHtml}${dots ? ' ' : ''}${dots}</div>
                         ${hintHtml}
                     </div>
-                    <span class="squad-chevron">${expanded ? '▾' : '▸'}</span>
+                    <span class="squad-chevron">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
                 </div>
                 ${detail}
             </div>`;
@@ -2633,7 +2639,9 @@ function isResultEditable() {
 function setEditResultMode(enabled) {
     editingResult = Boolean(enabled) && isResultEditable();
     if (el.editResultBtn) {
-        el.editResultBtn.textContent = editingResult ? '✓ Færdig' : '✎ Rediger';
+        el.editResultBtn.innerHTML = editingResult
+            ? `${icon('check')} Færdig`
+            : `${icon('edit')} Rediger`;
         el.editResultBtn.classList.toggle('is-active', editingResult);
     }
     if (state.lastResult) renderRound(state.lastResult);
@@ -4478,7 +4486,7 @@ function syncAccountUI() {
     const activeRole = u && u.club ? u.club.role : null;
     if (el.accountBtn) {
         const clubSuffix = u && u.club ? ` (${u.club.name})` : '';
-        el.accountBtn.textContent = u ? `👤 ${u.name}${clubSuffix}` : '👤 Log ind';
+        el.accountBtn.innerHTML = u ? `${icon('account')} ${escapeHtml(u.name)}${escapeHtml(clubSuffix)}` : `${icon('account')} Log ind`;
     }
     if (el.usersBtn) {
         // Owner i aktiv klub — eller site-admin med en aktiv klub.
@@ -4490,7 +4498,7 @@ function syncAccountUI() {
     }
     if (el.clubBtn) {
         el.clubBtn.classList.toggle('hidden', !(u && u.club));
-        if (u && u.club) el.clubBtn.textContent = `🏸 ${u.club.name}`;
+        if (u && u.club) el.clubBtn.innerHTML = `${icon('club')} ${escapeHtml(u.club.name)}`;
     }
     if (el.cloudListsSection) {
         // Cloud-sektionen kræver både login og medlemskab af mindst én klub.
@@ -4514,7 +4522,7 @@ function syncAccountUI() {
             el.noClubHint.classList.toggle('hidden', !showHint);
             if (showHint) {
                 el.noClubHint.textContent = u.isAdmin
-                    ? 'Du er ikke medlem af nogen klub endnu. Tilføj dig selv via 🛠 Admin → "Tilføj medlemskab".'
+                    ? 'Du er ikke medlem af nogen klub endnu. Tilføj dig selv via Admin → "Tilføj medlemskab".'
                     : 'Du er ikke medlem af nogen klub endnu. Bed en klub-ejer om at invitere dig pr. e-mail.';
             }
         }
@@ -4783,7 +4791,7 @@ function renderUsersList(users) {
                     <div class="user-row-email">${escapeHtml(u.email)}</div>
                 </div>
                 <select class="user-role-select" data-user-id="${u.id}">${roleOpts}</select>
-                <button class="danger user-row-delete" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="Fjern fra klubben">✕</button>
+                <button class="danger user-row-delete" data-user-id="${u.id}" ${isSelf ? 'disabled' : ''} title="Fjern fra klubben">${icon('close', 'icon--sm')}</button>
             </div>
         `;
     }).join('');
@@ -4801,8 +4809,8 @@ function renderInvitesList(invites) {
                 <div class="user-row-name">${escapeHtml(i.email)}</div>
                 <div class="user-row-email">rolle: ${i.role} · udløber ${formatDateTime(i.expiresAt)}</div>
             </div>
-            <button class="ghost user-row-pw" data-invite-copy="${escapeHtml(i.link)}" title="Kopiér invitationslink">🔗</button>
-            <button class="danger user-row-delete" data-invite-revoke="${i.id}" title="Tilbagekald">✕</button>
+            <button class="ghost user-row-pw" data-invite-copy="${escapeHtml(i.link)}" title="Kopiér invitationslink">${icon('link')}</button>
+            <button class="danger user-row-delete" data-invite-revoke="${i.id}" title="Tilbagekald">${icon('close', 'icon--sm')}</button>
         </div>
     `).join('');
 }
@@ -5002,7 +5010,7 @@ function renderClubSquadsAdmin() {
                 <span class="membership-chip">
                     ${escapeHtml(m.name)}${shouldShowLevels() ? ` <em>(${levelName(m.level)})</em>` : ''}
                     ${canEdit ? `<button class="membership-chip-remove" type="button"
-                        data-squad-member-remove="${m.id}" title="Fjern fra holdet">✕</button>` : ''}
+                        data-squad-member-remove="${m.id}" title="Fjern fra holdet">${icon('close', 'icon--sm')}</button>` : ''}
                 </span>
             `).join('');
             const addable = squadAdmin.players.filter(p => !memberIds.has(p.id));
@@ -5018,7 +5026,7 @@ function renderClubSquadsAdmin() {
                 <div class="squad-add-row">
                     <input id="squadNewPlayerName" type="text" placeholder="Ny spillers navn"/>
                     <select id="squadNewPlayerLevel">${getLevelOptions(3)}</select>
-                    <button class="primary" type="button" data-squad-create-player>＋ Opret &amp; tilføj</button>
+                    <button class="primary" type="button" data-squad-create-player>${icon('add')} Opret &amp; tilføj</button>
                 </div>
                 <div class="squad-help">Vælg en eksisterende spiller fra klubben — eller opret en helt ny spiller direkte på holdet.</div>
             ` : '';
@@ -5033,7 +5041,7 @@ function renderClubSquadsAdmin() {
             <div class="user-row squad-row user-row--clickable${isOpen ? ' squad-row--open' : ''}" data-squad-expand="${s.id}" role="button" tabindex="0" title="${isOpen ? 'Klik for at lukke' : 'Klik for at administrere holdet'}">
                 <div class="user-row-main">
                     <div class="squad-row-header">
-                        <span class="squad-chevron" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>
+                        <span class="squad-chevron" aria-hidden="true">${icon(isOpen ? 'chevron-down' : 'chevron-right')}</span>
                         <div>
                             <div class="user-row-name">${escapeHtml(s.name)}</div>
                             <div class="user-row-email">${s.memberCount} spiller${s.memberCount === 1 ? '' : 'e'}${isOpen ? '' : ' · klik for at se og redigere'}</div>
@@ -5041,7 +5049,7 @@ function renderClubSquadsAdmin() {
                     </div>
                     ${detail}
                 </div>
-                ${canEdit ? `<button class="danger user-row-delete" type="button" data-squad-delete="${s.id}" title="Slet holdet">✕</button>` : ''}
+                ${canEdit ? `<button class="danger user-row-delete" type="button" data-squad-delete="${s.id}" title="Slet holdet">${icon('trash', 'icon--sm')}</button>` : ''}
             </div>
         `;
     }).join('');
@@ -5174,7 +5182,7 @@ function renderClubSessions(sessions) {
                 <div class="user-row-email">Opdateret ${formatDateTime(s.updatedAt)}${s.updatedBy ? ` af ${escapeHtml(s.updatedBy)}` : ''}</div>
             </div>
             <button class="primary" data-load-session="${s.id}" title="Hent og fortsæt sessionen">↓ Overtag</button>
-            ${canEdit ? `<button class="danger user-row-delete" data-delete-session="${s.id}" title="Slet">✕</button>` : ''}
+            ${canEdit ? `<button class="danger user-row-delete" data-delete-session="${s.id}" title="Slet">${icon('trash', 'icon--sm')}</button>` : ''}
         </div>
     `).join('');
 }
@@ -5355,7 +5363,7 @@ function renderAdminClubs() {
                 <div class="user-row-name">${escapeHtml(c.name)}${isOwnClub(c) ? ' <em>(din klub)</em>' : ''}</div>
                 <div class="user-row-email">${c.userCount} bruger${c.userCount === 1 ? '' : 'e'} · ${c.listCount} liste${c.listCount === 1 ? '' : 'r'} · sidst aktiv: ${formatDateTime(c.lastActivity)}</div>
             </div>
-            <span class="user-row-open" aria-hidden="true">›</span>
+            <span class="user-row-open" aria-hidden="true">${icon('chevron-right')}</span>
         </div>
     `).join('');
 }
@@ -5380,19 +5388,19 @@ function renderAdminUsers() {
                 ${escapeHtml(m.clubName)} <em>(${m.role})</em>
                 <button class="membership-chip-remove" type="button"
                         data-remove-membership="${u.id}:${m.clubId}"
-                        title="Fjern fra ${escapeHtml(m.clubName)}">✕</button>
+                        title="Fjern fra ${escapeHtml(m.clubName)}">${icon('close', 'icon--sm')}</button>
             </span>
         `).join('');
         return `
             <div class="user-row">
                 <div class="user-row-main">
-                    <div class="user-row-name">${escapeHtml(u.name)}${u.isAdmin ? ' 🛠' : ''}${isSelf ? ' <em>(dig)</em>' : ''}</div>
+                    <div class="user-row-name">${escapeHtml(u.name)}${u.isAdmin ? ` ${icon('admin', 'icon--sm')}` : ''}${isSelf ? ' <em>(dig)</em>' : ''}</div>
                     <div class="user-row-email">${escapeHtml(u.email)}</div>
                     <div class="user-row-usage">Login: ${u.loginCount} gange · Sidst: ${formatDateTime(u.lastLoginAt)}</div>
                     <div class="user-row-memberships">${chips || '<span class="subtle">Ingen klubber</span>'}</div>
                 </div>
-                <button class="ghost user-row-pw" data-admin-user-pw="${u.id}" title="Sæt ny adgangskode">🔑</button>
-                <button class="danger user-row-delete" data-admin-user-delete="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet kontoen">✕</button>
+                <button class="ghost user-row-pw" data-admin-user-pw="${u.id}" title="Sæt ny adgangskode">${icon('password')}</button>
+                <button class="danger user-row-delete" data-admin-user-delete="${u.id}" ${isSelf ? 'disabled' : ''} title="Slet kontoen">${icon('trash', 'icon--sm')}</button>
             </div>
         `;
     }).join('');

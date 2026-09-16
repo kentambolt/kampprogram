@@ -871,7 +871,7 @@ prefill-card-header {
 }
 
 .collapsible-panel:not(.collapsed) .collapse-indicator {
-    transform: rotate(180deg);
+    transform: rotate(90deg);
 }
 
 .panel-toggle {
@@ -2291,18 +2291,24 @@ prefill-card-header {
 
 .level-badge {
     flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 140px;
+    text-align: center;
     font-size: 12.5px;
     color: var(--muted);
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 4px 10px;
+    padding: 5px 10px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .player-menu-anchor {
     position: relative;
     flex: 0 0 auto;
     display: inline-flex;
+    margin: 0 6px 0 2px;
 }
 .player-menu-toggle {
     width: 34px;
@@ -2323,6 +2329,12 @@ prefill-card-header {
     border-color: var(--accent);
     color: var(--text);
 }
+.player-row.is-menu-open {
+    opacity: 1;
+    position: relative;
+    z-index: 60;
+}
+
 .player-menu {
     position: absolute;
     top: calc(100% + 6px);
@@ -2356,4 +2368,46 @@ prefill-card-header {
 }
 .player-menu-item:hover {
     background: var(--panel-2);
+}
+
+@media (max-width: 980px) {
+    .level-badge {
+        width: 128px;
+    }
+}
+
+
+/* ── Custom-ikoner (SVG-sprite, icons.svg) ───────────────── */
+
+.icon {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    display: inline-block;
+    vertical-align: -3px;
+}
+.icon--sm {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+}
+.collapse-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.collapse-indicator .icon {
+    width: 22px;
+    height: 22px;
+}
+.player-menu-toggle .icon,
+.menu-toggle .icon {
+    width: 20px;
+    height: 20px;
+}
+.eye-icon .icon {
+    vertical-align: -4px;
+}
+.menu-radio-marker .icon {
+    display: block;
 }

@@ -5,12 +5,13 @@
 // API-kald (/api/) røres ALDRIG — de degraderer selv pænt.
 // =============================================================
 
-const CACHE_NAME = 'kampprogram-v1';
+const CACHE_NAME = 'kampprogram-v2';
 const CORE_ASSETS = [
     './',
     './index.html',
     './styles.css',
     './script.js',
+    './icons.svg',
     './favicon.svg',
     './site.webmanifest',
 ];

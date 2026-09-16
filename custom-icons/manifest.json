@@ -1,0 +1,162 @@
+[
+  {
+    "id": "menu",
+    "label": "Hovedmenu"
+  },
+  {
+    "id": "actions",
+    "label": "Handlinger"
+  },
+  {
+    "id": "eye",
+    "label": "Vis niveauer"
+  },
+  {
+    "id": "eye-off",
+    "label": "Skjul niveauer"
+  },
+  {
+    "id": "selected",
+    "label": "Valgt sortering"
+  },
+  {
+    "id": "more",
+    "label": "Spiller-menu"
+  },
+  {
+    "id": "club",
+    "label": "Klub"
+  },
+  {
+    "id": "statistics",
+    "label": "Spillerstatistik"
+  },
+  {
+    "id": "import-export",
+    "label": "Import / eksport"
+  },
+  {
+    "id": "account",
+    "label": "Min konto"
+  },
+  {
+    "id": "users",
+    "label": "Brugere"
+  },
+  {
+    "id": "admin",
+    "label": "Admin"
+  },
+  {
+    "id": "close",
+    "label": "Luk / fjern"
+  },
+  {
+    "id": "next-round",
+    "label": "Næste kamprunde"
+  },
+  {
+    "id": "retry",
+    "label": "Prøv igen"
+  },
+  {
+    "id": "make-teams",
+    "label": "Lav hold"
+  },
+  {
+    "id": "edit",
+    "label": "Rediger"
+  },
+  {
+    "id": "undo",
+    "label": "Fjern seneste runde"
+  },
+  {
+    "id": "end-evening",
+    "label": "Afslut aften"
+  },
+  {
+    "id": "check",
+    "label": "Gem / bekræft"
+  },
+  {
+    "id": "arrow-up",
+    "label": "Importér spillere"
+  },
+  {
+    "id": "arrow-down",
+    "label": "Hent hold"
+  },
+  {
+    "id": "copy",
+    "label": "Kopiér"
+  },
+  {
+    "id": "add",
+    "label": "Tilføj / opret"
+  },
+  {
+    "id": "cloud",
+    "label": "Klubbens hold"
+  },
+  {
+    "id": "local-lists",
+    "label": "Lokale lister"
+  },
+  {
+    "id": "level",
+    "label": "Rediger niveau"
+  },
+  {
+    "id": "camera",
+    "label": "Skift billede"
+  },
+  {
+    "id": "download",
+    "label": "Eksportér statistik"
+  },
+  {
+    "id": "upload",
+    "label": "Importér statistik"
+  },
+  {
+    "id": "trash",
+    "label": "Ryd statistik"
+  },
+  {
+    "id": "invite",
+    "label": "Send invitation"
+  },
+  {
+    "id": "link",
+    "label": "Invitationslink"
+  },
+  {
+    "id": "password",
+    "label": "Ny adgangskode"
+  },
+  {
+    "id": "warning",
+    "label": "Advarsel"
+  },
+  {
+    "id": "level-up",
+    "label": "Niveau op"
+  },
+  {
+    "id": "level-down",
+    "label": "Niveau ned"
+  },
+  {
+    "id": "chevron-right",
+    "label": "Panel / åbn række"
+  },
+  {
+    "id": "chevron-down",
+    "label": "Åbent panel"
+  },
+  {
+    "id": "arrow-right",
+    "label": "Retningspil"
+  }
+]
