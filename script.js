@@ -846,7 +846,7 @@ function updateActivePlayersTitle() {
     const activePlayersCount = getActivePlayers().length;
     const totalPlayersCount = getPlayers().length;
     el.activePlayersTitle.textContent = `Aktive spillere (${activePlayersCount})`;
-    el.allPlayersTitle.textContent = `Alle spillere (${totalPlayersCount})`;
+    el.allPlayersTitle.innerHTML = `Dagens spillere <span class="attendance-count">${activePlayersCount} af ${totalPlayersCount} mødt op</span>`;
 }
 
 function updateShuffleBtn() {
@@ -1869,6 +1869,15 @@ function renderRoster() {
 let openPlayerMenuIndex = null;
 let editingLevelIndex = null;
 
+// Fem niveauprikker (altid 5, udfyldt = spillerens niveau 1-5) med
+// skærmlæservenlig beskrivelse, fx "Niveau 2 af 5, Let øvet".
+function levelDotsHtml(level) {
+    const lv = clampLevel(level);
+    const dots = Array.from({length: 5}, (_, i) =>
+        `<i class="level-dot${i < lv ? ' is-filled' : ''}"></i>`).join('');
+    return `<span class="level-dots" role="img" aria-label="Niveau ${lv} af 5, ${levelName(lv)}">${dots}</span>`;
+}
+
 function renderPlayerManagerList() {
     const players = sortPlayersForDisplay(state.roster);
 
@@ -1877,24 +1886,27 @@ function renderPlayerManagerList() {
         return;
     }
 
-    el.playerManagerListArea.innerHTML = players.map(player => {
+    const showLevel = isUsingSkillLevels() && shouldShowLevels();
+
+    const rows = players.map(player => {
         const index = state.roster.findIndex(p => p.name === player.name);
-        const showLevel = isUsingSkillLevels() && shouldShowLevels();
 
         // Niveau vises altid (når niveauer bruges/vises), men er kun
         // redigerbart efter "Rediger niveau" i ⋮-menuen.
-        const levelHtml = !showLevel ? '' : (editingLevelIndex === index ? `
-                <select class="level-select" data-player-level-index="${index}">
+        const levelCells = !showLevel ? '' : (editingLevelIndex === index ? `
+                <select class="level-select attendance-level-edit" data-player-level-index="${index}">
                     ${getLevelOptions(player.level)}
                 </select>` : `
-                <span class="level-badge">${levelName(player.level)}</span>`);
+                ${levelDotsHtml(player.level)}
+                <span class="attendance-level" aria-hidden="true">${levelName(player.level)}</span>`);
 
         const photoItems = player.photo
             ? `<button class="player-menu-item" type="button" data-player-action="photo-change" data-index="${index}">${icon('camera')} Skift billede</button>
                <button class="player-menu-item" type="button" data-player-action="photo-remove" data-index="${index}">${icon('close')} Fjern billede</button>`
             : `<button class="player-menu-item" type="button" data-player-action="photo-add" data-index="${index}">${icon('camera')} Indsæt billede</button>`;
 
-        const menuHtml = openPlayerMenuIndex === index ? `
+        const menuOpen = openPlayerMenuIndex === index;
+        const menuHtml = menuOpen ? `
                 <div class="player-menu">
                     ${showLevel ? `<button class="player-menu-item" type="button" data-player-action="edit-level" data-index="${index}">${icon('level')} Rediger niveau</button>` : ''}
                     <button class="player-menu-item" type="button" data-player-action="edit-name" data-index="${index}">${icon('edit')} Rediger navn</button>
@@ -1902,22 +1914,39 @@ function renderPlayerManagerList() {
                     <button class="player-menu-item" type="button" data-player-action="goto" data-index="${index}">${icon('statistics')} Gå til spiller</button>
                 </div>` : '';
 
+        // Label omkring alt undtagen ⋮ — klik hvor som helst i rækken skifter
+        // fremmøde via den rigtige checkbox (tastatur + skærmlæser med).
         return `
-            <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}${openPlayerMenuIndex === index ? ' is-menu-open' : ''}">
-                <div class="player-row-main compact-player-row">
-                    ${playerAvatarHtml(player)}
-                    <button class="player-row-name" onclick="${player.active ? `removePlayer(${index})` : `markArrived(${index})`}">
-                        <strong>${escapeHtml(player.name)}</strong>
-                    </button>
-                    ${levelHtml}
-                    <span class="player-menu-anchor">
-                        <button class="player-menu-toggle" type="button" data-player-menu-toggle="${index}" title="Flere muligheder" aria-label="Flere muligheder for ${escapeHtml(player.name)}">${icon('more')}</button>
-                        ${menuHtml}
+            <div class="attendance-row${player.active ? ' is-met' : ''}${menuOpen ? ' is-menu-open' : ''}">
+                <label class="attendance-label">
+                    <span class="attendance-check-cell">
+                        <input type="checkbox" class="attendance-check" data-attend-index="${index}"
+                               ${player.active ? 'checked' : ''}
+                               aria-label="${escapeHtml(player.name)} mødt op">
                     </span>
-                </div>
+                    ${playerAvatarHtml(player, 'avatar--att')}
+                    <span class="attendance-name" title="${escapeHtml(player.name)}">${escapeHtml(player.name)}</span>
+                    ${levelCells}
+                </label>
+                <span class="player-menu-anchor">
+                    <button class="player-menu-toggle" type="button" data-player-menu-toggle="${index}"
+                            title="Flere muligheder" aria-label="Flere muligheder for ${escapeHtml(player.name)}"
+                            aria-haspopup="menu" aria-expanded="${menuOpen ? 'true' : 'false'}">${icon('more')}</button>
+                    ${menuHtml}
+                </span>
             </div>
         `;
     }).join('');
+
+    el.playerManagerListArea.innerHTML = `
+        <div class="attendance-table${showLevel ? '' : ' attendance-table--no-level'}">
+            <div class="attendance-head" aria-hidden="true">
+                <span class="attendance-head-met">Mødt</span>
+                <span class="attendance-head-player">Spiller</span>
+                ${showLevel ? '<span class="attendance-head-level">Niveau</span>' : ''}
+            </div>
+            ${rows}
+        </div>`;
 }
 
 // ── Kamparkiv (grundlag for spillerstatistik) ─────────────
@@ -4244,6 +4273,24 @@ function openStatsForPlayer(name) {
 }
 el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
 el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
+
+// Fremmøde-checkbox: ét change-event pr. skift (label sørger for klikfladen).
+el.playerManagerListArea?.addEventListener('change', (event) => {
+    const box = event.target.closest('input[data-attend-index]');
+    if (!box) return;
+    const idx = Number(box.dataset.attendIndex);
+    if (!Number.isInteger(idx)) return;
+    if (box.checked) markArrived(idx); else removePlayer(idx);
+});
+
+// Escape lukker ⋮-menuen og giver fokus tilbage til menuknappen.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || openPlayerMenuIndex === null) return;
+    const idx = openPlayerMenuIndex;
+    openPlayerMenuIndex = null;
+    renderPlayerManagerList();
+    el.playerManagerListArea?.querySelector(`[data-player-menu-toggle="${idx}"]`)?.focus();
+});
 
 // ── Resultat-knapper (rundekort + historik) ──
 function handleResultMarkClick(event) {
