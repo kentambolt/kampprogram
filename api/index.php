@@ -32,6 +32,7 @@ require __DIR__ . '/handlers/admin.php';
 require __DIR__ . '/handlers/invites.php';
 require __DIR__ . '/handlers/clubs.php';
 require __DIR__ . '/handlers/squads.php';
+require __DIR__ . '/handlers/matches.php';
 
 // ---------- Route parsing ----------
 
@@ -112,7 +113,18 @@ try {
         if ($id !== null) {
             $third = $segments[2] ?? '';
             if ($third === 'players') {
-                if ($method === 'GET') handle_club_players_list($id);
+                $pid = isset($segments[3]) && ctype_digit($segments[3]) ? (int)$segments[3] : null;
+                if ($pid === null) {
+                    if ($method === 'GET')  handle_club_players_list($id);
+                    if ($method === 'POST') handle_club_player_create($id);
+                } else {
+                    if ($method === 'PATCH' || $method === 'PUT') handle_club_player_update($id, $pid);
+                }
+                json_error('Method not allowed.', 405);
+            }
+            if ($third === 'matches') {
+                if ($method === 'GET')  handle_club_matches_list($id);
+                if ($method === 'POST') handle_club_matches_upsert($id);
                 json_error('Method not allowed.', 405);
             }
             if ($third === 'squads') {
@@ -154,7 +166,7 @@ try {
         $id = isset($segments[1]) && ctype_digit($segments[1]) ? (int)$segments[1] : null;
         if ($id === null) {
             if ($method === 'GET')  handle_users_list();
-            if ($method === 'POST') handle_users_create();
+            // Brugeroprettelse sker via invitationer (POST /invites).
         } else {
             if ($method === 'PATCH' || $method === 'PUT') handle_users_update($id);
             if ($method === 'DELETE')                    handle_users_delete($id);

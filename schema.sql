@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS club_players (
     club_id    INT UNSIGNED NOT NULL,
     name       VARCHAR(120) NOT NULL,
     level      TINYINT UNSIGNED NOT NULL DEFAULT 3,   -- 1-5 (Nybegynder..Elite)
+    photo      MEDIUMTEXT NULL,                        -- lille data-URL (valgfrit spillerfoto)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_club_player (club_id, name),
@@ -76,6 +77,23 @@ CREATE TABLE IF NOT EXISTS squad_members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Global brugerkonto — én pr. e-mail, uafhængig af klubber.
+-- Fælles kampstatistik pr. klub (upsert på club+runde+bane fra enhederne).
+CREATE TABLE IF NOT EXISTS club_matches (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    club_id      INT UNSIGNED NOT NULL,
+    rid          VARCHAR(40) NOT NULL,               -- runde-id fra frontenden
+    court_index  TINYINT UNSIGNED NOT NULL,
+    played_at_ms BIGINT UNSIGNED NOT NULL,           -- epoch ms
+    side_a       TEXT NOT NULL,                      -- JSON: [{id?, name}]
+    side_b       TEXT NOT NULL,
+    result       ENUM('A','B','D') NULL,             -- valgfrit, kun statistik
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_club_match (club_id, rid, court_index),
+    KEY idx_club_played (club_id, played_at_ms),
+    CONSTRAINT fk_cm_club FOREIGN KEY (club_id)
+        REFERENCES clubs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS users (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email         VARCHAR(190) NOT NULL UNIQUE,

@@ -47,6 +47,13 @@ const state = {
     // Klubbens hold + fælles spillerbase (hentes efter login/klubskifte).
     cloudSquads: [],
     clubPlayers: [],
+    // Varigt kamparkiv på denne enhed (til spillerstatistik). Runder
+    // arkiveres hertil, inden historikken ryddes — statistikken overlever
+    // altså "Nulstil historik" og nye spilleaftener.
+    matchLog: [],
+    // Kampe (rid:bane-nøgler) der endnu ikke er sendt til klubbens
+    // fælles statistik. Tømmes efterhånden som sync lykkes.
+    pendingSync: [],
 };
 
 const STORAGE_KEY = 'kampprogram-state-v3';
@@ -229,6 +236,18 @@ const el = {
     clubDangerZone: document.getElementById('clubDangerZone'),
     deleteClubBtn: document.getElementById('deleteClubBtn'),
     quickAddClubPlayer: document.getElementById('quickAddClubPlayer'),
+    photoFileInput: document.getElementById('photoFileInput'),
+    statsBtn: document.getElementById('statsBtn'),
+    statsPanel: document.getElementById('statsPanel'),
+    closeStatsBtn: document.getElementById('closeStatsBtn'),
+    statsInterval: document.getElementById('statsInterval'),
+    statsSort: document.getElementById('statsSort'),
+    statsListArea: document.getElementById('statsListArea'),
+    clearStatsBtn: document.getElementById('clearStatsBtn'),
+    exportStatsBtn: document.getElementById('exportStatsBtn'),
+    importStatsBtn: document.getElementById('importStatsBtn'),
+    importStatsFile: document.getElementById('importStatsFile'),
+    endEveningBtn: document.getElementById('endEveningBtn'),
     clubSquadCreateRow: document.getElementById('clubSquadCreateRow'),
     clubNewSquadName: document.getElementById('clubNewSquadName'),
     clubCreateSquadBtn: document.getElementById('clubCreateSquadBtn'),
@@ -388,6 +407,7 @@ function generateTeams() {
     }));
 
     // Generated teams invalidate the prior history (the units changed).
+    archiveHistoryToMatchLog();
     state.history = [];
     state.lastResult = null;
     setEditResultMode(false);
@@ -409,6 +429,7 @@ function clearTeams() {
     if (!confirmed) return;
 
     state.teams = [];
+    archiveHistoryToMatchLog();
     state.history = [];
     state.lastResult = null;
     setEditResultMode(false);
@@ -481,6 +502,29 @@ function createDefaultPrefills(courtCount) {
     }));
 }
 
+// Stram validering af spillerfotos (XSS-værn): kun rene base64-data-URL'er
+// fra kendte billedformater accepteres — uanset om de kommer fra egen canvas,
+// localStorage eller klubbens API.
+const PHOTO_DATAURL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+function sanitizePhoto(raw) {
+    return (typeof raw === 'string' && raw.length <= 200000 && PHOTO_DATAURL_RE.test(raw)) ? raw : null;
+}
+
+// Stabilt spiller-id: 'c<id>' for spillere fra klubbens spillerbase,
+// 'l<random>' for lokalt oprettede. Identitet følger id'et — ikke navnet.
+function makeLocalPid() {
+    return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function isClubPid(pid) {
+    return typeof pid === 'string' && /^c\d+$/.test(pid);
+}
+
+function clubIdFromPid(pid) {
+    return isClubPid(pid) ? Number(pid.slice(1)) : null;
+}
+
 function normalizePlayer(player) {
     if (player && Array.isArray(player.members)) {
         // Team super-player: don't clamp level (sum can exceed 9), keep members.
@@ -491,6 +535,7 @@ function normalizePlayer(player) {
             members: player.members.map(m => ({
                 name: normalizeName(m.name),
                 level: clampLevel(m.level),
+                pid: (typeof m.pid === 'string' && m.pid) ? m.pid : undefined,
             })),
             id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
         };
@@ -499,9 +544,13 @@ function normalizePlayer(player) {
         name: normalizeName(player.name),
         level: clampLevel(player.level),
         active: Boolean(player.active),
+        // Stabilt id — statistik, fotos og klub-identitet hænger på dette.
+        pid: (typeof player.pid === 'string' && player.pid) ? player.pid : makeLocalPid(),
         // Oprettelsestidspunkt (til sortering). Gamle spillere uden stempel
         // får ét første gang, de normaliseres — stabilt derefter.
         createdAt: Number(player.createdAt) || Date.now(),
+        // Valgfrit lille spillerfoto (data-URL fra canvas-nedskalering).
+        photo: sanitizePhoto(player.photo),
     };
 }
 
@@ -551,6 +600,8 @@ function saveState() {
         history: state.history,
         lastResult: state.lastResult,
         teams: state.teams || [],
+        matchLog: state.matchLog || [],
+        pendingSync: state.pendingSync || [],
         ui: {
             courtCount: el.courtCount.value,
             partnerLevelRule: el.partnerLevelRule?.value ?? 'prefer',
@@ -560,6 +611,8 @@ function saveState() {
             disallowExactRepeat: el.disallowExactRepeat?.checked ?? false,
             showAllLevels: state.showAllLevels,
             sortPlayersBy: state.sortPlayersBy,
+            statsInterval: el.statsInterval?.value ?? '0',
+            statsSort: el.statsSort?.value ?? 'name',
             // saveState reads enabled formats raw from the checkboxes — not from
             // getEnabledFormats() which returns [1] in team mode, so we'd lose
             // the user's earlier selection.
@@ -586,7 +639,12 @@ function saveState() {
         }
     };
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        // Typisk QuotaExceededError — sig det højt i stedet for at fejle stille.
+        showStatusMessage('⚠ Kunne ikke gemme alle data lokalt (lageret er fuldt). Prøv at fjerne nogle spillerfotos.');
+    }
 }
 
 // Convert v2 ui blob into v3-shaped ui object. v2 had separate
@@ -640,6 +698,9 @@ function restoreState() {
         // when scoring the next round).
         state.lastResult = state.history[state.history.length - 1] || null;
         state.teams = Array.isArray(data.teams) ? data.teams.map(normalizeTeam) : [];
+        state.matchLog = Array.isArray(data.matchLog) ? data.matchLog.filter(isValidLogEntry) : [];
+        state.pendingSync = Array.isArray(data.pendingSync)
+            ? data.pendingSync.filter(k => typeof k === 'string').slice(-2000) : [];
 
         if (data.ui) {
             const defaultCourts = data.ui.defaultCourtCount ?? '2';
@@ -656,6 +717,8 @@ function restoreState() {
             // Visibility/sort live in state (not on DOM elements).
             state.showAllLevels = data.ui.showAllLevels !== undefined ? Boolean(data.ui.showAllLevels) : true;
             state.sortPlayersBy = data.ui.sortPlayersBy || 'name';
+            if (el.statsInterval && data.ui.statsInterval !== undefined) el.statsInterval.value = String(data.ui.statsInterval);
+            if (el.statsSort && data.ui.statsSort) el.statsSort.value = String(data.ui.statsSort);
             syncSortMenuItems();
             syncLevelsMenuItem();
             updateSkillLevelSettingsUI();
@@ -712,8 +775,11 @@ function normalizeRoundFromStorage(round) {
 
     return {
         ...round,
+        rid: (typeof round.rid === 'string' && round.rid) ? round.rid : makeRoundId(),
+        ts: Number(round.ts) || Date.now(),
         courts: round.courts.map(court => ({
             ...court,
+            result: (court.result === 'A' || court.result === 'B' || court.result === 'D') ? court.result : null,
             format: normalizeCourtFormat(court.format) || inferCourtFormat(court),
             teamA: {
                 ...court.teamA,
@@ -740,6 +806,7 @@ function normalizePlayerForRound(player) {
             members: player.members.map(m => ({
                 name: normalizeName(m.name),
                 level: clampLevel(m.level),
+                pid: (typeof m.pid === 'string' && m.pid) ? m.pid : undefined,
             })),
             id: player.id || `team-${Math.random().toString(36).slice(2, 8)}`,
         };
@@ -748,6 +815,7 @@ function normalizePlayerForRound(player) {
         name: normalizeName(player.name),
         level: clampLevel(player.level),
         active: true,
+        pid: (typeof player.pid === 'string' && player.pid) ? player.pid : undefined,
     };
 }
 
@@ -946,7 +1014,10 @@ function saveCurrentPlayersAsStoredList() {
 
     lists[existingName || listName] = clonePlayers(state.roster).map(player => ({
         ...player,
-        active: false
+        active: false,
+        // Fotos gemmes IKKE i lokale lister (ville duplikere dem i localStorage);
+        // de gendannes automatisk fra klubbens spillerbase ved login.
+        photo: null,
     }));
 
     saveStoredPlayerLists(lists);
@@ -1809,6 +1880,10 @@ function renderPlayerManagerList() {
         return `
             <div class="player-row ${player.active ? 'is-active' : 'is-inactive'}">
                 <div class="player-row-main compact-player-row">
+                    <span class="avatar-wrap">
+                        <button class="avatar-btn" type="button" data-photo-index="${index}" title="Tilføj eller skift billede (valgfrit)">${playerAvatarHtml(player)}</button>
+                        ${player.photo ? `<button class="avatar-remove" type="button" data-photo-remove-index="${index}" title="Fjern billede">✕</button>` : ''}
+                    </span>
                     <button class="player-row-name" onclick="${player.active ? `removePlayer(${index})` : `markArrived(${index})`}">
                         <strong>${escapeHtml(player.name)}</strong>
                     </button>
@@ -1818,6 +1893,675 @@ function renderPlayerManagerList() {
         `;
     }).join('');
 }
+
+// ── Kamparkiv (grundlag for spillerstatistik) ─────────────
+// Resultater er ALTID valgfrie at indtaste og påvirker på ingen måde,
+// hvordan kampene genereres — de bruges udelukkende til statistik.
+
+const MATCH_LOG_MAX = 5000;
+
+function makeRoundId() {
+    return `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function isValidLogEntry(e) {
+    return Boolean(e && typeof e === 'object' && e.rid && Number.isInteger(e.ci)
+        && Array.isArray(e.a) && Array.isArray(e.b));
+}
+
+// Deltagere i en runde-entry som {pid, name} — hold-superspillere foldes
+// ud til deres medlemmer. pid kan mangle på ældre data.
+function entrySideRefs(entry) {
+    if (!entry) return [];
+    if (Array.isArray(entry.members)) {
+        return entry.members.map(m => ({pid: m.pid || null, name: m.name})).filter(r => r.name);
+    }
+    return entry.name ? [{pid: entry.pid || null, name: entry.name}] : [];
+}
+
+// Normalisér en gemt side: gamle entries er rene navne-strenge, nye er
+// {pid, name}, og skyens er {id, name} (klub-spiller-id).
+function logSideRefs(side) {
+    if (!Array.isArray(side)) return [];
+    return side.map(item => {
+        if (typeof item === 'string') return {pid: null, name: item};
+        if (item && typeof item === 'object') {
+            const pid = (typeof item.pid === 'string' && item.pid) ? item.pid
+                : (item.id ? `c${item.id}` : null);
+            return {pid, name: String(item.name || '')};
+        }
+        return null;
+    }).filter(r => r && r.name);
+}
+
+function courtToLogEntry(round, court, ci) {
+    return {
+        rid: round.rid,
+        ci,
+        ts: Number(round.ts) || Date.now(),
+        a: (court.teamA?.players || []).flatMap(entrySideRefs),
+        b: (court.teamB?.players || []).flatMap(entrySideRefs),
+        res: (court.result === 'A' || court.result === 'B' || court.result === 'D') ? court.result : null,
+    };
+}
+
+// Arkivér den nuværende historik i matchLog (upsert pr. runde+bane, så
+// samme kamp aldrig tælles dobbelt). Kaldes FØR historikken ryddes/erstattes.
+function archiveHistoryToMatchLog() {
+    if (!Array.isArray(state.matchLog)) state.matchLog = [];
+    const indexByKey = new Map(state.matchLog.map((e, i) => [`${e.rid}:${e.ci}`, i]));
+    state.history.forEach(round => {
+        if (!round.rid) return;
+        (round.courts || []).forEach((court, ci) => {
+            const entry = courtToLogEntry(round, court, ci);
+            const key = `${entry.rid}:${entry.ci}`;
+            if (indexByKey.has(key)) {
+                state.matchLog[indexByKey.get(key)] = entry;
+            } else {
+                indexByKey.set(key, state.matchLog.length);
+                state.matchLog.push(entry);
+            }
+        });
+    });
+    if (state.matchLog.length > MATCH_LOG_MAX) {
+        state.matchLog = state.matchLog.slice(state.matchLog.length - MATCH_LOG_MAX);
+    }
+}
+
+// Arkiv + aktuel historik flettet (historikken vinder ved sammenfald).
+function getEffectiveMatchLog() {
+    const map = new Map();
+    (state.matchLog || []).forEach(e => {
+        if (isValidLogEntry(e)) map.set(`${e.rid}:${e.ci}`, e);
+    });
+    state.history.forEach(round => {
+        if (!round.rid) return;
+        (round.courts || []).forEach((court, ci) => {
+            const entry = courtToLogEntry(round, court, ci);
+            map.set(`${entry.rid}:${entry.ci}`, entry);
+        });
+    });
+    return [...map.values()].sort((x, y) => x.ts - y.ts);
+}
+
+// Markér/afmarkér et baneresultat: 'A' (venstre vandt), 'B' (højre vandt),
+// 'D' (uafgjort). Samme tryk igen fjerner markeringen.
+function markCourtResult(rid, courtIndex, code) {
+    if (code !== 'A' && code !== 'B' && code !== 'D') return;
+    const round = state.history.find(r => r.rid === rid);
+    if (!round) return;
+    const court = round.courts[courtIndex];
+    if (!court) return;
+    court.result = (court.result === code) ? null : code;
+    markMatchesPending([`${rid}:${courtIndex}`]);
+    saveState();
+    if (state.lastResult && state.lastResult.rid === rid) renderRound(state.lastResult);
+    renderHistory();
+    if (isStatsPanelOpen()) renderStatsPanel();
+}
+
+// ── Sync af statistik og spillere til klubben ─────────────
+// Klubben er den kanoniske kilde: fotos, niveauer og kampstatistik deles
+// mellem alle med editor-rolle, så en anden kan logge ind og overtage
+// uden duplikerede spillere eller forskellige billeder/niveauer.
+
+let matchSyncTimer = null;
+let matchSyncInFlight = false;
+let cloudMatchesLoading = false;
+
+function canEditActiveClub() {
+    const u = state.user;
+    if (!u || !u.club) return false;
+    return u.club.role === 'owner' || u.club.role === 'editor' || Boolean(u.isAdmin);
+}
+
+function markMatchesPending(keys) {
+    if (!Array.isArray(state.pendingSync)) state.pendingSync = [];
+    const have = new Set(state.pendingSync);
+    keys.forEach(k => {
+        if (k && !have.has(k)) {
+            have.add(k);
+            state.pendingSync.push(k);
+        }
+    });
+    if (state.pendingSync.length > 2000) state.pendingSync = state.pendingSync.slice(-2000);
+    scheduleMatchSync();
+}
+
+function scheduleMatchSync() {
+    if (!canEditActiveClub()) return;
+    if (!Array.isArray(state.pendingSync) || state.pendingSync.length === 0) return;
+    clearTimeout(matchSyncTimer);
+    matchSyncTimer = setTimeout(() => { syncMatchesToClub(); }, 2500);
+}
+
+function refToApi(ref) {
+    const id = clubIdFromPid(ref.pid);
+    return id ? {id, name: ref.name} : {name: ref.name};
+}
+
+async function syncMatchesToClub() {
+    if (matchSyncInFlight || !canEditActiveClub()) return;
+    const clubId = activeClubId();
+    if (!clubId || !Array.isArray(state.pendingSync) || state.pendingSync.length === 0) return;
+
+    const byKey = new Map(getEffectiveMatchLog().map(e => [`${e.rid}:${e.ci}`, e]));
+    const resolved = [];
+    const dead = [];
+    state.pendingSync.forEach(k => {
+        const e = byKey.get(k);
+        if (e) resolved.push(e); else dead.push(k);
+    });
+    if (dead.length) {
+        // Fx runder fjernet med fortryd — de findes ikke længere.
+        state.pendingSync = state.pendingSync.filter(k => !dead.includes(k));
+        saveState();
+    }
+    const toSend = resolved.slice(0, 500);
+    if (toSend.length === 0) return;
+
+    matchSyncInFlight = true;
+    try {
+        await api('POST', `clubs/${clubId}/matches`, {
+            matches: toSend.map(e => ({
+                rid: e.rid,
+                ci: e.ci,
+                ts: e.ts,
+                res: e.res,
+                a: logSideRefs(e.a).map(refToApi),
+                b: logSideRefs(e.b).map(refToApi),
+            })),
+        });
+        const sent = new Set(toSend.map(e => `${e.rid}:${e.ci}`));
+        state.pendingSync = (state.pendingSync || []).filter(k => !sent.has(k));
+        saveState();
+        if (state.pendingSync.length > 0) scheduleMatchSync();
+    } catch (e) {
+        console.warn('Statistik-sync fejlede (prøver igen senere):', e.message);
+    } finally {
+        matchSyncInFlight = false;
+    }
+}
+
+// Hent klubbens fælles kampe og flet dem ind i det lokale arkiv.
+async function refreshCloudMatches() {
+    if (cloudMatchesLoading) return;
+    const clubId = activeClubId();
+    if (!clubId) return;
+    cloudMatchesLoading = true;
+    try {
+        const days = Number(el.statsInterval?.value) || 0;
+        const res = await api('GET', `clubs/${clubId}/matches${days > 0 ? `?days=${days}` : ''}`);
+        mergeCloudMatches(res.matches || []);
+    } catch (e) {
+        console.warn('Kunne ikke hente klubstatistik:', e.message);
+    } finally {
+        cloudMatchesLoading = false;
+    }
+}
+
+function mergeCloudMatches(matches) {
+    if (!Array.isArray(matches) || matches.length === 0) return;
+    if (!Array.isArray(state.matchLog)) state.matchLog = [];
+    const pending = new Set(state.pendingSync || []);
+    const historyRids = new Set(state.history.map(r => r.rid));
+    const indexByKey = new Map(state.matchLog.map((e, i) => [`${e.rid}:${e.ci}`, i]));
+    let changed = false;
+
+    matches.forEach(m => {
+        if (!m || !m.rid) return;
+        const key = `${m.rid}:${m.ci}`;
+        // Lokale uafsendte ændringer og den igangværende historik vinder.
+        if (pending.has(key) || historyRids.has(m.rid)) return;
+        const entry = {
+            rid: String(m.rid),
+            ci: Number(m.ci) || 0,
+            ts: Number(m.ts) || Date.now(),
+            a: Array.isArray(m.a) ? m.a : [],
+            b: Array.isArray(m.b) ? m.b : [],
+            res: (m.res === 'A' || m.res === 'B' || m.res === 'D') ? m.res : null,
+        };
+        const idx = indexByKey.get(key);
+        if (idx === undefined) {
+            indexByKey.set(key, state.matchLog.length);
+            state.matchLog.push(entry);
+            changed = true;
+        } else if (state.matchLog[idx].res !== entry.res || state.matchLog[idx].ts !== entry.ts) {
+            state.matchLog[idx] = entry;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        if (state.matchLog.length > MATCH_LOG_MAX) state.matchLog = state.matchLog.slice(-MATCH_LOG_MAX);
+        saveState();
+        if (isStatsPanelOpen()) renderStatsPanel();
+    }
+}
+
+// Opret en nyoprettet spiller i klubbens spillerbase (editor+).
+async function pushNewPlayerToClub(player) {
+    if (!canEditActiveClub() || !player || player.members) return;
+    const clubId = activeClubId();
+    try {
+        const res = await api('POST', `clubs/${clubId}/players`, {
+            name: player.name,
+            level: player.level,
+            photo: player.photo || null,
+        });
+        if (res.player) {
+            player.pid = `c${res.player.id}`;
+            const i = (state.clubPlayers || []).findIndex(cp => cp.id === res.player.id);
+            if (i >= 0) state.clubPlayers[i] = res.player;
+            else (state.clubPlayers = state.clubPlayers || []).push(res.player);
+            saveState();
+            syncQuickAddOptions();
+        }
+    } catch (e) {
+        console.warn('Kunne ikke oprette spilleren i klubben:', e.message);
+    }
+}
+
+// Skub niveau-/foto-ændring til klubbens spillerbase (editor+).
+async function pushPlayerUpdateToClub(player, fields) {
+    if (!canEditActiveClub() || !player || player.members) return;
+    const clubId = activeClubId();
+    const cpid = clubIdFromPid(player.pid);
+    try {
+        if (cpid) {
+            await api('PATCH', `clubs/${clubId}/players/${cpid}`, fields);
+            const cp = (state.clubPlayers || []).find(x => x.id === cpid);
+            if (cp) Object.assign(cp, fields);
+        } else {
+            await pushNewPlayerToClub(player);
+        }
+    } catch (e) {
+        console.warn('Kunne ikke opdatere spilleren i klubben:', e.message);
+    }
+}
+
+// Afstem den lokale spillerliste med klubbens spillerbase: pid kobles på,
+// og klubbens niveau/oprettelsesdato/foto adopteres (klubben er kanonisk).
+function reconcileRosterWithClub() {
+    const clubPlayers = state.clubPlayers || [];
+    if (clubPlayers.length === 0) return;
+    const byName = new Map(clubPlayers.map(cp => [cp.name.toLowerCase(), cp]));
+    let changed = false;
+
+    state.roster.forEach(p => {
+        if (p.members) return;
+        const cp = byName.get(p.name.toLowerCase());
+        if (!cp) return;
+        const pid = `c${cp.id}`;
+        if (p.pid !== pid) { p.pid = pid; changed = true; }
+        const clubLevel = Number(cp.level);
+        if (clubLevel >= 1 && clubLevel <= 5 && p.level !== clubLevel) { p.level = clubLevel; changed = true; }
+        const clubCreated = Number(cp.createdAt);
+        if (clubCreated > 0 && clubCreated < p.createdAt) { p.createdAt = clubCreated; changed = true; }
+        const clubPhoto = sanitizePhoto(cp.photo);
+        if (clubPhoto && !p.photo) {
+            p.photo = clubPhoto;
+            changed = true;
+        } else if (!clubPhoto && p.photo) {
+            // Lokalt foto som klubben mangler → skub op.
+            pushPlayerUpdateToClub(p, {photo: p.photo});
+        }
+    });
+
+    if (changed) {
+        saveState();
+        renderRoster();
+        renderPlayerManagerList();
+        if (isStatsPanelOpen()) renderStatsPanel();
+    }
+}
+
+// ── Spillerfotos (valgfrit) ───────────────────────────────
+
+const PHOTO_SIZE = 96;  // px — lille avatar, holder localStorage-forbruget nede
+let photoTargetName = null;
+
+function playerInitials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    const first = parts[0][0] || '';
+    const last = parts.length > 1 ? (parts[parts.length - 1][0] || '') : '';
+    return (first + last).toUpperCase();
+}
+
+function playerAvatarHtml(player, extraClass = '') {
+    const photo = sanitizePhoto(player && player.photo);
+    if (photo) {
+        return `<img class="avatar ${extraClass}" src="${escapeHtml(photo)}" alt="">`;
+    }
+    return `<span class="avatar avatar--initials ${extraClass}">${escapeHtml(playerInitials(player && player.name))}</span>`;
+}
+
+function openPhotoPicker(name) {
+    photoTargetName = name;
+    if (el.photoFileInput) {
+        el.photoFileInput.value = '';
+        el.photoFileInput.click();
+    }
+}
+
+function setPlayerPhotoFromFile(file, name) {
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+        showStatusMessage('Vælg en billedfil.');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = PHOTO_SIZE;
+            canvas.height = PHOTO_SIZE;
+            const ctx = canvas.getContext('2d');
+            // Beskær kvadratisk fra midten (cover), så ansigtet fylder cirklen.
+            const side = Math.min(img.width, img.height);
+            const sx = (img.width - side) / 2;
+            const sy = (img.height - side) / 2;
+            ctx.drawImage(img, sx, sy, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE);
+            applyPlayerPhoto(name, canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = () => showStatusMessage('Billedet kunne ikke læses.');
+        img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+}
+
+function applyPlayerPhoto(name, dataUrl) {
+    const player = state.roster.find(p => p.name === name);
+    if (!player) return;
+    player.photo = dataUrl ? sanitizePhoto(dataUrl) : null;
+    pushPlayerUpdateToClub(player, {photo: player.photo});
+    renderPlayerManagerList();
+    if (isStatsPanelOpen()) renderStatsPanel();
+    saveState();
+    showStatusMessage(player.photo ? `Billedet af ${name} er gemt.` : `Billedet af ${name} er fjernet.`);
+}
+
+el.photoFileInput?.addEventListener('change', () => {
+    const file = el.photoFileInput.files && el.photoFileInput.files[0];
+    const name = photoTargetName;
+    photoTargetName = null;
+    if (file && name) setPlayerPhotoFromFile(file, name);
+});
+
+// ── Spillerstatistik-panel (📊 i menuen) ──────────────────
+// Al statistik bygger på kamparkivet + den aktuelle historik og påvirker
+// aldrig genereringen af kampe.
+
+let statsExpandedName = null;
+
+function isStatsPanelOpen() {
+    return Boolean(el.statsPanel && el.statsPanel.style.display === 'block');
+}
+
+function localDayKey(ts) {
+    const d = new Date(ts);
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+
+function daysSince(ts) {
+    return Math.max(0, Math.floor((Date.now() - (Number(ts) || Date.now())) / 86400000));
+}
+
+function formatCreatedAgo(createdAt) {
+    if (!createdAt) return '';
+    const days = daysSince(createdAt);
+    if (days === 0) return 'Oprettet i dag';
+    if (days === 1) return 'Oprettet i går';
+    return `Oprettet for ${days} dage siden`;
+}
+
+function computePlayerStatistics() {
+    const intervalDays = Number(el.statsInterval?.value) || 0;   // 0 = altid
+    const cutoff = intervalDays > 0 ? Date.now() - intervalDays * 86400000 : 0;
+    const log = getEffectiveMatchLog().filter(e => e.ts >= cutoff);
+
+    // Identitet: pid når det kendes; ellers slås navnet op mod nuværende
+    // spillere (så gamle navnebaserede entries stadig tæller med).
+    const rosterPlayers = state.roster.filter(player => !player.members);
+    const rosterPids = new Set(rosterPlayers.map(p => p.pid));
+    const nameToPid = new Map(rosterPlayers.map(p => [p.name.toLowerCase(), p.pid]));
+    const keyForRef = (ref) => {
+        if (ref.pid && rosterPids.has(ref.pid)) return ref.pid;
+        const byName = nameToPid.get(ref.name.toLowerCase());
+        if (byName) return byName;
+        return ref.pid || `n:${ref.name.toLowerCase()}`;
+    };
+
+    const byKey = new Map();
+    const statFor = (key) => {
+        if (!byKey.has(key)) {
+            byKey.set(key, {matches: 0, won: 0, lost: 0, draw: 0, days: new Set(), seq: []});
+        }
+        return byKey.get(key);
+    };
+
+    log.forEach(e => {
+        const add = (side, ownSide) => {
+            logSideRefs(side).forEach(ref => {
+                const st = statFor(keyForRef(ref));
+                st.matches += 1;
+                st.days.add(localDayKey(e.ts));
+                if (e.res === 'D') { st.draw += 1; st.seq.push('D'); }
+                else if (e.res === ownSide) { st.won += 1; st.seq.push('W'); }
+                else if (e.res) { st.lost += 1; st.seq.push('L'); }
+            });
+        };
+        add(e.a, 'A');
+        add(e.b, 'B');
+    });
+
+    return rosterPlayers
+        .map(player => {
+            const st = byKey.get(player.pid) || {matches: 0, won: 0, lost: 0, draw: 0, days: new Set(), seq: []};
+            return {
+                name: player.name,
+                photo: player.photo || null,
+                createdAt: player.createdAt,
+                matches: st.matches,
+                won: st.won,
+                lost: st.lost,
+                draw: st.draw,
+                playDays: st.days.size,
+                seq: st.seq.slice(-10),
+                ...computeLevelHint(st),
+            };
+        });
+}
+
+// Diskret niveau-hint: kræver mindst 8 AFGJORTE kampe i perioden.
+// ≥70 % sejre → overvej højere niveau; ≤30 % → overvej lavere.
+function computeLevelHint(st) {
+    const decided = st.won + st.lost;
+    const winPct = decided > 0 ? st.won / decided : 0;
+    let hint = null;
+    if (decided >= 8) {
+        if (winPct >= 0.7) hint = 'up';
+        else if (winPct <= 0.3) hint = 'down';
+    }
+    return {decided, winPct, hint};
+}
+
+function sortStatsRows(rows) {
+    const mode = el.statsSort?.value || 'name';
+    const byName = (a, b) => a.name.localeCompare(b.name, 'da');
+    const sorted = [...rows];
+    if (mode === 'won')     return sorted.sort((a, b) => (b.won - a.won) || byName(a, b));
+    if (mode === 'lost')    return sorted.sort((a, b) => (b.lost - a.lost) || byName(a, b));
+    if (mode === 'matches') return sorted.sort((a, b) => (b.matches - a.matches) || byName(a, b));
+    if (mode === 'days')    return sorted.sort((a, b) => (b.playDays - a.playDays) || byName(a, b));
+    return sorted.sort(byName);
+}
+
+function renderStatsPanel() {
+    if (!el.statsListArea) return;
+    const rows = sortStatsRows(computePlayerStatistics());
+
+    if (rows.length === 0) {
+        el.statsListArea.innerHTML = '<div class="subtle">Ingen spillere endnu. Tilføj spillere under "Spillere" på forsiden.</div>';
+        return;
+    }
+
+    el.statsListArea.innerHTML = rows.map(row => {
+        const expanded = statsExpandedName === row.name;
+        const createdText = formatCreatedAgo(row.createdAt);
+        const marked = row.won + row.lost + row.draw;
+
+        const dots = row.seq.length
+            ? `<span class="result-dots" title="Seneste ${row.seq.length} markerede kampe (ældste til venstre)">${row.seq.map(r =>
+                `<span class="dot ${r === 'W' ? 'dot--win' : (r === 'L' ? 'dot--loss' : 'dot--draw')}"></span>`).join('')}</span>`
+            : '';
+        const wldHtml = marked > 0
+            ? `<span class="wld"><span class="wld-win">${row.won} V</span> · <span class="wld-loss">${row.lost} T</span> · <span class="wld-draw">${row.draw} U</span></span>`
+            : '<span class="subtle-inline">Ingen markerede resultater</span>';
+
+        const detail = expanded ? `
+            <div class="stats-detail">
+                <div class="stats-detail-grid">
+                    <div><strong>${row.matches}</strong><span>kampe</span></div>
+                    <div><strong>${row.playDays}</strong><span>spilledage</span></div>
+                    <div><strong>${row.won}</strong><span>vundet</span></div>
+                    <div><strong>${row.lost}</strong><span>tabt</span></div>
+                    <div><strong>${row.draw}</strong><span>uafgjort</span></div>
+                </div>
+                <div class="stats-photo-actions">
+                    <button type="button" class="secondary" data-stats-photo="${escapeHtml(row.name)}">📷 ${row.photo ? 'Skift billede' : 'Tilføj billede'}</button>
+                    ${row.photo ? `<button type="button" class="secondary" data-stats-photo-remove="${escapeHtml(row.name)}">✕ Fjern billede</button>` : ''}
+                </div>
+            </div>` : '';
+
+        const hintHtml = row.hint
+            ? `<div class="stats-row-meta"><span class="level-hint level-hint--${row.hint}">${row.hint === 'up'
+                ? `▲ Har vundet ${Math.round(row.winPct * 100)} % af ${row.decided} afgjorte kampe — overvej højere niveau`
+                : `▼ Har tabt ${Math.round((1 - row.winPct) * 100)} % af ${row.decided} afgjorte kampe — overvej lavere niveau`}</span></div>`
+            : '';
+
+        return `
+            <div class="stats-row ${expanded ? 'is-expanded' : ''}" data-stats-name="${escapeHtml(row.name)}">
+                <div class="stats-row-header" data-stats-toggle>
+                    ${playerAvatarHtml({name: row.name, photo: row.photo}, 'avatar--md')}
+                    <div class="stats-row-text">
+                        <div class="stats-row-name">${escapeHtml(row.name)}</div>
+                        <div class="stats-row-meta">${createdText}${createdText ? ' · ' : ''}${row.playDays} spilledage · ${row.matches} kampe</div>
+                        <div class="stats-row-meta">${wldHtml}${dots ? ' ' : ''}${dots}</div>
+                        ${hintHtml}
+                    </div>
+                    <span class="squad-chevron">${expanded ? '▾' : '▸'}</span>
+                </div>
+                ${detail}
+            </div>`;
+    }).join('');
+}
+
+el.statsBtn?.addEventListener('click', () => {
+    closeMenu();
+    renderStatsPanel();
+    showStandAlone(el.statsPanel);
+    // Hent klubbens fælles statistik i baggrunden (re-render ved fletning).
+    refreshCloudMatches();
+    syncMatchesToClub();
+});
+el.closeStatsBtn?.addEventListener('click', () => closeStandAlone());
+el.statsInterval?.addEventListener('change', () => {
+    saveState();
+    renderStatsPanel();
+    refreshCloudMatches();
+});
+el.statsSort?.addEventListener('change', () => {
+    saveState();
+    renderStatsPanel();
+});
+
+el.statsListArea?.addEventListener('click', (event) => {
+    const photoBtn = event.target.closest('[data-stats-photo]');
+    if (photoBtn) { openPhotoPicker(photoBtn.dataset.statsPhoto); return; }
+    const removeBtn = event.target.closest('[data-stats-photo-remove]');
+    if (removeBtn) { applyPlayerPhoto(removeBtn.dataset.statsPhotoRemove, null); return; }
+    // Kun klik på selve række-headeren folder ud/ind — ikke detaljeområdet.
+    const header = event.target.closest('[data-stats-toggle]');
+    if (!header) return;
+    const row = header.closest('[data-stats-name]');
+    if (!row) return;
+    const name = row.dataset.statsName;
+    statsExpandedName = (statsExpandedName === name) ? null : name;
+    renderStatsPanel();
+});
+
+// ── Statistik-backup (eksport/import som fil) ──
+el.exportStatsBtn?.addEventListener('click', () => {
+    const entries = getEffectiveMatchLog();
+    if (entries.length === 0) { showStatusMessage('Der er ingen kampe at eksportere.'); return; }
+    const data = {app: 'kampprogram-statistik', v: 1, exportedAt: Date.now(), matchLog: entries};
+    const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `kampprogram-statistik-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    showStatusMessage(`${entries.length} kampe eksporteret som fil.`);
+});
+
+el.importStatsBtn?.addEventListener('click', () => {
+    if (el.importStatsFile) { el.importStatsFile.value = ''; el.importStatsFile.click(); }
+});
+
+el.importStatsFile?.addEventListener('change', () => {
+    const file = el.importStatsFile.files && el.importStatsFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(String(reader.result));
+            const entries = Array.isArray(data.matchLog) ? data.matchLog.filter(isValidLogEntry) : [];
+            if (entries.length === 0) { showStatusMessage('Filen indeholder ingen kampe.'); return; }
+            const existing = new Set(getEffectiveMatchLog().map(e => `${e.rid}:${e.ci}`));
+            const addedKeys = [];
+            entries.forEach(e => {
+                const key = `${e.rid}:${e.ci}`;
+                if (existing.has(key)) return;
+                existing.add(key);
+                state.matchLog.push({
+                    rid: String(e.rid),
+                    ci: Number(e.ci) || 0,
+                    ts: Number(e.ts) || Date.now(),
+                    a: e.a,
+                    b: e.b,
+                    res: (e.res === 'A' || e.res === 'B' || e.res === 'D') ? e.res : null,
+                });
+                addedKeys.push(key);
+            });
+            if (state.matchLog.length > MATCH_LOG_MAX) state.matchLog = state.matchLog.slice(-MATCH_LOG_MAX);
+            markMatchesPending(addedKeys);
+            saveState();
+            renderStatsPanel();
+            showStatusMessage(addedKeys.length > 0
+                ? `${addedKeys.length} kampe importeret.`
+                : 'Alle kampe i filen fandtes allerede.');
+        } catch (err) {
+            showStatusMessage('Kunne ikke læse filen — er det en statistik-eksport fra Kampprogram?');
+        }
+    };
+    reader.readAsText(file);
+});
+
+el.clearStatsBtn?.addEventListener('click', () => {
+    const ok = window.confirm('Vil du slette AL spillerstatistik på denne enhed? Markerede resultater i den aktuelle historik fjernes også. Dette kan ikke fortrydes.');
+    if (!ok) return;
+    state.matchLog = [];
+    state.history.forEach(round => (round.courts || []).forEach(court => { court.result = null; }));
+    saveState();
+    renderStatsPanel();
+    if (state.lastResult) renderRound(state.lastResult);
+    renderHistory();
+    showStatusMessage('Spillerstatistikken er ryddet.');
+});
 
 function renderPlayerStats() {
     const stats = getPlayerStats();
@@ -2058,6 +2802,32 @@ function renderResultSlot(round, entry, courtIndex, side, slotIndex, editing, ma
     </div>`;
 }
 
+// Valgfri resultat-knapper under hvert banekort. Venstre knap = venstre
+// side vandt ('A'), højre = højre side vandt ('B'), midt = uafgjort ('D').
+function renderResultMarkRow(round, court, courtIndex) {
+    const res = court.result || null;
+    const rid = round.rid || '';
+    if (!rid) return '';
+    const btn = (code, label, cls) =>
+        `<button type="button" class="result-mark ${cls}" data-rid="${rid}" data-court-index="${courtIndex}" data-result-mark="${code}">${label}</button>`;
+    return `
+        <div class="result-mark-row" title="Valgfrit: markér resultatet — bruges kun til statistik">
+            ${btn('A', res === 'B' ? 'Tabte' : 'Vandt', res === 'A' ? 'is-win' : (res === 'B' ? 'is-loss' : ''))}
+            ${btn('D', 'Uafgjort', res === 'D' ? 'is-draw' : '')}
+            ${btn('B', res === 'A' ? 'Tabte' : 'Vandt', res === 'B' ? 'is-win' : (res === 'A' ? 'is-loss' : ''))}
+        </div>`;
+}
+
+// Kompakte 1/X/2-knapper i historikken (tipskupon-notation).
+function renderHistoryResultMarks(round, court, courtIndex) {
+    const res = court.result || null;
+    const rid = round.rid || '';
+    if (!rid) return '';
+    const mini = (code, label, activeCls, title) =>
+        `<button type="button" class="result-mark result-mark--mini ${res === code ? activeCls : ''}" data-rid="${rid}" data-court-index="${courtIndex}" data-result-mark="${code}" title="${title}">${label}</button>`;
+    return `<span class="history-result-marks">${mini('A', '1', 'is-win', 'Første hold vandt')}${mini('D', 'X', 'is-draw', 'Uafgjort')}${mini('B', '2', 'is-win', 'Andet hold vandt')}</span>`;
+}
+
 function renderRound(result) {
     let html = '';
 
@@ -2096,6 +2866,7 @@ function renderRound(result) {
                     <div class="flex-center"><strong>VS</strong></div>
                     <div class="team">${sideHtml(court.teamB.players, 'B')}</div>
                 </div>
+                ${editing ? '' : renderResultMarkRow(result, court, index)}
             </div>
         `;
     });
@@ -2127,6 +2898,8 @@ function describeCourtForHistory(court, courtIndex) {
     return `${aNames} mod ${bNames}`;
 }
 
+let historyShowAll = false;
+
 function renderHistory() {
     updatePanelVisibility();
 
@@ -2135,7 +2908,7 @@ function renderHistory() {
         return;
     }
 
-    const recent = state.history.slice(-6).reverse();
+    const recent = (historyShowAll ? [...state.history] : state.history.slice(-6)).reverse();
     el.historyArea.innerHTML = recent.map((round, idx) => {
         const roundNo = state.history.length - idx;
         return `
@@ -2144,12 +2917,17 @@ function renderHistory() {
                     <span>Kamprunde ${roundNo}</span>
                 </div>
                 <ul class="history-list">
-                    ${round.courts.map((court, i) => `<li>${describeCourtForHistory(court, i)}</li>`).join('')}
+                    ${round.courts.map((court, i) => `<li class="history-court-line"><span>${describeCourtForHistory(court, i)}</span>${renderHistoryResultMarks(round, court, i)}</li>`).join('')}
                     ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)}`).join(', ')}</li>` : ''}
                 </ul>
             </div>
         `;
     }).join('');
+
+    if (state.history.length > 6) {
+        el.historyArea.innerHTML += `<button class="ghost history-showall" type="button" data-history-showall>${
+            historyShowAll ? 'Vis kun de seneste 6 runder' : `Vis alle ${state.history.length} runder`}</button>`;
+    }
 }
 
 async function copyCurrentPlayersToClipboard() {
@@ -2187,7 +2965,8 @@ function buildSessionPayload() {
     // Intern roster names first so they get the lowest indices.
     state.roster.forEach(p => intern(p.name));
 
-    const r = state.roster.map(p => [intern(p.name), p.level, p.active ? 1 : 0]);
+    // [navnIdx, niveau, aktiv, createdAt, pid] — ældre dekodere læser kun de 3 første.
+    const r = state.roster.map(p => [intern(p.name), p.level, p.active ? 1 : 0, Number(p.createdAt) || 0, p.pid || '']);
 
     const t = (state.teams || []).map(team => [
         intern(team.name),
@@ -2195,12 +2974,17 @@ function buildSessionPayload() {
         team.active === false ? 0 : 1,
     ]);
 
+    // Runde: [courts, benched, ts, rid] — court: [aIdxs, bIdxs, resultKode].
+    // Ekstra positioner ignoreres af ældre dekodere (bagudkompatibelt).
     const h = state.history.map(round => [
         (round.courts || []).map(court => [
             (court.teamA?.players || []).map(p => intern(p.name)),
             (court.teamB?.players || []).map(p => intern(p.name)),
+            ({A: 1, B: 2, D: 3})[court.result] || 0,
         ]),
         (round.benched || []).map(p => intern(p.name)),
+        Number(round.ts) || 0,
+        round.rid || '',
     ]);
 
     let formatsMask = 0;
@@ -2255,11 +3039,13 @@ function expandSessionPayload(data) {
     const lookupName = (idx) => (Number.isInteger(idx) && idx >= 0 && idx < names.length) ? names[idx] : '';
 
     const roster = (data.r || []).map(triple => {
-        const [nIdx, level, active] = Array.isArray(triple) ? triple : [];
+        const [nIdx, level, active, createdAt, pid] = Array.isArray(triple) ? triple : [];
         return {
             name: lookupName(nIdx),
             level: Number(level) || 1,
             active: Boolean(active),
+            createdAt: Number(createdAt) || undefined,
+            pid: (typeof pid === 'string' && pid) ? pid : undefined,
         };
     });
     const rosterByName = new Map(roster.map(p => [p.name, p]));
@@ -2301,9 +3087,9 @@ function expandSessionPayload(data) {
     };
 
     const history = (data.h || []).map(roundRaw => {
-        const [courtsRaw, benchedRaw] = Array.isArray(roundRaw) ? roundRaw : [[], []];
+        const [courtsRaw, benchedRaw, tsRaw, ridRaw] = Array.isArray(roundRaw) ? roundRaw : [[], []];
         const courts = (courtsRaw || []).map(courtRaw => {
-            const [aIdxs, bIdxs] = Array.isArray(courtRaw) ? courtRaw : [[], []];
+            const [aIdxs, bIdxs, resRaw] = Array.isArray(courtRaw) ? courtRaw : [[], []];
             const teamA = (aIdxs || []).map(buildEntity);
             const teamB = (bIdxs || []).map(buildEntity);
             const teamSize = Math.max(teamA.length, teamB.length, 1);
@@ -2312,10 +3098,16 @@ function expandSessionPayload(data) {
                 teamA: {players: teamA, totalLevel: teamA.reduce((s, p) => s + (p.level || 0), 0)},
                 teamB: {players: teamB, totalLevel: teamB.reduce((s, p) => s + (p.level || 0), 0)},
                 lockedSlots: null,
+                result: ({1: 'A', 2: 'B', 3: 'D'})[Number(resRaw)] || null,
             };
         });
         const benched = (benchedRaw || []).map(buildEntity);
-        return {courts, benched};
+        return {
+            courts,
+            benched,
+            ts: Number(tsRaw) || Date.now(),
+            rid: (typeof ridRaw === 'string' && ridRaw) ? ridRaw : makeRoundId(),
+        };
     });
 
     const u = Array.isArray(data.u) ? data.u : [];
@@ -2474,8 +3266,13 @@ function importSessionFromTextarea() {
 // Apply a parsed session payload to the live app state.
 // Mirrors restoreState but works from an in-memory object.
 function applySessionPayload(data) {
+    // Gem de hidtidige kampe i arkivet, inden historikken erstattes.
+    archiveHistoryToMatchLog();
     state.roster = Array.isArray(data.roster) ? data.roster.map(normalizePlayer) : [];
     state.history = Array.isArray(data.history) ? data.history.map(normalizeRoundFromStorage) : [];
+    state.history.forEach(round => {
+        markMatchesPending((round.courts || []).map((c, i) => `${round.rid}:${i}`));
+    });
     state.lastResult = state.history[state.history.length - 1] || null;
     state.teams = Array.isArray(data.teams) ? data.teams.map(normalizeTeam) : [];
 
@@ -2554,6 +3351,7 @@ function replaceRoster(newPlayers) {
         ...player,
         active: false,
     }));
+    archiveHistoryToMatchLog();
     state.history = [];
     state.lastResult = null;
 
@@ -2586,7 +3384,10 @@ function addPlayer() {
         return;
     }
 
-    state.roster.push({name, level, active: true, createdAt: Date.now()});
+    const newPlayer = {name, level, active: true, createdAt: Date.now(), pid: makeLocalPid(), photo: null};
+    state.roster.push(newPlayer);
+    // Editor i en klub: opret også spilleren i klubbens fælles spillerbase.
+    pushNewPlayerToClub(newPlayer);
 
     el.newPlayerName.value = '';
     el.newPlayerLevel.value = '3';
@@ -2723,6 +3524,7 @@ function updatePlayerLevel(index, level) {
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 9) return;
 
     player.level = parsed;
+    pushPlayerUpdateToClub(player, {level: parsed});
     renderRoster();
     renderPlayerManagerList();
     renderPlayerStats();
@@ -2763,8 +3565,11 @@ async function generateRound() {
             throw new Error('Kunne ikke finde en runde der opfylder alle "Kræv"-regler. Prøv at lempe en regel under Indstillinger → Regler.');
         }
 
+        best.rid = makeRoundId();
+        best.ts = Date.now();
         state.lastResult = best;
         state.history.push(best);
+        markMatchesPending(best.courts.map((c, i) => `${best.rid}:${i}`));
 
         // Reset prefill configuration for the next round (no one wants to reuse the same setup).
         renderPrefillArea(createDefaultPrefills(getCourtCount()));
@@ -2806,6 +3611,7 @@ function resetHistory() {
     const confirmed = window.confirm('Er du sikker på, at du vil nulstille hele historikken?');
     if (!confirmed) return;
 
+    archiveHistoryToMatchLog();
     state.history = [];
     state.lastResult = null;
     renderHistory();
@@ -2818,9 +3624,10 @@ function resetHistory() {
 }
 
 function resetAll() {
-    const confirmed = window.confirm('Dette ville nulstille alt pånær dine gemte spillerlister. Er du sikker?');
+    const confirmed = window.confirm('Dette nulstiller alt pånær dine gemte spillerlister og spillerstatistikken. Er du sikker?');
     if (!confirmed) return;
 
+    archiveHistoryToMatchLog();
     state.history = [];
     state.roster = [];
     state.lastResult = null;
@@ -2838,6 +3645,45 @@ function resetAll() {
     closeMenu();
 
     saveState();
+}
+
+// "Afslut aften": arkivér kampene til statistikken, sync til klubben,
+// (valgfrit) gem sessionen hos klubben, og gør appen klar til næste gang.
+async function endEvening() {
+    if (state.history.length === 0) {
+        showStatusMessage('Der er ingen kamprunder at afslutte.');
+        return;
+    }
+    const ok = window.confirm(
+        'Afslut aftenen?\n\n' +
+        '• Kampene arkiveres til spillerstatistikken\n' +
+        '• Historikken nulstilles\n' +
+        '• Alle spillere sættes som "taget hjem"'
+    );
+    if (!ok) return;
+
+    if (canEditActiveClub()) {
+        const alsoSave = window.confirm('Vil du også gemme aftenens session hos klubben, inden den nulstilles?');
+        if (alsoSave) await saveSessionToClub();
+    }
+
+    archiveHistoryToMatchLog();
+    state.history = [];
+    state.lastResult = null;
+    state.roster.forEach(p => { p.active = false; });
+    setEditResultMode(false);
+    historyShowAll = false;
+
+    renderHistory();
+    renderPlayerStats();
+    renderRoster();
+    renderPlayerManagerList();
+    updatePanelVisibility();
+    el.resultArea.innerHTML = 'Ingen kamprunde genereret endnu.';
+
+    scheduleMatchSync();
+    saveState();
+    showStatusMessage('Aftenen er afsluttet — statistikken er gemt. Tak for i dag! 🏸');
 }
 
 function undoLastRound() {
@@ -2916,6 +3762,7 @@ el.menuBackdrop?.addEventListener('click', closeMenu);
 el.generateBtn.addEventListener('click', generateRound);
 el.shuffleBtn?.addEventListener('click', retryRound);
 el.resetHistoryBtn.addEventListener('click', resetHistory);
+el.endEveningBtn?.addEventListener('click', endEvening);
 el.resetAllBtn.addEventListener('click', resetAll);
 el.undoBtn.addEventListener('click', undoLastRound);
 el.clearPrefillBtn.addEventListener('click', clearPrefills);
@@ -3211,6 +4058,22 @@ function confirmBulkDelete() {
 
 // ── Per-player level reveal (event delegation on the player containers) ──
 function handlePlayerAreaClick(event) {
+    // ✕ på avatar → fjern spillerfoto.
+    const photoRemoveBtn = event.target.closest('[data-photo-remove-index]');
+    if (photoRemoveBtn) {
+        const idx = Number(photoRemoveBtn.dataset.photoRemoveIndex);
+        const player = state.roster[idx];
+        if (player) applyPlayerPhoto(player.name, null);
+        return;
+    }
+    // Avatar-klik → vælg/skift spillerfoto.
+    const avatarBtn = event.target.closest('[data-photo-index]');
+    if (avatarBtn) {
+        const idx = Number(avatarBtn.dataset.photoIndex);
+        const player = state.roster[idx];
+        if (player) openPhotoPicker(player.name);
+        return;
+    }
     // Roster-chip click → toggle player active.
     const chip = event.target.closest('[data-action="remove-player"]');
     if (chip) {
@@ -3220,6 +4083,22 @@ function handlePlayerAreaClick(event) {
 }
 el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
 el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
+
+// ── Resultat-knapper (rundekort + historik) ──
+function handleResultMarkClick(event) {
+    const btn = event.target.closest('[data-result-mark]');
+    if (!btn) return;
+    event.preventDefault();
+    markCourtResult(btn.dataset.rid, Number(btn.dataset.courtIndex), btn.dataset.resultMark);
+}
+el.resultArea?.addEventListener('click', handleResultMarkClick);
+el.historyArea?.addEventListener('click', handleResultMarkClick);
+el.historyArea?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-history-showall]');
+    if (!btn) return;
+    historyShowAll = !historyShowAll;
+    renderHistory();
+});
 // ── Global "vis/skjul niveauer" menu item ──
 el.toggleLevelsBtn?.addEventListener('click', () => {
     state.showAllLevels = !state.showAllLevels;
@@ -3518,6 +4397,9 @@ async function refreshCloudLists() {
         state.cloudSquads = squadsRes.squads || [];
         state.clubPlayers = playersRes.players || [];
         renderCloudLists();
+        // Klubben er kanonisk: afstem lokale spillere og skub ventende statistik.
+        reconcileRosterWithClub();
+        scheduleMatchSync();
     } catch (e) {
         showStatusMessage(`Kunne ikke hente klubbens hold: ${e.message}`);
     }
@@ -3563,7 +4445,13 @@ async function loadCloudList() {
     try {
         const res = await api('GET', `clubs/${clubId}/squads/${id}`);
         const squad = res.squad;
-        replaceRoster(squad.members.map(p => ({ name: p.name, level: p.level, active: false })));
+        replaceRoster(squad.members.map(p => ({
+            name: p.name,
+            level: p.level,
+            active: false,
+            pid: `c${p.id}`,
+            photo: sanitizePhoto(p.photo),
+        })));
         showStatusMessage(`Hentede holdet "${squad.name}" (${squad.members.length} spillere).`);
     } catch (e) {
         showStatusMessage(`Kunne ikke hente holdet: ${e.message}`);
@@ -3580,7 +4468,7 @@ async function saveCloudList() {
 
     const players = state.roster
         .filter(p => !p.members)   // hold-superspillere (team-mode) gemmes ikke
-        .map(p => ({ name: p.name, level: p.level }));
+        .map(p => ({ name: p.name, level: p.level, photo: p.photo || null }));
 
     const existing = state.cloudSquads.find(s => s.name.toLowerCase() === name.toLowerCase());
     try {
@@ -3624,7 +4512,14 @@ el.quickAddClubPlayer?.addEventListener('change', () => {
     el.quickAddClubPlayer.value = '';
     if (!p) return;
     if (state.roster.some(r => r.name.toLowerCase() === p.name.toLowerCase())) return;
-    state.roster.push({ name: p.name, level: p.level, active: true, createdAt: Date.now() });
+    state.roster.push({
+        name: p.name,
+        level: p.level,
+        active: true,
+        pid: `c${p.id}`,
+        createdAt: Number(p.createdAt) || Date.now(),
+        photo: sanitizePhoto(p.photo),
+    });
     renderRoster();
     renderPlayerManagerList();
     updatePanelVisibility();
@@ -4515,3 +5410,12 @@ el.adminUsersList?.addEventListener('click', async (event) => {
 bootstrapAuth();
 
 loadDefaults();
+
+// ── Service worker: offline-sikkerhed i hallen ──────────────
+// Network-first med cache-fallback (se sw.js). API-kald caches aldrig.
+if ('serviceWorker' in navigator
+    && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => { /* valgfrit */ });
+    });
+}

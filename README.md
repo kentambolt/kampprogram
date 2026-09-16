@@ -247,6 +247,52 @@ delmængder af spillerbasen. En spiller kan være på flere hold.
 Roller: alle klubmedlemmer kan hente hold og bruge quick-tilføj;
 **editor+** kan oprette/gemme/slette hold og ændre holdmedlemmer.
 
+## Spillerfotos og statistik
+
+- **Foto (valgfrit):** Klik på avataren ud for en spiller under "Alle
+  spillere" for at vælge et billede. Billedet nedskaleres automatisk til en
+  lille avatar. Fotos gemmes også i klubbens spillerbase, når et hold gemmes
+  til klubben (kræver `upgrade_photos.sql`).
+- **Resultater (valgfrit):** Markér vundet/tabt/uafgjort direkte på
+  rundekortet — eller med 1/X/2-knapperne i historikken. Det påvirker ALDRIG
+  genereringen af kampe; det bruges kun til statistik.
+- **📊 Spillerstatistik** i menuen viser pr. spiller: hvor længe spilleren
+  har været oprettet, antal spilledage, antal kampe, vundne/tabte/uafgjorte
+  samt en farvet sekvens (grøn/rød/gul) af de seneste 10 markerede kampe.
+  Vælg periode og sortér fx efter flest vundne eller tabte for at spotte
+  spillere, hvis niveau bør justeres manuelt.
+- **Fælles statistik pr. klub:** Er man logget ind som editor/owner, sendes
+  kampene automatisk til klubben (`club_matches`), og statistikpanelet
+  fletter klubbens kampe ind. Skifter man enhed, eller overtager en anden
+  aftenen, ser alle de samme tal. Uden login gemmes alt kun lokalt.
+- **Stabile spiller-id'er:** Spillere identificeres med et id (klub-spillere
+  med deres id i spillerbasen), så statistik og fotos følger den rigtige
+  person — også hvis en spiller slettes og oprettes igen. Klubben er den
+  kanoniske kilde: niveau, foto og oprettelsesdato afstemmes ved login.
+- **Backup:** Statistikken kan eksporteres/importeres som JSON-fil fra
+  statistikpanelet.
+- **"🌙 Afslut aften"** (i Historik) arkiverer kampene, tilbyder at gemme
+  sessionen hos klubben og sætter alle spillere som "taget hjem".
+
+## Offline (service worker)
+
+`sw.js` cacher forsiden, CSS og JS med network-first-strategi: med net får
+man altid nyeste version; uden net (typisk i hallen) starter appen fra
+cachen. API-kald caches aldrig. Husk at uploade `sw.js` sammen med de
+øvrige filer. Ændrer du listen af kernefiler, så bump `CACHE_NAME`.
+
+## E-mail-levering (SPF/DKIM) — manuel DNS-opgave
+
+Invitationer sendes fra `noreply@kampprogram.dk` via PHP `mail()`. For at
+de ikke lander i spam hos Gmail/Outlook skal domænets DNS have en
+SPF-record, der godkender Simply.com som afsender (og gerne DKIM):
+
+1. Simply.com-kontrolpanel → DNS for `kampprogram.dk`.
+2. Tjek/opret TXT-recorden med SPF — følg Simply.com's egen vejledning
+   ("SPF og DKIM"), så deres mailservere er inkluderet.
+3. Aktivér DKIM-signering under mail-indstillingerne, hvis muligt.
+4. Test med fx mail-tester.com ved at sende en invitation dertil.
+
 ## Opgradering fra tidligere version
 
 Kør i rækkefølge (via phpMyAdmin → Importér), afhængigt af hvor du er:
@@ -254,6 +300,8 @@ Kør i rækkefølge (via phpMyAdmin → Importér), afhængigt af hvor du er:
 1. `upgrade_multiclub.sql` — fra v2 (én klub pr. bruger) til multi-klub
 2. `upgrade_clubpages.sql` — tilføjer klub-baner + delte sessioner
 3. `upgrade_squads.sql` — tilføjer hold + klub-spillerbase
+4. `upgrade_photos.sql` — tilføjer valgfrit spillerfoto på klub-spillere
+5. `upgrade_matches.sql` — tilføjer fælles kampstatistik pr. klub
 
 Ny frisk installation bruger blot `schema.sql` (indeholder alt).
 

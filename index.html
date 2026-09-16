@@ -69,6 +69,7 @@
                 <button class="ghost menu-toggle" id="menuToggleBtn" aria-label="Menu" title="Menu">☰</button>
                 <div class="menu-dropdown" id="menuDropdown">
                     <button class="menu-item hidden" id="clubBtn">🏸 Klub</button>
+                    <button class="menu-item" id="statsBtn">📊 Spillerstatistik</button>
                     <button class="menu-item" id="settingsBtn">⚙ Indstillinger</button>
                     <button class="menu-item" id="importExportBtn">⇅ Import / eksport</button>
                     <button class="menu-item menu-item--section account-menu-item" id="accountBtn">👤 Log ind</button>
@@ -260,6 +261,7 @@
                     <div class="collapsible-content">
                         <div class="history-header">
 
+                            <button class="primary" id="endEveningBtn">🌙 Afslut aften</button>
                             <button class="ghost" id="undoBtn">↩ Fjern seneste</button>
                             <button class="danger" id="resetHistoryBtn">✕ Fjern alle</button>
                         </div>
@@ -672,6 +674,44 @@
                 </div>
             </div>
 
+            <div class="panel stats-panel standalone" id="statsPanel">
+                <div class="flex-row">
+                    <h2 class="h-no-m">Spillerstatistik</h2>
+                    <button class="ghost" id="closeStatsBtn">✕ Luk</button>
+                </div>
+                <p class="muted stats-intro">Statistikken bygger på kampene gemt på denne enhed. Resultater er valgfrie at markere (på rundekortet eller i historikken) og påvirker ikke, hvordan kampene genereres.</p>
+                <div class="stats-controls">
+                    <div>
+                        <label for="statsInterval">Periode</label>
+                        <select id="statsInterval">
+                            <option value="0" selected>Altid</option>
+                            <option value="7">Sidste 7 dage</option>
+                            <option value="30">Sidste 30 dage</option>
+                            <option value="90">Sidste 90 dage</option>
+                            <option value="365">Sidste år</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="statsSort">Sortér efter</label>
+                        <select id="statsSort">
+                            <option value="name" selected>Navn</option>
+                            <option value="won">Flest vundne</option>
+                            <option value="lost">Flest tabte</option>
+                            <option value="matches">Flest kampe</option>
+                            <option value="days">Flest spilledage</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="statsListArea"></div>
+                <div class="stats-backup">
+                    <button class="ghost" id="exportStatsBtn" type="button">⭳ Eksportér statistik (backup)</button>
+                    <button class="ghost" id="importStatsBtn" type="button">⭱ Importér statistik</button>
+                    <input type="file" id="importStatsFile" accept="application/json,.json" class="hidden" aria-hidden="true">
+                </div>
+                <div class="stats-danger">
+                    <button class="danger" id="clearStatsBtn" type="button">🗑 Ryd al statistik</button>
+                </div>
+            </div>
             <div class="panel new-player-panel standalone" id="newPlayerPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Opret spiller</h2>
@@ -702,6 +742,7 @@
         </div>
     </div>
 </div>
+<input type="file" id="photoFileInput" accept="image/*" class="hidden" aria-hidden="true">
 <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
 <div id="generateOverlay" class="generate-overlay" role="status" aria-label="Genererer kamprunde…">
     <div class="generate-overlay__spinner"></div>

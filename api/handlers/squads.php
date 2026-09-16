@@ -14,12 +14,31 @@ function squad_clamp_level($raw): int {
     return $n;
 }
 
+// Validér et spillerfoto (lille data-URL fra frontendens canvas-nedskalering).
+// Returnerer strengen, null (= fjern foto) eller false (= ikke angivet/ugyldigt).
+function squad_normalise_photo($raw) {
+    if ($raw === null) return null;
+    if (is_string($raw) && strlen($raw) <= 200000
+        && preg_match('#^data:image/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$#', $raw)) {
+        return $raw;
+    }
+    return false;
+}
+
 // Upsert en spiller i klubbens spillerbase; returnerer id.
-function upsert_club_player(int $clubId, string $name, int $level): int {
-    db()->prepare(
-        'INSERT INTO club_players (club_id, name, level) VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE level = VALUES(level)'
-    )->execute([$clubId, $name, $level]);
+// $photo: string = sæt foto, null = fjern foto, false = rør ikke fotoet.
+function upsert_club_player(int $clubId, string $name, int $level, $photo = false): int {
+    if ($photo === false) {
+        db()->prepare(
+            'INSERT INTO club_players (club_id, name, level) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE level = VALUES(level)'
+        )->execute([$clubId, $name, $level]);
+    } else {
+        db()->prepare(
+            'INSERT INTO club_players (club_id, name, level, photo) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE level = VALUES(level), photo = VALUES(photo)'
+        )->execute([$clubId, $name, $level, $photo]);
+    }
 
     $stmt = db()->prepare('SELECT id FROM club_players WHERE club_id = ? AND name = ?');
     $stmt->execute([$clubId, $name]);
@@ -34,7 +53,8 @@ function squad_normalise_players($input): array {
         if (!is_array($p)) continue;
         $name = trim((string)($p['name'] ?? ''));
         if ($name === '' || strlen($name) > 120) continue;
-        $out[] = ['name' => $name, 'level' => squad_clamp_level($p['level'] ?? 3)];
+        $photo = array_key_exists('photo', $p) ? squad_normalise_photo($p['photo']) : false;
+        $out[] = ['name' => $name, 'level' => squad_clamp_level($p['level'] ?? 3), 'photo' => $photo];
     }
     return $out;
 }
@@ -43,14 +63,73 @@ function squad_normalise_players($input): array {
 function handle_club_players_list(int $clubId): void {
     club_access($clubId);
     $stmt = db()->prepare(
-        'SELECT id, name, level FROM club_players WHERE club_id = ? ORDER BY name ASC'
+        'SELECT id, name, level, photo, UNIX_TIMESTAMP(created_at) * 1000 AS created_ms
+         FROM club_players WHERE club_id = ? ORDER BY name ASC'
     );
     $stmt->execute([$clubId]);
     json_response(['players' => array_map(fn($r) => [
-        'id'    => (int)$r['id'],
-        'name'  => $r['name'],
-        'level' => (int)$r['level'],
+        'id'        => (int)$r['id'],
+        'name'      => $r['name'],
+        'level'     => (int)$r['level'],
+        'photo'     => $r['photo'] !== null && $r['photo'] !== '' ? $r['photo'] : null,
+        'createdAt' => (int)$r['created_ms'],
     ], $stmt->fetchAll())]);
+}
+
+// POST /api/clubs/:id/players {name, level?, photo?} — opret/upsert spiller (editor+).
+function handle_club_player_create(int $clubId): void {
+    [$u, $role] = club_access($clubId);
+    if (!club_role_at_least($role, 'editor')) json_error('Kræver editor-rolle.', 403);
+
+    $body = read_json_body();
+    $name = trim((string)($body['name'] ?? ''));
+    if ($name === '' || strlen($name) > 120) json_error('Ugyldigt spillernavn.', 422);
+    $photo = array_key_exists('photo', $body) ? squad_normalise_photo($body['photo']) : false;
+
+    $pid = upsert_club_player($clubId, $name, squad_clamp_level($body['level'] ?? 3), $photo);
+
+    $stmt = db()->prepare(
+        'SELECT id, name, level, photo, UNIX_TIMESTAMP(created_at) * 1000 AS created_ms
+         FROM club_players WHERE id = ?'
+    );
+    $stmt->execute([$pid]);
+    $r = $stmt->fetch();
+    log_activity($u, 'player_upsert', $name);
+
+    json_response(['ok' => true, 'player' => [
+        'id'        => (int)$r['id'],
+        'name'      => $r['name'],
+        'level'     => (int)$r['level'],
+        'photo'     => $r['photo'] !== null && $r['photo'] !== '' ? $r['photo'] : null,
+        'createdAt' => (int)$r['created_ms'],
+    ]], 201);
+}
+
+// PATCH /api/clubs/:id/players/:pid {level?, photo?} — ret spiller (editor+).
+function handle_club_player_update(int $clubId, int $pid): void {
+    [$u, $role] = club_access($clubId);
+    if (!club_role_at_least($role, 'editor')) json_error('Kræver editor-rolle.', 403);
+
+    $stmt = db()->prepare('SELECT id, name FROM club_players WHERE id = ? AND club_id = ?');
+    $stmt->execute([$pid, $clubId]);
+    $row = $stmt->fetch();
+    if (!$row) json_error('Spilleren findes ikke i klubben.', 404);
+
+    $body = read_json_body();
+    if (array_key_exists('level', $body)) {
+        db()->prepare('UPDATE club_players SET level = ? WHERE id = ?')
+            ->execute([squad_clamp_level($body['level']), $pid]);
+    }
+    if (array_key_exists('photo', $body)) {
+        $photo = squad_normalise_photo($body['photo']);
+        if ($photo !== false) {
+            db()->prepare('UPDATE club_players SET photo = ? WHERE id = ?')
+                ->execute([$photo, $pid]);
+        }
+    }
+    log_activity($u, 'player_update', $row['name']);
+
+    json_response(['ok' => true]);
 }
 
 // GET /api/clubs/:id/squads — alle hold med medlemsantal.
@@ -81,7 +160,7 @@ function handle_squad_get(int $clubId, int $sid): void {
     if (!$squad) json_error('Holdet findes ikke.', 404);
 
     $stmt = db()->prepare(
-        'SELECT cp.id, cp.name, cp.level
+        'SELECT cp.id, cp.name, cp.level, cp.photo
          FROM squad_members sm
          JOIN club_players cp ON cp.id = sm.club_player_id
          WHERE sm.squad_id = ?
@@ -95,6 +174,7 @@ function handle_squad_get(int $clubId, int $sid): void {
             'id'    => (int)$r['id'],
             'name'  => $r['name'],
             'level' => (int)$r['level'],
+            'photo' => $r['photo'] !== null && $r['photo'] !== '' ? $r['photo'] : null,
         ], $stmt->fetchAll()),
     ]]);
 }
@@ -120,7 +200,7 @@ function handle_squad_create(int $clubId): void {
     $sid = (int)db()->lastInsertId();
 
     foreach ($players as $p) {
-        $pid = upsert_club_player($clubId, $p['name'], $p['level']);
+        $pid = upsert_club_player($clubId, $p['name'], $p['level'], $p['photo']);
         db()->prepare('INSERT IGNORE INTO squad_members (squad_id, club_player_id) VALUES (?, ?)')
             ->execute([$sid, $pid]);
     }
@@ -157,7 +237,7 @@ function handle_squad_update(int $clubId, int $sid): void {
         $players = squad_normalise_players($body['players']);
         db()->prepare('DELETE FROM squad_members WHERE squad_id = ?')->execute([$sid]);
         foreach ($players as $p) {
-            $pid = upsert_club_player($clubId, $p['name'], $p['level']);
+            $pid = upsert_club_player($clubId, $p['name'], $p['level'], $p['photo']);
             db()->prepare('INSERT IGNORE INTO squad_members (squad_id, club_player_id) VALUES (?, ?)')
                 ->execute([$sid, $pid]);
         }
@@ -206,7 +286,8 @@ function handle_squad_member_add(int $clubId, int $sid): void {
     } else {
         $name = trim((string)($body['name'] ?? ''));
         if ($name === '' || strlen($name) > 120) json_error('Ugyldigt spillernavn.', 422);
-        $pid = upsert_club_player($clubId, $name, squad_clamp_level($body['level'] ?? 3));
+        $photo = array_key_exists('photo', $body) ? squad_normalise_photo($body['photo']) : false;
+        $pid = upsert_club_player($clubId, $name, squad_clamp_level($body['level'] ?? 3), $photo);
     }
 
     db()->prepare('INSERT IGNORE INTO squad_members (squad_id, club_player_id) VALUES (?, ?)')
