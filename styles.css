@@ -508,12 +508,21 @@ select option {
 }
 
 .player-manager-form {
-    display: flex;
+    display: grid;
+    grid-template-columns: 3fr 2fr;   /* 60/40: navn / niveau */
     gap: 10px;
-    margin-bottom: 24px;
-    flex-direction: row;
-    align-items: center;
+    align-items: end;
     margin-top: 24px;
+    margin-bottom: 24px;
+}
+.player-manager-form > div {
+    min-width: 0;
+}
+.player-manager-form input,
+.player-manager-form select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .lowered {
@@ -592,7 +601,8 @@ select option {
 }
 
 #newPlayerLevel {
-    width: 60px;
+    width: 100%;
+    min-width: 0;
 }
 #newPlayerName {
     width: 100%;
@@ -2670,7 +2680,11 @@ prefill-card-header {
     position: sticky;
     bottom: 0;
     z-index: 30;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "info setup"
+        "generate generate";
     align-items: center;
     gap: 10px;
     margin: 8px -4px 0;
@@ -2681,6 +2695,9 @@ prefill-card-header {
     border-radius: 14px 14px 0 0;
     box-shadow: 0 -8px 24px rgba(45, 51, 41, 0.10);
 }
+.actionbar-info { grid-area: info; }
+.actionbar-setup { grid-area: setup; }
+.actionbar-generate { grid-area: generate; }
 .actionbar-info {
     display: inline-flex;
     align-items: center;
@@ -2688,8 +2705,8 @@ prefill-card-header {
     font-size: 13px;
     color: var(--muted);
     white-space: nowrap;
-    flex: 0 1 auto;
     min-width: 0;
+    overflow: hidden;
 }
 .actionbar-info input#courtCount {
     width: 52px;
@@ -2698,12 +2715,12 @@ prefill-card-header {
     text-align: center;
 }
 .actionbar-setup {
-    flex: 0 0 auto;
     font-size: 13px;
-    padding: 10px 10px;
+    padding: 10px 12px;
+    justify-self: end;
 }
 .actionbar-generate {
-    flex: 1 1 auto;
+    width: 100%;
     min-height: 48px;
     font-size: 15.5px;
     font-weight: 700;
@@ -2808,4 +2825,13 @@ prefill-card-header {
 }
 .lists-tab > .small-text {
     margin: 0 0 14px;
+}
+
+
+/* Farligt punkt i ⋮-menuen */
+.player-menu-item--danger {
+    color: var(--danger);
+}
+.player-menu-item--danger:hover {
+    background: #fdeaea;
 }

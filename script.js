@@ -1941,6 +1941,7 @@ function renderPlayerManagerList() {
                     <button class="player-menu-item" type="button" data-player-action="edit-name" data-index="${index}">${icon('edit')} Rediger navn</button>
                     ${photoItems}
                     <button class="player-menu-item" type="button" data-player-action="goto" data-index="${index}">${icon('statistics')} Gå til spiller</button>
+                    <button class="player-menu-item player-menu-item--danger" type="button" data-player-action="remove" data-index="${index}">${icon('trash')} Fjern fra listen</button>
                 </div>` : '';
 
         // Label omkring alt undtagen ⋮ — klik hvor som helst i rækken skifter
@@ -4213,8 +4214,40 @@ function handlePlayerMenuAction(action, index) {
     renderPlayerManagerList();
     if (action === 'edit-name')    { renamePlayer(index); return; }
     if (action === 'photo-add' || action === 'photo-change') { openPhotoPicker(player.name); return; }
-    if (action === 'photo-remove') { applyPlayerPhoto(player.name, null); return; }
+    if (action === 'photo-remove') {
+        const ok = window.confirm(`Vil du fjerne billedet af ${player.name}?`);
+        if (ok) applyPlayerPhoto(player.name, null);
+        return;
+    }
     if (action === 'goto')         { openStatsForPlayer(player.name); return; }
+    if (action === 'remove')       { removePlayerFromList(index); return; }
+}
+
+// Fjern en spiller helt fra dagens liste (og evt. hold). Statistikken i
+// kamparkivet bevares — spilleren kan tilføjes igen senere.
+function removePlayerFromList(index) {
+    const player = state.roster[index];
+    if (!player) return;
+    const ok = window.confirm(`Fjern ${player.name} fra dagens spillere?\n\nSpilleren slettes fra listen (og eventuelle hold). Tidligere kampe og statistik bevares.`);
+    if (!ok) return;
+    state.roster.splice(index, 1);
+    if (Array.isArray(state.teams)) {
+        state.teams.forEach(team => {
+            if (Array.isArray(team.members)) {
+                team.members = team.members.filter(m => m.name !== player.name);
+                team.level = team.members.reduce((sum, m) => sum + (m.level || 0), 0);
+            }
+        });
+        state.teams = state.teams.filter(t => Array.isArray(t.members) && t.members.length > 0);
+    }
+    renderRoster();
+    renderPlayerManagerList();
+    renderPlayerStats();
+    renderTeams();
+    updateTeamModeUi();
+    updatePanelVisibility();
+    saveState();
+    showStatusMessage(`${player.name} er fjernet fra listen.`);
 }
 
 // Luk ⋮-menu / inline niveau-redigering ved klik udenfor.
