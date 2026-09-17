@@ -123,8 +123,10 @@ try {
                 json_error('Method not allowed.', 405);
             }
             if ($third === 'matches') {
-                if ($method === 'GET')  handle_club_matches_list($id);
-                if ($method === 'POST') handle_club_matches_upsert($id);
+                $rid = $segments[3] ?? null;
+                if ($rid !== null && $method === 'DELETE') handle_club_matches_delete($id, $rid);
+                if ($rid === null && $method === 'GET')  handle_club_matches_list($id);
+                if ($rid === null && $method === 'POST') handle_club_matches_upsert($id);
                 json_error('Method not allowed.', 405);
             }
             if ($third === 'squads') {

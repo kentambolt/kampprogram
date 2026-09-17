@@ -102,3 +102,20 @@ function handle_club_matches_upsert(int $clubId): void {
 
     json_response(['ok' => true, 'saved' => $saved]);
 }
+
+// DELETE /api/clubs/:id/matches/:rid — slet alle kampe i en runde (editor+).
+// Bruges når en kamp/runde slettes lokalt: hele runden fjernes i skyen, og
+// klienten gen-sender de resterende kampe (upsert), så numre altid stemmer.
+function handle_club_matches_delete(int $clubId, string $rid): void {
+    [$u, $role] = club_access($clubId);
+    if (!club_role_at_least($role, 'editor')) json_error('Kræver editor-rolle.', 403);
+
+    $rid = trim($rid);
+    if ($rid === '' || strlen($rid) > 40) json_error('Ugyldigt runde-id.', 422);
+
+    $stmt = db()->prepare('DELETE FROM club_matches WHERE club_id = ? AND rid = ?');
+    $stmt->execute([$clubId, $rid]);
+    if ($stmt->rowCount() > 0) log_activity($u, 'matches_delete', $rid);
+
+    json_response(['ok' => true, 'deleted' => $stmt->rowCount()]);
+}

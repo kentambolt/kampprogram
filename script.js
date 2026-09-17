@@ -66,15 +66,12 @@ let toastTimer = null;
 const el = {
     mainPage: document.getElementById('mainPage'),
     fetchPlayersPanel: document.getElementById('fetchPlayersPanel'),
-    activePlayersTitle: document.getElementById('activePlayersTitle'),
     allPlayersTitle: document.getElementById('allPlayersTitle'),
-    playerRosterArea: document.getElementById('playerRosterArea'),
     playerStatsArea: document.getElementById('playerStatsArea'),
     playerManagerListArea: document.getElementById('playerManagerListArea'),
     playersPanel: document.getElementById('playersPanel'),
     arrivalPanel: document.getElementById('arrivalPanel'),
     newPlayerPanel: document.getElementById('newPlayerPanel'),
-    resultPanel: document.getElementById('resultPanel'),
     editResultBtn: document.getElementById('editResultBtn'),
     newPlayerBtn: document.getElementById('newPlayerBtn'),
     closeNewPlayerBtn: document.getElementById('closeNewPlayerBtn'),
@@ -84,7 +81,6 @@ const el = {
     courtCount: document.getElementById('courtCount'),
     generateOverlay: document.getElementById('generateOverlay'),
     shuffleBtn: document.getElementById('shuffleBtn'),
-    resultToggleBtn: document.getElementById('resultToggleBtn'),
     settingsBtn: document.getElementById('settingsBtn'),
     settingsPanel: document.getElementById('settingsPanel'),
     generateBtn: document.getElementById('generateBtn'),
@@ -100,9 +96,20 @@ const el = {
     playerStatsPanel: document.getElementById('playerStatsPanel'),
     historyPanel: document.getElementById('historyPanel'),
     toast: document.getElementById('toast'),
-    importExportBtn: document.getElementById('importExportBtn'),
-    importExportPanel: document.getElementById('importExportPanel'),
-    closeImportExportBtn: document.getElementById('closeImportExportBtn'),
+    playerListsBtn: document.getElementById('playerListsBtn'),
+    openPlayerListsBtn: document.getElementById('openPlayerListsBtn'),
+    closePlayerListsBtn: document.getElementById('closePlayerListsBtn'),
+    tabbar: document.getElementById('tabbar'),
+    tabFremmode: document.getElementById('tabFremmode'),
+    tabKampe: document.getElementById('tabKampe'),
+    tabAftenen: document.getElementById('tabAftenen'),
+    tabAttendBadge: document.getElementById('tabAttendBadge'),
+    actionbarMet: document.getElementById('actionbarMet'),
+    openSetupBtn: document.getElementById('openSetupBtn'),
+    headerSub: document.getElementById('headerSub'),
+    prefillBadge: document.getElementById('prefillBadge'),
+    roundTitle: document.getElementById('roundTitle'),
+    roundSubtitle: document.getElementById('roundSubtitle'),
     presetPlayerList: document.getElementById('presetPlayerList'),
     loadPresetPlayersBtn: document.getElementById('loadPresetPlayersBtn'),
     playerImportText: document.getElementById('playerImportText'),
@@ -631,7 +638,6 @@ function saveState() {
                 arrivalPanel: el.arrivalPanel?.classList.contains('collapsed') ?? true,
                 fetchPlayersPanel: el.fetchPlayersPanel?.classList.contains('collapsed') ?? true,
                 prefillPanel: el.prefillPanel?.classList.contains('collapsed') ?? true,
-                resultPanel: el.resultPanel?.classList.contains('collapsed') ?? true,
                 playerStatsPanel: el.playerStatsPanel?.classList.contains('collapsed') ?? true,
                 historyPanel: el.historyPanel?.classList.contains('collapsed') ?? true,
                 playerListsPanel: el.playerListsPanel?.classList.contains('collapsed') ?? true,
@@ -746,13 +752,8 @@ function restoreState() {
             const collapsed = collapsedPanels[key] ?? true;
             panel.classList.toggle('collapsed', collapsed);
         };
-        setCollapsed(el.playerListsPanel, 'playerListsPanel');
-        setCollapsed(el.arrivalPanel, 'arrivalPanel');
         setCollapsed(el.fetchPlayersPanel, 'fetchPlayersPanel');
         setCollapsed(el.prefillPanel, 'prefillPanel');
-        setCollapsed(el.resultPanel, 'resultPanel');
-        setCollapsed(el.playerStatsPanel, 'playerStatsPanel');
-        setCollapsed(el.historyPanel, 'historyPanel');
 
         renderPrefillArea(data.ui?.prefills || createDefaultPrefills(getCourtCount()));
         return state.roster.length > 0;
@@ -845,9 +846,33 @@ function getPlayers() {
 function updateActivePlayersTitle() {
     const activePlayersCount = getActivePlayers().length;
     const totalPlayersCount = getPlayers().length;
-    el.activePlayersTitle.textContent = `Aktive spillere (${activePlayersCount})`;
-    el.allPlayersTitle.innerHTML = `Dagens spillere <span class="attendance-count">${activePlayersCount} af ${totalPlayersCount} mødt op</span>`;
+    if (el.allPlayersTitle) {
+        el.allPlayersTitle.innerHTML = `Dagens spillere <span class="attendance-count">${activePlayersCount} af ${totalPlayersCount} mødt op</span>`;
+    }
+    if (el.actionbarMet) el.actionbarMet.textContent = `${activePlayersCount} mødt`;
+    if (el.tabAttendBadge) el.tabAttendBadge.textContent = String(activePlayersCount);
 }
+
+// ── Faner: Fremmøde / Kampe / Aftenen ──
+// Frie visninger, ikke en guide. Appen åbner på Fremmøde (eller Kampe hvis
+// en runde allerede findes) og skifter selv til Kampe efter generering.
+let activeTab = 'fremmode';
+
+function setActiveTab(name) {
+    if (!el.tabFremmode) return;
+    activeTab = name;
+    el.tabFremmode.classList.toggle('hidden', name !== 'fremmode');
+    el.tabKampe.classList.toggle('hidden', name !== 'kampe');
+    el.tabAftenen.classList.toggle('hidden', name !== 'aftenen');
+    el.tabbar?.querySelectorAll('[data-tab]').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.tab === name);
+    });
+}
+
+el.tabbar?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-tab]');
+    if (btn) setActiveTab(btn.dataset.tab);
+});
 
 function updateShuffleBtn() {
     if (el.shuffleBtn) el.shuffleBtn.disabled = state.history.length === 0;
@@ -861,13 +886,14 @@ function updatePanelVisibility() {
 
     // In team mode, the match panel needs at least 2 teams; otherwise 2 players.
     const canMatch = tm ? hasEnoughTeams : activePlayersCount >= 2;
-    el.matchPanel.classList.toggle('hidden', !canMatch);
+    // Kampe-fanen er altid synlig; "Lav næste runde" i handlingslinjen
+    // deaktiveres blot, når der ikke kan laves kampe.
+    if (el.generateBtn) el.generateBtn.disabled = !canMatch;
 
     el.playerStatsPanel.classList.toggle('hidden', !hasHistory);
     el.historyPanel.classList.toggle('hidden', !hasHistory);
-    el.playerRosterArea.classList.toggle('hidden', activePlayersCount === 0);
-    // resultPanel is now a collapsible sub-section inside matchPanel; show/hide it
-    el.resultPanel.classList.toggle('hidden', !hasHistory);
+    updateRoundHeader();
+    updatePrefillBadge();
 
     // Teams panel: only visible in team mode and with at least one active player
     if (el.teamsPanel) {
@@ -881,21 +907,35 @@ function updatePanelVisibility() {
     updateShuffleBtn();
 }
 
-// Collapse every major panel, then expand the result section so the
-// freshly generated round is immediately visible.
-function collapseAllAndShowResult() {
-    const toCollapse = [
-        el.arrivalPanel,
-        el.fetchPlayersPanel,
-        el.prefillPanel,
-        el.playerStatsPanel,
-        el.historyPanel,
-        el.playerListsPanel,
-    ];
-    toCollapse.forEach(p => p?.classList.add('collapsed'));
+// Runde-overskriften på Kampe-fanen.
+function updateRoundHeader() {
+    if (!el.roundTitle) return;
+    const hasRound = state.history.length > 0 && state.lastResult;
+    if (hasRound) {
+        el.roundTitle.textContent = `Runde ${state.history.length}`;
+        const courts = state.lastResult.courts.length;
+        el.roundSubtitle.textContent = `${courts} ${courts === 1 ? 'bane' : 'baner'} · Resultater er valgfrie`;
+    } else {
+        el.roundTitle.textContent = 'Ingen runde endnu';
+        el.roundSubtitle.textContent = 'Markér fremmøde og tryk "Lav næste runde".';
+    }
+}
 
-    // Expand the result sub-panel
-    el.resultPanel?.classList.remove('collapsed');
+// Markering på "Lås pladser", når mindst én lås er sat.
+function updatePrefillBadge() {
+    if (!el.prefillBadge) return;
+    let active = false;
+    try {
+        active = getPrefillStateFromUi().some(p =>
+            (p.format && p.format !== COURT_FORMAT_AUTO) || Object.values(p.slots || {}).some(Boolean));
+    } catch (e) { /* før første render */ }
+    el.prefillBadge.classList.toggle('hidden', !active);
+}
+
+function collapseAllAndShowResult() {
+    // Faner har erstattet sammenfoldningen: vis Kampe-fanen med den nye runde.
+    setActiveTab('kampe');
+    window.scrollTo(0, 0);
 }
 
 function showStatusMessage(message, duration = 2800) {
@@ -1841,25 +1881,9 @@ function getPlayerStats() {
 }
 
 function renderRoster() {
-    const activePlayers = getActivePlayers();
+    // Chips-sektionen er udgået — fremmødelisten er den eneste sandhed.
     updateActivePlayersTitle();
     updatePanelVisibility();
-
-    if (activePlayers.length === 0) {
-        el.playerRosterArea.innerHTML = '<span class="muted">Ingen aktive spillere</span>';
-        return;
-    }
-
-    el.playerRosterArea.innerHTML = sortPlayersForDisplay(activePlayers)
-        .map(player => {
-            const index = state.roster.findIndex(p => p.name === player.name);
-            return `
-            <button class="player-chip" type="button" data-action="remove-player" data-player-index="${index}" title="Klik for at sætte spilleren som inaktiv">
-                ${escapeHtml(player.name)}
-            </button>
-        `;
-        }).join('');
-
     renderPrefillArea(getPrefillStateFromUi());
     syncQuickAddOptions();
 }
@@ -2670,7 +2694,7 @@ function setEditResultMode(enabled) {
     if (el.editResultBtn) {
         el.editResultBtn.innerHTML = editingResult
             ? `${icon('check')} Færdig`
-            : `${icon('edit')} Rediger`;
+            : `${icon('edit')} Rediger opstilling`;
         el.editResultBtn.classList.toggle('is-active', editingResult);
     }
     if (state.lastResult) renderRound(state.lastResult);
@@ -2869,9 +2893,9 @@ function renderResultMarkRow(round, court, courtIndex) {
         `<button type="button" class="result-mark ${cls}" data-rid="${rid}" data-court-index="${courtIndex}" data-result-mark="${code}">${label}</button>`;
     return `
         <div class="result-mark-row" title="Valgfrit: markér resultatet — bruges kun til statistik">
-            ${btn('A', res === 'B' ? 'Tabte' : 'Vandt', res === 'A' ? 'is-win' : (res === 'B' ? 'is-loss' : ''))}
+            ${btn('A', 'Venstre vandt', res === 'A' ? 'is-win' : '')}
             ${btn('D', 'Uafgjort', res === 'D' ? 'is-draw' : '')}
-            ${btn('B', res === 'A' ? 'Tabte' : 'Vandt', res === 'B' ? 'is-win' : (res === 'A' ? 'is-loss' : ''))}
+            ${btn('B', 'Højre vandt', res === 'B' ? 'is-win' : '')}
         </div>`;
 }
 
@@ -2917,6 +2941,7 @@ function renderRound(result) {
             <div class="result-card">
                 <div class="court-title">
                     <span>Bane ${index + 1}</span>
+                    <span class="court-format">${isTeamMatchup ? 'Hold-kamp' : fmtLabel}</span>
                 </div>
                 <div class="vs-grid">
                     <div class="team">${sideHtml(court.teamA.players, 'A')}</div>
@@ -2947,6 +2972,7 @@ function renderRound(result) {
     }
 
     el.resultArea.innerHTML = html;
+    updateRoundHeader();
 }
 
 function describeCourtForHistory(court, courtIndex) {
@@ -2972,9 +2998,10 @@ function renderHistory() {
             <div class="result-card">
                 <div class="court-title">
                     <span>Kamprunde ${roundNo}</span>
+                    <button type="button" class="history-delete-btn" data-round-delete="${round.rid}" title="Slet runden">${icon('trash', 'icon--sm')}</button>
                 </div>
                 <ul class="history-list">
-                    ${round.courts.map((court, i) => `<li class="history-court-line"><span>${describeCourtForHistory(court, i)}</span>${renderHistoryResultMarks(round, court, i)}</li>`).join('')}
+                    ${round.courts.map((court, i) => `<li class="history-court-line"><span>${describeCourtForHistory(court, i)}</span><span class="history-line-actions">${renderHistoryResultMarks(round, court, i)}<button type="button" class="history-delete-btn history-delete-btn--match" data-match-delete data-rid="${round.rid}" data-ci="${i}" title="Slet denne kamp">${icon('close', 'icon--sm')}</button></span></li>`).join('')}
                     ${round.benched.length ? `<li>Sidder over: ${round.benched.map(p => `${escapeHtml(p.name)}`).join(', ')}</li>` : ''}
                 </ul>
             </div>
@@ -3614,6 +3641,7 @@ async function generateRound() {
     el.generateOverlay?.classList.add('generate-overlay--visible');
 
     try {
+        lastUsedPrefills = tm ? null : prefills;
         const best = await findBestRoundAsync(players, courtCount, state.history, config, prefills, 1000);
 
         if (!best || best.courts.length === 0) {
@@ -3650,11 +3678,22 @@ async function generateRound() {
     saveState();
 }
 
+// Låsene fra seneste generering, så "Prøv igen" kan genbruge dem.
+let lastUsedPrefills = null;
+
 function retryRound() {
     if (state.history.length === 0) return;
-    // Silently undo the last round then generate a fresh one
+    const last = state.history[state.history.length - 1];
+    // Resultater må aldrig følge med over på en ny opstilling — advar først.
+    if ((last.courts || []).some(c => c.result)) {
+        const ok = window.confirm('Runden har registrerede resultater. "Prøv igen" erstatter opstillingen, og resultaterne slettes. Fortsæt?');
+        if (!ok) return;
+    }
+    // Forkast runden, så den ikke tæller som spillede kampe/makkere/oversidning.
     state.history.pop();
     state.lastResult = state.history[state.history.length - 1] || null;
+    // Gendan låste pladser fra før rundens dannelse.
+    if (lastUsedPrefills && !isTeamMode()) renderPrefillArea(lastUsedPrefills);
     generateRound();
 }
 window.retryRound = retryRound;
@@ -3854,13 +3893,16 @@ el.closeSettingsBtn.addEventListener('click', () => {
     closeStandAlone();
 });
 
-el.importExportBtn.addEventListener('click', () => {
-    el.playerImportText.value = playersToText(state.roster);
-    showStandAlone(el.importExportPanel);
-});
-
-el.closeImportExportBtn.addEventListener('click', () => {
-    closeStandAlone();
+function openPlayerListsPage() {
+    closeMenu();
+    if (el.playerImportText) el.playerImportText.value = playersToText(state.roster);
+    showStandAlone(el.playerListsPanel);
+}
+el.playerListsBtn?.addEventListener('click', openPlayerListsPage);
+el.openPlayerListsBtn?.addEventListener('click', openPlayerListsPage);
+el.closePlayerListsBtn?.addEventListener('click', () => closeStandAlone());
+el.openSetupBtn?.addEventListener('click', () => {
+    showStandAlone(el.settingsPanel);
 });
 
 [
@@ -3911,6 +3953,7 @@ el.teamMode?.addEventListener('change', () => {
 el.generateTeamsBtn?.addEventListener('click', generateTeams);
 el.clearTeamsBtn?.addEventListener('click', clearTeams);
 
+el.prefillArea.addEventListener('change', () => updatePrefillBadge());
 el.prefillArea.addEventListener('change', (event) => {
 
     const target = event.target;
@@ -3967,10 +4010,6 @@ el.playerManagerListArea.addEventListener('change', (event) => {
 
 el.prefillToggleBtn?.addEventListener('click', () => {
     toggleCollapsiblePanel(el.prefillPanel);
-});
-
-el.resultToggleBtn?.addEventListener('click', () => {
-    toggleCollapsiblePanel(el.resultPanel);
 });
 
 el.editResultBtn?.addEventListener('click', (event) => {
@@ -4271,7 +4310,6 @@ function openStatsForPlayer(name) {
         }
     });
 }
-el.playerRosterArea?.addEventListener('click', handlePlayerAreaClick);
 el.playerManagerListArea?.addEventListener('click', handlePlayerAreaClick);
 
 // Fremmøde-checkbox: ét change-event pr. skift (label sørger for klikfladen).
@@ -4302,11 +4340,88 @@ function handleResultMarkClick(event) {
 el.resultArea?.addEventListener('click', handleResultMarkClick);
 el.historyArea?.addEventListener('click', handleResultMarkClick);
 el.historyArea?.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-history-showall]');
-    if (!btn) return;
-    historyShowAll = !historyShowAll;
-    renderHistory();
+    const showAll = event.target.closest('[data-history-showall]');
+    if (showAll) {
+        historyShowAll = !historyShowAll;
+        renderHistory();
+        return;
+    }
+    const roundDel = event.target.closest('[data-round-delete]');
+    if (roundDel) {
+        deleteRoundFromHistory(roundDel.dataset.roundDelete);
+        return;
+    }
+    const matchDel = event.target.closest('[data-match-delete]');
+    if (matchDel) {
+        deleteMatchFromHistory(matchDel.dataset.rid, Number(matchDel.dataset.ci));
+    }
 });
+
+// ── Slet kamp/runde fra historikken (uden dobbelttælling) ──
+// Lokale arkiventries og cloud-rækker for runden fjernes; resterende kampe i
+// runden gen-nummereres og sendes op igen. Ændrer aldrig senere opstillinger.
+
+function purgeRidLocally(rid) {
+    state.matchLog = (state.matchLog || []).filter(e => e.rid !== rid);
+    state.pendingSync = (state.pendingSync || []).filter(k => !k.startsWith(`${rid}:`));
+}
+
+async function deleteRidFromClub(rid) {
+    if (!canEditActiveClub()) return;
+    try {
+        await api('DELETE', `clubs/${activeClubId()}/matches/${encodeURIComponent(rid)}`);
+    } catch (e) {
+        console.warn('Kunne ikke slette kampen hos klubben:', e.message);
+    }
+}
+
+function afterHistoryEdit(rid) {
+    deleteRidFromClub(rid);
+    scheduleMatchSync();
+    saveState();
+    if (state.lastResult) {
+        renderRound(state.lastResult);
+    } else {
+        el.resultArea.innerHTML = 'Ingen kamprunde genereret endnu.';
+    }
+    renderHistory();
+    renderPlayerStats();
+    updatePanelVisibility();
+    if (isStatsPanelOpen()) renderStatsPanel();
+}
+
+function deleteRoundFromHistory(rid) {
+    const i = state.history.findIndex(r => r.rid === rid);
+    if (i < 0) return;
+    const ok = window.confirm('Slet hele runden? Kampene fjernes også fra statistikken.');
+    if (!ok) return;
+    state.history.splice(i, 1);
+    purgeRidLocally(rid);
+    state.lastResult = state.history[state.history.length - 1] || null;
+    setEditResultMode(false);
+    afterHistoryEdit(rid);
+    showStatusMessage('Runden er slettet.');
+}
+
+function deleteMatchFromHistory(rid, ci) {
+    const round = state.history.find(r => r.rid === rid);
+    if (!round || !round.courts[ci]) return;
+    const ok = window.confirm('Slet denne ene kamp? Den fjernes også fra statistikken — resten af runden bevares.');
+    if (!ok) return;
+    round.courts.splice(ci, 1);
+    purgeRidLocally(rid);
+    if (round.courts.length === 0) {
+        const i = state.history.indexOf(round);
+        state.history.splice(i, 1);
+        state.lastResult = state.history[state.history.length - 1] || null;
+        setEditResultMode(false);
+    } else {
+        // Gen-nummererede kampe sendes op igen.
+        markMatchesPending(round.courts.map((c, i2) => `${rid}:${i2}`));
+    }
+    afterHistoryEdit(rid);
+    showStatusMessage('Kampen er slettet.');
+}
 // ── Global "vis/skjul niveauer" menu item ──
 el.toggleLevelsBtn?.addEventListener('click', () => {
     state.showAllLevels = !state.showAllLevels;
@@ -4546,6 +4661,9 @@ function syncAccountUI() {
     if (el.clubBtn) {
         el.clubBtn.classList.toggle('hidden', !(u && u.club));
         if (u && u.club) el.clubBtn.innerHTML = `${icon('club')} ${escapeHtml(u.club.name)}`;
+        if (el.headerSub) {
+            el.headerSub.textContent = (u && u.club) ? `${u.club.name} · Dagens spil` : 'På denne enhed';
+        }
     }
     if (el.cloudListsSection) {
         // Cloud-sektionen kræver både login og medlemskab af mindst én klub.
@@ -5618,6 +5736,9 @@ el.adminUsersList?.addEventListener('click', async (event) => {
 bootstrapAuth();
 
 loadDefaults();
+
+// Åbn på Kampe, hvis en runde allerede er i gang — ellers Fremmøde.
+setActiveTab(state.lastResult ? 'kampe' : 'fremmode');
 
 // ── Service worker: offline-sikkerhed i hallen ──────────────
 // Network-first med cache-fallback (se sw.js). API-kald caches aldrig.

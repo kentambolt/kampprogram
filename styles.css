@@ -1,29 +1,29 @@
 :root {
-    /* Bright, warm light palette — sunrise + fresh sport */
-    --bg: #C6CAED;             /* warm cream */
-    --bg-2: #fff1e1;           /* gentle peach for gradient */
-    --panel: #ffffff;          /* clean white panels */
-    --panel-2: #ececec;        /* warm light peach for nested cards */
-    --panel-3: #d8d8d8;        /* a touch deeper for emphasis */
-    --text: #2d3142;           /* warm charcoal */
-    --muted: #6e7390;          /* soft warm gray */
-    --accent: #4A5240;
-    --accent-hover: #929891;   /* lighter coral */
+    /* Samlet lys grågrøn palet (B1-retningen) */
+    --bg: #F5F6F2;             /* rolig grågrøn sidebaggrund */
+    --bg-2: #F5F6F2;
+    --panel: #FFFFFF;          /* hvide kort */
+    --panel-2: #f0f2ec;        /* indlejrede felter */
+    --panel-3: #e4e8dd;        /* hover / betoning */
+    --text: #2D3329;           /* mørk grågrøn tekst */
+    --muted: #67705F;          /* afdæmpet grågrøn */
+    --accent: #4A5240;         /* mørk oliven — primær handling */
+    --accent-hover: #5b6450;
     --accent-contrast: #ffffff;
-    --accent-2: #9c9c9c;       /* fresh mint — secondary */
-    --accent-2-contrast: #074c48;
-    --accent-3: #ffc857;       /* sunshine yellow — highlight */
-    --danger: #a12731;         /* warm red */
+    --accent-2: #8a927e;
+    --accent-2-contrast: #2D3329;
+    --accent-3: #ffc857;       /* gul — uafgjort/advarsel */
+    --danger: #a12731;
     --danger-contrast: #ffffff;
-    --border: #e1e1e1;         /* warm sand border */
-    --border-strong: #e5d3b8;  /* slightly stronger border */
-    --warning: #ffb627;        /* sunshine warning */
-    --chip-text: #2d3142;
-    --chip-bg: #ffe2d6;        /* peach chip */
-    --chip-bg-hover: #ffcdba;  /* deeper peach */
-    --shadow-soft: 0 6px 20px rgba(45, 49, 66, 0.06);
-    --shadow-card: 0 10px 28px rgba(255, 122, 92, 0.10);
-    --shadow-pop: 0 18px 40px rgba(45, 49, 66, 0.12);
+    --border: #DFE4D9;         /* tynd grågrøn kant */
+    --border-strong: #c9d1c0;
+    --warning: #ffb627;
+    --chip-text: #2D3329;
+    --chip-bg: #E9EFE4;
+    --chip-bg-hover: #dde5d4;
+    --shadow-soft: 0 4px 14px rgba(45, 51, 41, 0.05);
+    --shadow-card: 0 6px 18px rgba(45, 51, 41, 0.06);
+    --shadow-pop: 0 14px 32px rgba(45, 51, 41, 0.14);
 }
 
 * {
@@ -2596,5 +2596,206 @@ prefill-card-header {
     }
     .attendance-level {
         font-size: 11.5px;
+    }
+}
+
+
+/* ── Arbejdsrum: faner, handlingslinje, runde-header ─────── */
+
+.app-title-wrap {
+    min-width: 0;
+}
+.header-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tabbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+.tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    padding: 12px 4px 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+}
+.tab:hover {
+    color: var(--text);
+}
+.tab.is-active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+.tab-badge {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--panel-3);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab.is-active .tab-badge {
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+
+/* Fast handlingslinje nederst — "Lav næste runde" er altid inden for
+   rækkevidde. Indholdet ovenfor får bundafstand, så intet dækkes. */
+#mainPage {
+    padding-bottom: 96px;
+}
+.actionbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px -4px 0;
+    padding: 10px 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 24px rgba(45, 51, 41, 0.10);
+}
+.actionbar-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+.actionbar-info input#courtCount {
+    width: 52px;
+    min-width: 52px;
+    padding: 6px 4px;
+    text-align: center;
+}
+.actionbar-setup {
+    flex: 0 0 auto;
+    font-size: 13px;
+    padding: 10px 10px;
+}
+.actionbar-generate {
+    flex: 1 1 auto;
+    min-height: 48px;
+    font-size: 15.5px;
+    font-weight: 700;
+}
+
+.round-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.round-header-text {
+    min-width: 0;
+}
+.round-header .result-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.court-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.court-format {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.prefill-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 11.5px;
+    font-weight: 600;
+    vertical-align: 2px;
+}
+
+/* Historik: slet runde/kamp */
+.history-delete-btn {
+    background: transparent;
+    border: none;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+.history-delete-btn:hover {
+    background: var(--panel-3);
+    color: var(--danger);
+}
+.history-line-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.end-evening-row {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+}
+.w100 {
+    width: 100%;
+}
+.small-btn {
+    font-size: 13px;
+    padding: 8px 12px;
+}
+.icon--flip {
+    transform: scaleX(-1);
+}
+
+@media (max-width: 640px) {
+    .actionbar-setup {
+        padding: 10px 8px;
+    }
+    .round-header .result-actions {
+        width: 100%;
+    }
+    .round-header .result-actions button {
+        flex: 1 1 auto;
     }
 }

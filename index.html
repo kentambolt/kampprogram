@@ -26,7 +26,10 @@
 <body>
 <div class="container">
     <header class="app-header">
-        <div class="app-title">Kampprogram</div>
+        <div class="app-title-wrap">
+            <div class="app-title">Kampprogram</div>
+            <div class="header-sub" id="headerSub">På denne enhed</div>
+        </div>
         <div class="header-controls">
             <div class="header-menu">
                 <button class="ghost menu-toggle" id="actionsToggleBtn" aria-label="Handlinger" title="Handlinger"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-actions"></use></svg></button>
@@ -70,8 +73,8 @@
                 <div class="menu-dropdown" id="menuDropdown">
                     <button class="menu-item hidden" id="clubBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-club"></use></svg> Klub</button>
                     <button class="menu-item" id="statsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-statistics"></use></svg> Spillerstatistik</button>
-                    <button class="menu-item" id="settingsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-actions"></use></svg> Indstillinger</button>
-                    <button class="menu-item" id="importExportBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-import-export"></use></svg> Import / eksport</button>
+                    <button class="menu-item" id="playerListsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-local-lists"></use></svg> Spillerlister</button>
+                    <button class="menu-item" id="settingsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-actions"></use></svg> Kampopsætning</button>
                     <button class="menu-item menu-item--section account-menu-item" id="accountBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-account"></use></svg> Log ind</button>
                     <button class="menu-item hidden" id="usersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-users"></use></svg> Brugere</button>
                     <button class="menu-item hidden" id="adminBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-admin"></use></svg> Admin</button>
@@ -87,6 +90,14 @@
 
             <div id="mainPage">
 
+                <nav class="tabbar" id="tabbar" aria-label="Aftenens visninger">
+                    <button class="tab is-active" type="button" data-tab="fremmode">Fremmøde <span class="tab-badge" id="tabAttendBadge">0</span></button>
+                    <button class="tab" type="button" data-tab="kampe">Kampe</button>
+                    <button class="tab" type="button" data-tab="aftenen">Aftenen</button>
+                </nav>
+
+                <div class="tab-page" id="tabFremmode">
+
                 <div class="panel" id="playersPanel">
                     <div class="flex-row">
                         <h2 class="h-no-m">Spillere</h2>
@@ -98,124 +109,36 @@
                         </div>
                     </div>
 
-                    <div class="collapsible-panel collapsed mt24" id="activePlayersPanel">
-                        <button class="prefill-header collapsible-toggle" type="button" data-target="activePlayersPanel">
-                            <span class="h-no-m" id="activePlayersTitle">Aktive spillere</span>
-                            <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                        </button>
-                        <div class="player-chip-list mt collapsible-content" id="playerRosterArea"></div>
-                    </div>
-
-                    <div class="collapsible-panel collapsed mt24" id="arrivalPanel">
-                        <button class="prefill-header collapsible-toggle" type="button" data-target="arrivalPanel">
-                            <span class="h-no-m" id="allPlayersTitle">Alle spillere</span>
-                            <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                        </button>
-                        <div id="playerManagerListArea" class="player-manager-list mt collapsible-content"></div>
-                    </div>
-
-                    <div class="collapsible-panel collapsed mt24" id="playerListsPanel">
-                        <button class="prefill-header collapsible-toggle" type="button" data-target="playerListsPanel">
-                            <span class="h-no-m">Spillerlister</span>
-                            <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                        </button>
-
-                        <div class="collapsible-content">
-                            <div id="cloudListsSection" class="cloud-lists-section hidden">
-                                <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-cloud"></use></svg> Klubbens hold</h4>
-                                <div class="settings-row" style="margin-top: 0;">
-                                    <label for="cloudPlayerList">Hent hold</label>
-                                    <div class="actions">
-                                        <select id="cloudPlayerList">
-                                            <option value="">Vælg hold</option>
-                                        </select>
-                                        <button class="primary" id="loadCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-down"></use></svg> Hent</button>
-                                    </div>
-                                </div>
-                                <div class="settings-row cloud-editor-only">
-                                    <label for="newCloudListName">Gem nuværende spillere som hold</label>
-                                    <div class="actions">
-                                        <input id="newCloudListName" type="text" placeholder="Fx Torsdagsholdet"/>
-                                        <button class="primary" id="saveCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-check"></use></svg> Gem</button>
-                                    </div>
-                                </div>
-                                <div class="settings-row cloud-editor-only">
-                                    <label for="deleteCloudList">Slet hold</label>
-                                    <div class="actions">
-                                        <select id="deleteCloudList">
-                                            <option value="">Vælg hold</option>
-                                        </select>
-                                        <button class="danger" id="deleteCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-local-lists"></use></svg> Lokale spillerlister</h4>
-                            <div class="settings-row" style="margin-top: 0;">
-                                <label for="presetPlayerList">Hent gemt spillerliste</label>
-                                <div class="actions">
-                                    <select id="presetPlayerList">
-                                        <option value="">Vælg liste</option>
-                                    </select>
-                                    <button class="primary" id="loadPresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-down"></use></svg> Hent spillere</button>
-                                </div>
-                            </div>
-
-                            <div class="settings-row">
-                                <label for="newPresetListName">Gem nuværende spillere som ny liste</label>
-                                <div class="actions">
-                                    <input id="newPresetListName" type="text" placeholder="Fx Torsdagsholdet"/>
-                                    <button class="primary" id="savePresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-check"></use></svg> Gem liste</button>
-                                </div>
-                            </div>
-
-                            <div class="settings-row">
-                                <label for="deletePresetPlayerList">Slet gemt spillerliste</label>
-                                <div class="actions">
-                                    <select id="deletePresetPlayerList">
-                                        <option value="">Vælg liste</option>
-                                    </select>
-                                    <button class="danger" id="deletePresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet liste</button>
-                                </div>
-                            </div>
+                    <div class="mt24" id="arrivalPanel">
+                        <div class="flex-row">
+                            <span class="h-no-m" id="allPlayersTitle">Dagens spillere</span>
+                            <button class="ghost small-btn" id="openPlayerListsBtn" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-local-lists"></use></svg> Hent spillerliste</button>
                         </div>
+                        <div id="playerManagerListArea" class="player-manager-list mt"></div>
                     </div>
 
                 </div>
 
-                <div class="panel collapsible-panel hidden" id="teamsPanel">
-                    <button class="prefill-header collapsible-toggle" type="button" data-target="teamsPanel">
-                        <span class="h-no-m" id="teamsTitle">Hold</span>
-                        <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                    </button>
-                    <div class="collapsible-content">
-                        <div class="team-mode-actions">
-                            <button class="primary" id="generateTeamsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-make-teams"></use></svg> Lav hold</button>
-                            <button class="ghost" id="clearTeamsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Nulstil hold</button>
-                        </div>
-                        <div id="teamsArea" class="teams-area"></div>
-                    </div>
                 </div>
 
-                <div class="panel hidden" id="matchPanel">
-                    <h2>Lav kampe</h2>
-
-                    <div class="court-count">
-                        <div class="courts">
-                            <label for="courtCount">Baner</label>
-                            <input id="courtCount" type="number" min="1" value="2"/>
+                <div class="tab-page hidden" id="tabKampe">
+                <div class="panel" id="matchPanel">
+                    <div class="round-header">
+                        <div class="round-header-text">
+                            <h2 class="h-no-m" id="roundTitle">Ingen runde endnu</h2>
+                            <div class="subtle small-text" id="roundSubtitle">Markér fremmøde og tryk "Lav næste runde".</div>
                         </div>
-                        <button class="primary" id="generateBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-next-round"></use></svg> Lav næste kamprunde</button>
+                        <div class="result-actions">
+                            <button class="ghost" id="editResultBtn" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-edit"></use></svg> Rediger opstilling</button>
+                            <button class="ghost" id="shuffleBtn" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-retry"></use></svg> Prøv igen</button>
+                        </div>
                     </div>
 
-                    <div class="session-share-row hidden" id="sessionShareRow">
-                        <button class="ghost" id="saveClubSessionBtn" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-cloud"></use></svg> Gem session til klubben</button>
-                        <span class="session-share-hint">Gemmer aftenens tilstand (fremmødte, runder, bænk), så et andet klubmedlem kan overtage.</span>
-                    </div>
+                    <div id="resultArea" class="subtle">Ingen kamprunde genereret endnu.</div>
 
                     <div class="prefill-panel collapsible-panel collapsed" id="prefillPanel">
                         <button class="prefill-header collapsible-toggle" id="prefillToggleBtn" type="button">
-                            <h3 class="h-no-m">Præudfyld</h3>
+                            <h3 class="h-no-m">Lås pladser til næste runde <span class="prefill-badge hidden" id="prefillBadge">aktiv</span></h3>
                             <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
                         </button>
 
@@ -227,54 +150,73 @@
                         </div>
                     </div>
 
-                    <div class="prefill-panel collapsible-panel collapsed" id="resultPanel">
-                        <button class="prefill-header collapsible-toggle" id="resultToggleBtn" type="button">
-                            <h3 class="h-no-m">Seneste kamprunde</h3>
-                            <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                        </button>
-                        <div class="collapsible-content">
-                            <div class="result-actions">
-                                <button class="ghost" id="editResultBtn" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-edit"></use></svg> Rediger</button>
-                                <button class="ghost" id="shuffleBtn" disabled><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-retry"></use></svg> Shuffle</button>
-                            </div>
-                            <div id="resultArea" class="subtle">Ingen kamprunde genereret endnu.</div>
-                        </div>
-                    </div>
                 </div>
 
-                <div class="panel hidden collapsible-panel collapsed" id="playerStatsPanel">
-                    <button class="collapsible-toggle panel-toggle" type="button" data-target="playerStatsPanel">
-                        <span>Spillerstatus</span>
-                        <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                    </button>
-                    <div class="collapsible-content">
-                        <div id="playerStatsArea" class="subtle">Ingen data endnu.</div>
-                    </div>
                 </div>
 
-                <div class="panel hidden collapsible-panel collapsed" id="historyPanel">
-                    <button class="collapsible-toggle panel-toggle" type="button" data-target="historyPanel">
-                        <span>Historik</span>
-                        <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
-                    </button>
+                <div class="tab-page hidden" id="tabAftenen">
 
-                    <div class="collapsible-content">
+                <div class="panel hidden" id="playerStatsPanel">
+                    <h3 class="h-no-m">Fordeling af spilletid</h3>
+                    <div id="playerStatsArea" class="subtle mt">Ingen data endnu.</div>
+                </div>
+
+                <div class="panel hidden" id="historyPanel">
+                    <div class="flex-row">
+                        <h3 class="h-no-m">Tidligere runder</h3>
                         <div class="history-header">
-
-                            <button class="primary" id="endEveningBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-end-evening"></use></svg> Afslut aften</button>
                             <button class="ghost" id="undoBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-undo"></use></svg> Fjern seneste</button>
                             <button class="danger" id="resetHistoryBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Fjern alle</button>
                         </div>
-                        <div id="historyArea" class="subtle">Ingen kamprunder endnu.</div>
                     </div>
+                    <div id="historyArea" class="subtle mt">Ingen kamprunder endnu.</div>
+                </div>
+
+                <div class="panel" id="sessionPanel">
+                    <h3 class="h-no-m">Gem og del</h3>
+
+                    <div class="session-share-row hidden" id="sessionShareRow">
+                        <button class="ghost" id="saveClubSessionBtn" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-cloud"></use></svg> Gem session til klubben</button>
+                        <span class="session-share-hint">Delt med klubben: et andet medlem kan overtage aftenen fra klubsiden.</span>
+                    </div>
+
+                    <div class="settings-row session-transfer-section">
+                        <label for="sessionTransferText">Session-kode (gemt på enheden — del manuelt)</label>
+                        <textarea
+                                id="sessionTransferText"
+                                rows="5"
+                                placeholder="Indsæt session-kode her for at importere…"
+                        ></textarea>
+                        <div class="actions" style="margin-top: 12px;">
+                            <button class="ghost" id="exportSessionBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-copy"></use></svg> Kopiér aktuel session</button>
+                            <button class="ghost" id="importSessionBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importér session</button>
+                        </div>
+                    </div>
+
+                    <div class="end-evening-row">
+                        <button class="primary w100" id="endEveningBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-end-evening"></use></svg> Afslut aften</button>
+                    </div>
+                </div>
+
+                </div>
+
+                <div class="actionbar" id="actionbar">
+                    <div class="actionbar-info">
+                        <span id="actionbarMet">0 mødt</span>
+                        <span class="actionbar-dot" aria-hidden="true">·</span>
+                        <input id="courtCount" type="number" min="1" value="2" aria-label="Antal baner"/>
+                        <span>baner</span>
+                    </div>
+                    <button class="ghost actionbar-setup" id="openSetupBtn" type="button">Kampopsætning</button>
+                    <button class="primary actionbar-generate" id="generateBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-next-round"></use></svg> Lav næste runde</button>
                 </div>
 
             </div>
 
             <div class="panel settings-panel standalone" id="settingsPanel">
                 <div class="flex-row">
-                    <h2 class="h-no-m">Indstillinger</h2>
-                    <button class="ghost" id="closeSettingsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <h2 class="h-no-m">Kampopsætning</h2>
+                    <button class="ghost" id="closeSettingsBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
 
                 <div class="settings-row settings-row--mode-toggle" id="teamModeRow">
@@ -284,6 +226,20 @@
                     </div>
                     <!-- Hidden checkbox preserves the existing el.teamMode contract so we don't rewrite every isTeamMode() callsite. -->
                     <input id="teamMode" type="checkbox" class="visually-hidden" />
+                </div>
+
+<div class="collapsible-panel hidden mt24" id="teamsPanel">
+                    <button class="prefill-header collapsible-toggle" type="button" data-target="teamsPanel">
+                        <span class="h-no-m" id="teamsTitle">Hold</span>
+                        <span class="collapse-indicator"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg></span>
+                    </button>
+                    <div class="collapsible-content">
+                        <div class="team-mode-actions">
+                            <button class="primary" id="generateTeamsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-make-teams"></use></svg> Lav hold</button>
+                            <button class="ghost" id="clearTeamsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Nulstil hold</button>
+                        </div>
+                        <div id="teamsArea" class="teams-area"></div>
+                    </div>
                 </div>
 
                 <div class="settings-section" id="rulesSection">
@@ -377,7 +333,7 @@
             <div class="panel admin-panel standalone" id="adminPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Admin</h2>
-                    <button class="ghost" id="closeAdminBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeAdminBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
 
                 <div class="admin-stats" id="adminStats"></div>
@@ -457,7 +413,7 @@
             <div class="panel club-panel standalone" id="clubPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m" id="clubPanelTitle">Klub</h2>
-                    <button class="ghost" id="closeClubBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeClubBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p class="muted" id="clubPanelStats"></p>
 
@@ -495,7 +451,7 @@
             <div class="panel invite-panel standalone" id="invitePanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Invitation</h2>
-                    <button class="ghost" id="closeInviteBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeInviteBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p id="inviteInfoText"></p>
                 <div id="inviteAcceptView" class="hidden">
@@ -537,7 +493,7 @@
             <div class="panel login-panel standalone" id="loginPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m" id="loginPanelTitle">Log ind</h2>
-                    <button class="ghost" id="closeLoginBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeLoginBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p class="muted" id="loginIntro">Log ind for at hente klubbens hold og dele sessioner med andre medlemmer.</p>
                 <form id="loginForm" autocomplete="on" novalidate>
@@ -571,7 +527,7 @@
             <div class="panel users-panel standalone" id="usersPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Medlemmer</h2>
-                    <button class="ghost" id="closeUsersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeUsersBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p class="muted">Invitér nye medlemmer pr. e-mail. Modtageren får et link, hvor de logger ind — eller opretter en konto — og automatisk bliver medlem af klubben.</p>
                 <div class="user-create-form">
@@ -603,7 +559,7 @@
             <div class="panel change-password-panel standalone" id="changePasswordPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Skift adgangskode</h2>
-                    <button class="ghost" id="closeChangePasswordBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeChangePasswordBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <form id="changePasswordForm" novalidate>
                     <div class="settings-row">
@@ -624,7 +580,7 @@
             <div class="panel bulk-delete-panel standalone" id="bulkDeletePanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Slet spillere</h2>
-                    <button class="ghost" id="closeBulkDeleteBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeBulkDeleteBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p class="muted bulk-delete-intro">Vælg de spillere du vil slette permanent. Tidligere kampe i historikken påvirkes ikke.</p>
                 <div class="bulk-delete-toolbar">
@@ -636,48 +592,92 @@
                     <button class="danger" id="bulkDeleteConfirmBtn" type="button" disabled>Slet valgte (0)</button>
                 </div>
             </div>
-            <div class="panel import-export-panel standalone" id="importExportPanel">
+            <div class="panel player-lists-panel standalone" id="playerListsPanel">
                 <div class="flex-row">
-                    <h2>Importer / eksporter</h2>
-                    <button class="ghost" id="closeImportExportBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <h2 class="h-no-m">Spillerlister</h2>
+                    <button class="ghost" id="closePlayerListsBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
 
-                <div class="settings-row">
+                        <div class="collapsible-content">
+                            <div id="cloudListsSection" class="cloud-lists-section hidden">
+                                <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-cloud"></use></svg> Klubbens hold</h4>
+                                <div class="settings-row" style="margin-top: 0;">
+                                    <label for="cloudPlayerList">Hent hold</label>
+                                    <div class="actions">
+                                        <select id="cloudPlayerList">
+                                            <option value="">Vælg hold</option>
+                                        </select>
+                                        <button class="primary" id="loadCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-down"></use></svg> Hent</button>
+                                    </div>
+                                </div>
+                                <div class="settings-row cloud-editor-only">
+                                    <label for="newCloudListName">Gem nuværende spillere som hold</label>
+                                    <div class="actions">
+                                        <input id="newCloudListName" type="text" placeholder="Fx Torsdagsholdet"/>
+                                        <button class="primary" id="saveCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-check"></use></svg> Gem</button>
+                                    </div>
+                                </div>
+                                <div class="settings-row cloud-editor-only">
+                                    <label for="deleteCloudList">Slet hold</label>
+                                    <div class="actions">
+                                        <select id="deleteCloudList">
+                                            <option value="">Vælg hold</option>
+                                        </select>
+                                        <button class="danger" id="deleteCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-local-lists"></use></svg> Lokale spillerlister</h4>
+                            <div class="settings-row" style="margin-top: 0;">
+                                <label for="presetPlayerList">Hent gemt spillerliste</label>
+                                <div class="actions">
+                                    <select id="presetPlayerList">
+                                        <option value="">Vælg liste</option>
+                                    </select>
+                                    <button class="primary" id="loadPresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-down"></use></svg> Hent spillere</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-row">
+                                <label for="newPresetListName">Gem nuværende spillere som ny liste</label>
+                                <div class="actions">
+                                    <input id="newPresetListName" type="text" placeholder="Fx Torsdagsholdet"/>
+                                    <button class="primary" id="savePresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-check"></use></svg> Gem liste</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-row">
+                                <label for="deletePresetPlayerList">Slet gemt spillerliste</label>
+                                <div class="actions">
+                                    <select id="deletePresetPlayerList">
+                                        <option value="">Vælg liste</option>
+                                    </select>
+                                    <button class="danger" id="deletePresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet liste</button>
+                                </div>
+                            </div>
+                        </div>
+
+                <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importér spillere fra tekst</h4>
+                <div class="settings-row" style="margin-top: 0;">
                     <label for="playerImportText">Indsæt spillerliste (navn,niveau 1-5 hvor 1=Nybegynder og 5=Elite)</label>
                     <textarea
                             id="playerImportText"
-                            rows="10"
+                            rows="8"
                             placeholder="Hans,3&#10;Anne,4&#10;Lotte,2&#10;Peter,5&#10;Mie,1"
                     ></textarea>
                 </div>
-
                 <div class="actions" style="margin-top: 12px;">
                     <button class="primary" id="importPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importer spillere</button>
                     <button class="ghost" id="copyPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-copy"></use></svg> Kopier nuværende spillerliste</button>
                 </div>
 
-                <div class="settings-row session-transfer-section">
-                    <h3>Del session</h3>
-                    <p class="subtle small-text">
-                        Eksporter aktuel session (aktive spillere, historik, hold, indstillinger) som tekst, og send til en kollega der kan importere og fortsætte.
-                    </p>
-                    <label for="sessionTransferText">Session-kode</label>
-                    <textarea
-                            id="sessionTransferText"
-                            rows="6"
-                            placeholder="Indsæt session-kode her for at importere…"
-                    ></textarea>
-                    <div class="actions" style="margin-top: 12px;">
-                        <button class="primary" id="exportSessionBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-copy"></use></svg> Kopiér aktuel session</button>
-                        <button class="primary" id="importSessionBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importér session</button>
-                    </div>
-                </div>
             </div>
 
             <div class="panel stats-panel standalone" id="statsPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Spillerstatistik</h2>
-                    <button class="ghost" id="closeStatsBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeStatsBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
                 <p class="muted stats-intro">Statistikken bygger på kampene gemt på denne enhed. Resultater er valgfrie at markere (på rundekortet eller i historikken) og påvirker ikke, hvordan kampene genereres.</p>
                 <div class="stats-controls">
@@ -715,7 +715,7 @@
             <div class="panel new-player-panel standalone" id="newPlayerPanel">
                 <div class="flex-row">
                     <h2 class="h-no-m">Opret spiller</h2>
-                    <button class="ghost" id="closeNewPlayerBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-close"></use></svg> Luk</button>
+                    <button class="ghost" id="closeNewPlayerBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
 
                 <div class="player-manager-form">
