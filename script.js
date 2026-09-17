@@ -99,6 +99,11 @@ const el = {
     playerListsBtn: document.getElementById('playerListsBtn'),
     openPlayerListsBtn: document.getElementById('openPlayerListsBtn'),
     closePlayerListsBtn: document.getElementById('closePlayerListsBtn'),
+    listsTabbar: document.getElementById('listsTabbar'),
+    listsTabKlub: document.getElementById('listsTabKlub'),
+    listsTabPrivat: document.getElementById('listsTabPrivat'),
+    listsTabImport: document.getElementById('listsTabImport'),
+    listsClubHint: document.getElementById('listsClubHint'),
     tabbar: document.getElementById('tabbar'),
     tabFremmode: document.getElementById('tabFremmode'),
     tabKampe: document.getElementById('tabKampe'),
@@ -3893,9 +3898,27 @@ el.closeSettingsBtn.addEventListener('click', () => {
     closeStandAlone();
 });
 
+// Spillerlister-sidens underfaner: Klub / Privat / Import.
+function setListsTab(name) {
+    if (!el.listsTabKlub) return;
+    el.listsTabKlub.classList.toggle('hidden', name !== 'klub');
+    el.listsTabPrivat.classList.toggle('hidden', name !== 'privat');
+    el.listsTabImport.classList.toggle('hidden', name !== 'import');
+    el.listsTabbar?.querySelectorAll('[data-lists-tab]').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.listsTab === name);
+    });
+}
+
+el.listsTabbar?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-lists-tab]');
+    if (btn) setListsTab(btn.dataset.listsTab);
+});
+
 function openPlayerListsPage() {
     closeMenu();
     if (el.playerImportText) el.playerImportText.value = playersToText(state.roster);
+    // Klub-fanen er standard for klubmedlemmer, ellers Privat.
+    setListsTab(state.user && state.user.club ? 'klub' : 'privat');
     showStandAlone(el.playerListsPanel);
 }
 el.playerListsBtn?.addEventListener('click', openPlayerListsPage);
@@ -4668,6 +4691,7 @@ function syncAccountUI() {
     if (el.cloudListsSection) {
         // Cloud-sektionen kræver både login og medlemskab af mindst én klub.
         el.cloudListsSection.classList.toggle('hidden', !(u && u.club));
+        if (el.listsClubHint) el.listsClubHint.classList.toggle('hidden', !!(u && u.club));
     }
     const isEditor = activeRole === 'owner' || activeRole === 'editor' || !!(u && u.isAdmin && u.club);
     document.querySelectorAll('.cloud-editor-only').forEach(node => {

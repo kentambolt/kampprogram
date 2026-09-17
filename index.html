@@ -598,9 +598,16 @@
                     <button class="ghost" id="closePlayerListsBtn"><svg class="icon icon--flip" aria-hidden="true" focusable="false"><use href="icons.svg#kp-chevron-right"></use></svg> Tilbage</button>
                 </div>
 
-                        <div class="collapsible-content">
-                            <div id="cloudListsSection" class="cloud-lists-section hidden">
-                                <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-cloud"></use></svg> Klubbens hold</h4>
+                <nav class="tabbar tabbar--sub" id="listsTabbar" aria-label="Spillerliste-visninger">
+                    <button class="tab is-active" type="button" data-lists-tab="klub">Klub</button>
+                    <button class="tab" type="button" data-lists-tab="privat">Privat</button>
+                    <button class="tab" type="button" data-lists-tab="import">Import</button>
+                </nav>
+
+                <div class="lists-tab" id="listsTabKlub">
+                    <p class="subtle small-text">Klubbens hold deles med alle medlemmer.</p>
+                    <div class="subtle hidden" id="listsClubHint">Log ind og vær medlem af en klub for at hente og gemme fælles hold.</div>
+                    <div id="cloudListsSection" class="cloud-lists-section hidden">
                                 <div class="settings-row" style="margin-top: 0;">
                                     <label for="cloudPlayerList">Hent hold</label>
                                     <div class="actions">
@@ -626,9 +633,11 @@
                                         <button class="danger" id="deleteCloudListBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet</button>
                                     </div>
                                 </div>
-                            </div>
+                    </div>
+                </div>
 
-                            <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-local-lists"></use></svg> Lokale spillerlister</h4>
+                <div class="lists-tab hidden" id="listsTabPrivat">
+                    <p class="subtle small-text">Private lister gemmes kun på denne enhed — ingen andre kan se dem.</p>
                             <div class="settings-row" style="margin-top: 0;">
                                 <label for="presetPlayerList">Hent gemt spillerliste</label>
                                 <div class="actions">
@@ -656,9 +665,16 @@
                                     <button class="danger" id="deletePresetPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-trash"></use></svg> Slet liste</button>
                                 </div>
                             </div>
-                        </div>
 
-                <h4 class="lists-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importér spillere fra tekst</h4>
+                            <div class="settings-row">
+                                <label>Eksportér</label>
+                                <div class="actions">
+                                    <button class="ghost" id="copyPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-copy"></use></svg> Kopier nuværende spillerliste</button>
+                                </div>
+                            </div>
+                </div>
+
+                <div class="lists-tab hidden" id="listsTabImport">
                 <div class="settings-row" style="margin-top: 0;">
                     <label for="playerImportText">Indsæt spillerliste (navn,niveau 1-5 hvor 1=Nybegynder og 5=Elite)</label>
                     <textarea
@@ -669,7 +685,7 @@
                 </div>
                 <div class="actions" style="margin-top: 12px;">
                     <button class="primary" id="importPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-arrow-up"></use></svg> Importer spillere</button>
-                    <button class="ghost" id="copyPlayersBtn"><svg class="icon" aria-hidden="true" focusable="false"><use href="icons.svg#kp-copy"></use></svg> Kopier nuværende spillerliste</button>
+                </div>
                 </div>
 
             </div>

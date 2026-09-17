@@ -2799,3 +2799,13 @@ prefill-card-header {
         flex: 1 1 auto;
     }
 }
+
+/* ── Spillerlister: underfaner (samme mønster som forsiden) ── */
+
+.tabbar--sub {
+    margin-top: 6px;
+    margin-bottom: 16px;
+}
+.lists-tab > .small-text {
+    margin: 0 0 14px;
+}
